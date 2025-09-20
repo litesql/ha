@@ -1,0 +1,23 @@
+FROM crazymax/osxcross:15.5-debian AS osxcross
+
+FROM golang:1.25-trixie
+
+RUN apt update
+RUN apt install -y dpkg curl tar xz-utils zip gettext clang lld libc-dev
+
+RUN curl https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz | tar x -J -C /opt
+RUN ln -s /opt/zig* /opt/zig
+
+ENV PATH="$PATH:/opt/zig"
+
+RUN curl -o goreleaser_amd64.tar.gz -L https://github.com/goreleaser/goreleaser/releases/download/v2.11.2/goreleaser_Linux_x86_64.tar.gz
+RUN tar xvf goreleaser_amd64.tar.gz -C /usr/bin
+
+COPY --from=osxcross /osxcross /osxcross
+
+ENV PATH="/osxcross/bin:$PATH"
+ENV LD_LIBRARY_PATH="/osxcross/lib:$LD_LIBRARY_PATH"
+
+WORKDIR /app
+
+COPY . /app
