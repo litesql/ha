@@ -8,8 +8,7 @@ before:
 
 builds:
   - id: ha
-    binary: ha
-    buildmode: "c-shared"
+    binary: ha    
     flags:
       - -tags=zig
     ldflags:
@@ -24,7 +23,6 @@ builds:
 
   - id: ha_linux_arm64
     binary: ha
-    buildmode: "c-shared"
     flags:
       - -tags=zig
     ldflags:
@@ -39,7 +37,6 @@ builds:
 
   - id: ha_windows
     binary: ha
-    buildmode: "c-shared"
     flags:
       - -tags=zig
     ldflags:
@@ -54,7 +51,6 @@ builds:
 
   - id: ha_darwin
     binary: ha
-    buildmode: "c-shared"
     ldflags:
     - -s -w -X github.com/litesql/ha/main.version={{.Version}} -X github.com/litesql/ha/main.commit={{.Commit}} -X github.com/litesql/ha/main.date={{.Date}}
     goos:
