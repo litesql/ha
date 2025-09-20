@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/mattn/go-sqlite3"
@@ -68,7 +69,7 @@ func Transaction(ctx context.Context, req []Request) ([]*Response, error) {
 	return list, nil
 }
 
-func Serialize(ctx context.Context, schema string) ([]byte, error) {
+func Serialize(ctx context.Context) ([]byte, error) {
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return nil, err
@@ -79,7 +80,25 @@ func Serialize(ctx context.Context, schema string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sqlite3Conn.Serialize(schema)
+	return sqlite3Conn.Serialize("")
+}
+
+func Deserialize(ctx context.Context, file string) error {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	sqlite3Conn, err := sqliteConn(conn)
+	if err != nil {
+		return err
+	}
+	return sqlite3Conn.Deserialize(data, "")
 }
 
 type querier interface {

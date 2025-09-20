@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -61,7 +60,7 @@ func main() {
 	port = fs.Uint('p', "port", 8080, "Server port")
 
 	natsPort = fs.IntLong("nats-port", 4222, "Embedded NATS server port (0 to disable)")
-	natsStoreDir = fs.StringLong("store-dir", "", "Embedded NATS server store directory")
+	natsStoreDir = fs.StringLong("nats-store-dir", "", "Embedded NATS server store directory")
 	natsConfig = fs.StringLong("nats-config", "", "Embedded NATS server config file")
 
 	pgPort = fs.IntLong("pg-port", 5432, "PostgreSQL Server port")
@@ -76,7 +75,7 @@ func main() {
 	replicationTimeout = fs.DurationLong("replication-timeout", 5*time.Second, "Replication publisher timeout")
 	replicationStream = fs.StringLong("replication-stream", "ha_replication", "Replication stream name")
 	replicationMaxAge = fs.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
-	replicationURL = fs.StringLong("replication-url", "", "Replication NATS url")
+	replicationURL = fs.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
 	printVersion := fs.BoolLong("version", "Print version information and exit")
 	_ = fs.String('c', "config", "", "config file (optional)")
 
@@ -158,11 +157,13 @@ func run() error {
 
 	sqlite.SetGlobalDB(db)
 
-	for _, schemaScripts := range fs.GetArgs() {
-		slog.Info("executing SQL file", "file", schemaScripts)
-		err := onLoad(db, schemaScripts)
+	args := fs.GetArgs()
+	if len(args) > 0 {
+		filename := args[0]
+		slog.Info("loading database", "file", filename)
+		err := sqlite.Deserialize(context.Background(), filename)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load database %q: %w", filename, err)
 		}
 	}
 
@@ -197,7 +198,7 @@ func run() error {
 		})
 	})
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		data, err := sqlite.Serialize(r.Context(), r.URL.Query().Get("schema"))
+		data, err := sqlite.Serialize(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -244,36 +245,4 @@ func run() error {
 
 	slog.Info("Starting HA server", "port", *port, "version", version, "commit", commit, "date", date)
 	return server.ListenAndServe()
-}
-
-func onLoad(db *sql.DB, filename string) error {
-	_, err := os.Stat(filename)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-	var buf bytes.Buffer
-	for query := range bytes.SplitSeq(data, []byte("\n")) {
-		query = bytes.TrimSpace(query)
-		if len(query) == 0 || bytes.HasPrefix(query, []byte("--")) {
-			continue
-		}
-		buf.Write(query)
-		buf.WriteByte('\n')
-		if bytes.HasSuffix(query, []byte(";")) {
-			sql := os.ExpandEnv(buf.String())
-			if _, err := db.ExecContext(context.Background(), sql); err != nil {
-				return fmt.Errorf("executing: %s: %w", sql, err)
-			}
-			buf.Reset()
-		}
-	}
-	return nil
 }
