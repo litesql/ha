@@ -197,7 +197,14 @@ func run() error {
 		})
 	})
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-
+		data, err := sqlite.Serialize(r.Context(), r.URL.Query().Get("schema"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Disposition", "attachment; filename=ha.db")
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Write(data)
 	})
 
 	server := http.Server{

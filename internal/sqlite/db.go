@@ -68,7 +68,7 @@ func Transaction(ctx context.Context, req []Request) ([]*Response, error) {
 	return list, nil
 }
 
-func Serialize(ctx context.Context, db *sql.DB, schema string) ([]byte, error) {
+func Serialize(ctx context.Context, schema string) ([]byte, error) {
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return nil, err
