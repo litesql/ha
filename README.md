@@ -69,3 +69,21 @@ curl -O -J http://localhost:8080
 ## Local Read Replicas
 
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
+
+## Using Docker
+
+1. Create an initial sqlite database:
+
+```sh
+sqlite3 mydatabase.db 'CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);'
+```
+
+2. Start docker
+
+```sh
+docker run --name ha -e HA_ARGS=/tmp/ha.db \
+-v $(pwd)/mydatabase.db:/tmp/ha.db \ 
+-p 5432:5432 -p 8080:8080 ghcr.io/litesql/ha:latest
+```
+
+- Create a volume to **/data** to persist nats streams state
