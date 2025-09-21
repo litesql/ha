@@ -35,7 +35,7 @@ ha --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4
 4. Insert some data using HTTP client
 
 ```sh
-curl -d '[{"sql": "INSERT INTO users(name) VALUES('\''HA user'\'')}"]' \
+curl -d '[{"sql": "INSERT INTO users(name) VALUES('\''HA user'\'')"}]' \
 http://localhost:8080
 ```
 
