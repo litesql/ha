@@ -65,3 +65,7 @@ SELECT * FROM users;
 ```sh
 curl -O -J http://localhost:8080
 ```
+
+## Local Read Replicas
+
+- Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
