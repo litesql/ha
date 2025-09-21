@@ -23,7 +23,16 @@ type CDCPublisher struct {
 func NewCDCPublisher(nc *nats.Conn, url string, stream string, maxAge time.Duration, timeout time.Duration) (*CDCPublisher, error) {
 	var err error
 	if nc == nil {
-		nc, err = nats.Connect(url)
+		nc, err = nats.Connect(url,
+			nats.ReconnectHandler(func(c *nats.Conn) {
+				slog.Info("reconnected to NATS server", "url", c.ConnectedUrl())
+			}),
+			nats.DisconnectHandler(func(c *nats.Conn) {
+				slog.Warn("disconnected from NATS server", "url", c.ConnectedUrl())
+			}),
+			nats.ClosedHandler(func(c *nats.Conn) {
+				slog.Info("NATS connection closed permanently")
+			}))
 		if err != nil {
 			return nil, err
 		}

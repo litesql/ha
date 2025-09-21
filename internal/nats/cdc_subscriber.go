@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"regexp"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -20,10 +23,66 @@ type CDCSubscriber struct {
 	db     *sql.DB
 }
 
-func NewCDCSubscriber(node string, nc *nats.Conn, url string, stream string, db *sql.DB) (*CDCSubscriber, error) {
+func NewCDCSubscriber(node string, nc *nats.Conn, url string, stream string, policy string, db *sql.DB) (*CDCSubscriber, error) {
+	var (
+		deliverPolicy jetstream.DeliverPolicy
+		startSeq      uint64
+		startTime     *time.Time
+	)
+	switch policy {
+	case "all", "":
+		deliverPolicy = jetstream.DeliverAllPolicy
+	case "last":
+		deliverPolicy = jetstream.DeliverLastPolicy
+	case "new":
+		deliverPolicy = jetstream.DeliverNewPolicy
+	default:
+		matched, err := regexp.MatchString(`^by_start_sequence=\d+`, policy)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			deliverPolicy = jetstream.DeliverByStartSequencePolicy
+			_, err := fmt.Sscanf(policy, "by_start_sequence=%d", &startSeq)
+			if err != nil {
+				return nil, fmt.Errorf("invalid CDC subscriber start sequence: %w", err)
+			}
+			break
+
+		}
+		matched, err = regexp.MatchString(`^by_start_time=\w+`, policy)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			deliverPolicy = jetstream.DeliverByStartTimePolicy
+			var dateTime string
+			_, err := fmt.Sscanf(policy, "by_start_time=%w", &dateTime)
+			if err != nil {
+				return nil, fmt.Errorf("invalid CDC subscriber start time (use 2006-01-02 15:04:05 format): %w", err)
+			}
+			t, err := time.Parse(time.DateTime, dateTime)
+			if err != nil {
+				return nil, fmt.Errorf("invalid CDC subscriber start time: %w", err)
+			}
+			startTime = &t
+			break
+		}
+		return nil, fmt.Errorf("invalid deliver policy: %s", policy)
+	}
+
 	var err error
 	if nc == nil {
-		nc, err = nats.Connect(url)
+		nc, err = nats.Connect(url,
+			nats.ReconnectHandler(func(c *nats.Conn) {
+				slog.Info("reconnected to NATS server", "url", c.ConnectedUrl())
+			}),
+			nats.DisconnectHandler(func(c *nats.Conn) {
+				slog.Warn("disconnected from NATS server", "url", c.ConnectedUrl())
+			}),
+			nats.ClosedHandler(func(c *nats.Conn) {
+				slog.Info("NATS connection closed permanently")
+			}))
 		if err != nil {
 			return nil, err
 		}
@@ -45,8 +104,10 @@ func NewCDCSubscriber(node string, nc *nats.Conn, url string, stream string, db 
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		FilterSubject: s.stream,
 		Durable:       s.node,
-		DeliverPolicy: jetstream.DeliverAllPolicy,
+		DeliverPolicy: deliverPolicy,
 		Name:          s.node,
+		OptStartSeq:   startSeq,
+		OptStartTime:  startTime,
 	})
 	if err != nil {
 		return nil, err
@@ -61,13 +122,11 @@ func NewCDCSubscriber(node string, nc *nats.Conn, url string, stream string, db 
 	return &s, nil
 }
 
-func (s *CDCSubscriber) Close() error {
-	slog.Info("Closing CDC subscriber", "node", s.node, "stream", s.stream)
-	err := s.nc.Drain()
+func (s *CDCSubscriber) Close() {
+	slog.Info("drain CDC subscriber", "node", s.node, "stream", s.stream)
 	if s.nc != nil && !s.nc.IsClosed() {
-		s.nc.Close()
+		s.nc.Drain()
 	}
-	return err
 }
 
 func (s *CDCSubscriber) handler(msg jetstream.Msg) {

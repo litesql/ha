@@ -11,10 +11,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
@@ -52,6 +55,7 @@ var (
 	replicationTimeout *time.Duration
 	replicationMaxAge  *time.Duration
 	replicationURL     *string
+	replicationPolicy  *string
 )
 
 func main() {
@@ -76,6 +80,7 @@ func main() {
 	replicationStream = fs.StringLong("replication-stream", "ha_replication", "Replication stream name")
 	replicationMaxAge = fs.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
 	replicationURL = fs.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
+	replicationPolicy = fs.StringLong("replication-policy", "", "Replication subscriver delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
 	printVersion := fs.BoolLong("version", "Print version information and exit")
 	_ = fs.String('c', "config", "", "config file (optional)")
 
@@ -119,10 +124,13 @@ func run() error {
 		nodeName = fmt.Sprintf("ha_%d", time.Now().UnixNano())
 	}
 
-	var natsConn *nats.Conn
+	var (
+		natsConn   *nats.Conn
+		natsServer *server.Server
+		err        error
+	)
 	if *natsPort > 0 || *natsConfig != "" {
-		slog.Info("starting embedded NATS server")
-		nc, ns, err := ha_nats.RunEmbeddedNATSServer(ha_nats.Config{
+		natsConn, natsServer, err = ha_nats.RunEmbeddedNATSServer(ha_nats.Config{
 			Name:     nodeName,
 			Port:     *natsPort,
 			StoreDir: *natsStoreDir,
@@ -131,12 +139,9 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("failed to start embedded NATS server: %w", err)
 		}
-		natsConn = nc
-		defer ns.Shutdown()
 	}
 
 	var cdcPublisher sqlite.CDCPublisher
-	var err error
 	if natsConn != nil || *replicationURL != "" {
 		slog.Info("starting replicator publisher", "stream", *replicationStream)
 		cdcPublisher, err = ha_nats.NewCDCPublisher(natsConn, *replicationURL, *replicationStream, *replicationMaxAge, *replicationTimeout)
@@ -165,11 +170,22 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("failed to load database %q: %w", filename, err)
 		}
+		if *replicationPolicy == "" {
+			matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`, filepath.Base(filename))
+			if matched {
+				dateTime := filepath.Base(filename)[0:len(time.DateTime)]
+				_, err := time.Parse(time.DateTime, dateTime)
+				if err == nil {
+					policy := fmt.Sprintf("by_start_time=%s", dateTime)
+					replicationPolicy = &policy
+				}
+			}
+		}
 	}
 
 	if natsConn != nil || *replicationURL != "" {
 		slog.Info("starting CDC subscriber", "stream", *replicationStream)
-		cdcSubscriber, err := ha_nats.NewCDCSubscriber(nodeName, natsConn, *replicationURL, *replicationStream, db)
+		cdcSubscriber, err := ha_nats.NewCDCSubscriber(nodeName, natsConn, *replicationURL, *replicationStream, *replicationPolicy, db)
 		if err != nil {
 			return fmt.Errorf("failed to start CDC NATS subscriber: %w", err)
 		}
@@ -198,20 +214,16 @@ func run() error {
 		})
 	})
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		filename := fmt.Sprintf("%s_ha.db", time.Now().Format(time.DateTime))
 		data, err := sqlite.Serialize(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Disposition", "attachment; filename=ha.db")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Write(data)
 	})
-
-	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", *port),
-		Handler: mux,
-	}
 
 	pgServer, err := pgwire.NewServer(pgwire.Config{
 		User:    *pgUser,
@@ -223,9 +235,19 @@ func run() error {
 		return fmt.Errorf("failed to create PostgreSQL server: %w", err)
 	}
 
-	err = pgServer.ListenAndServe(*pgPort)
-	if err != nil {
-		log.Fatalf("PostgreSQL server error: %v", err)
+	if *pgPort > 0 {
+		slog.Info("starting HA postgreSQL wire Protocol server", "port", *pgPort)
+		go func() {
+			err = pgServer.ListenAndServe(*pgPort)
+			if err != nil {
+				log.Fatalf("PostgreSQL server error: %v", err)
+			}
+		}()
+	}
+
+	server := http.Server{
+		Addr:    fmt.Sprintf(":%d", *port),
+		Handler: mux,
 	}
 
 	done := make(chan os.Signal, 1)
@@ -236,6 +258,12 @@ func run() error {
 		if err := pgServer.Close(); err != nil {
 			slog.Error("PostgreSQL server shutdown failed", "error", err)
 		}
+		if natsConn != nil {
+			natsConn.Close()
+		}
+		if natsServer != nil {
+			natsServer.WaitForShutdown()
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
@@ -243,6 +271,6 @@ func run() error {
 		}
 	}()
 
-	slog.Info("Starting HA server", "port", *port, "version", version, "commit", commit, "date", date)
+	slog.Info("starting HA HTTP server", "port", *port, "version", version, "commit", commit, "date", date)
 	return server.ListenAndServe()
 }

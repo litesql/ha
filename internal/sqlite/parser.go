@@ -67,23 +67,6 @@ func NewStatement(ctx context.Context, sql string) (*Statement, error) {
 	return stmt, nil
 }
 
-func (s *Statement) equals(other *Statement) bool {
-	if s == nil || other == nil {
-		return s == other
-	}
-	if slices.Compare(s.columns, other.columns) != 0 {
-		return false
-	}
-	if slices.Compare(s.parameters, other.parameters) != 0 {
-		return false
-	}
-	if s.hasDistinct != other.hasDistinct {
-		return false
-	}
-
-	return true
-}
-
 func (s *Statement) Source() string {
 	return s.source
 }
@@ -174,7 +157,7 @@ type errorListener struct {
 	err error
 }
 
-func (d *errorListener) SyntaxError(_ antlr.Recognizer, _ interface{}, line, column int, msg string, _ antlr.RecognitionException) {
+func (d *errorListener) SyntaxError(_ antlr.Recognizer, _ any, line, column int, msg string, _ antlr.RecognitionException) {
 	if msg != "" {
 		d.err = fmt.Errorf("%d:%d: %s: %w", line, column, msg, ErrInvalidSQL)
 	}

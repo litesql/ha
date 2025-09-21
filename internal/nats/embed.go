@@ -38,7 +38,7 @@ func RunEmbeddedNATSServer(cfg Config) (*nats.Conn, *server.Server, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	slog.Info("starting NATS server", "store_dir", ns.StoreDir())
+	slog.Info("starting NATS server", "port", opts.Port, "store_dir", opts.StoreDir)
 	go ns.Start()
 
 	if !ns.ReadyForConnections(5 * time.Second) {

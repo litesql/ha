@@ -1,6 +1,9 @@
 package sqlite
 
 import (
+	"context"
+	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -37,7 +40,7 @@ func (cs *ChangeSet) Send(pub CDCPublisher) error {
 	slog.Info("Sending changeset", "changes", len(cs.Changes))
 
 	cs.Timestamp = time.Now().UnixNano()
-	cs.setTableColumns()
+	cs.setTableColumns(db)
 
 	return pub.Publish(cs)
 }
@@ -46,8 +49,24 @@ func (cs *ChangeSet) Apply() error {
 	if len(cs.Changes) == 0 {
 		return nil
 	}
-	cs.setTableColumns()
-	tx, err := db.Begin()
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	sconn, err := sqliteConn(conn)
+	if err != nil {
+		return err
+	}
+	disableCDCHooks(sconn)
+	defer enableCDCHooks(sconn)
+
+	cs.setTableColumns(conn)
+	tx, err := conn.BeginTx(context.Background(), &sql.TxOptions{
+		Isolation: sql.LevelReadCommitted,
+		ReadOnly:  false,
+	})
 	if err != nil {
 		return err
 	}
@@ -97,7 +116,7 @@ func placeholders(n int) string {
 	return strings.TrimRight(b.String(), ",")
 }
 
-func (cs *ChangeSet) setTableColumns() {
+func (cs *ChangeSet) setTableColumns(q querier) {
 	tableColumns := make(map[string][]string)
 	tableTypes := make(map[string][]string)
 	for i, change := range cs.Changes {
@@ -105,7 +124,7 @@ func (cs *ChangeSet) setTableColumns() {
 			continue
 		}
 		if _, ok := tableColumns[change.Table]; !ok {
-			columns, types, err := getTableColumnsAndTypes(change.Table)
+			columns, types, err := getTableColumnsAndTypes(q, change.Table)
 			if err != nil {
 				slog.Error("failed to get table columns", "table", change.Table, "error", err)
 				continue
@@ -122,18 +141,18 @@ func (cs *ChangeSet) setTableColumns() {
 				strings.Contains(ctype, "CLOB") || strings.Contains(ctype, "JSON") ||
 				strings.Contains(ctype, "DATE") || strings.Contains(ctype, "TIME") {
 				if len(change.OldValues) > 0 && j < len(change.OldValues) {
-					change.OldValues[j] = fmt.Sprintf("%s", change.OldValues[j])
+					change.OldValues[j] = convert(change.OldValues[j])
 				}
 				if len(change.NewValues) > 0 && j < len(change.NewValues) {
-					change.NewValues[j] = fmt.Sprintf("%s", change.NewValues[j])
+					change.NewValues[j] = convert(change.NewValues[j])
 				}
 			}
 		}
 	}
 }
 
-func getTableColumnsAndTypes(table string) ([]string, []string, error) {
-	rows, err := db.Query("SELECT name, type FROM PRAGMA_table_info(?)", table)
+func getTableColumnsAndTypes(q querier, table string) ([]string, []string, error) {
+	rows, err := q.QueryContext(context.Background(), "SELECT name, type FROM PRAGMA_table_info(?)", table)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -162,4 +181,27 @@ type Change struct {
 	NewRowID  int64    `json:"new_rowid,omitempty"`
 	OldValues []any    `json:"old_values,omitempty"`
 	NewValues []any    `json:"new_values,omitempty"`
+}
+
+func convert(src any) string {
+	switch v := src.(type) {
+	case []byte:
+		var dst []byte
+		n, err := base64.StdEncoding.Decode(dst, v)
+		if err != nil {
+			slog.Warn("converter from []byte", "error", err)
+			return string(v)
+		}
+		return string(dst[0:n])
+	case string:
+		dst, err := base64.StdEncoding.DecodeString(v)
+		if err != nil {
+			slog.Error("converter from string", "error", err)
+			return v
+		}
+		return string(dst)
+	default:
+		return fmt.Sprintf("%s", src)
+	}
+
 }
