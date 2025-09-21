@@ -63,5 +63,5 @@ SELECT * FROM users;
 ### Backup database
 
 ```sh
-curl http://localhost:8080 -o mybackup.db
+curl -O -J http://localhost:8080
 ```

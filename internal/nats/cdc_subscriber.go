@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -56,11 +57,7 @@ func NewCDCSubscriber(node string, nc *nats.Conn, url string, stream string, pol
 		}
 		if matched {
 			deliverPolicy = jetstream.DeliverByStartTimePolicy
-			var dateTime string
-			_, err := fmt.Sscanf(policy, "by_start_time=%w", &dateTime)
-			if err != nil {
-				return nil, fmt.Errorf("invalid CDC subscriber start time (use 2006-01-02 15:04:05 format): %w", err)
-			}
+			dateTime := strings.TrimPrefix(policy, "by_start_time=")
 			t, err := time.Parse(time.DateTime, dateTime)
 			if err != nil {
 				return nil, fmt.Errorf("invalid CDC subscriber start time: %w", err)

@@ -214,7 +214,7 @@ func run() error {
 		})
 	})
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		filename := fmt.Sprintf("%s_ha.db", time.Now().Format(time.DateTime))
+		filename := fmt.Sprintf("%s_ha.db", time.Now().UTC().Format(time.DateTime))
 		data, err := sqlite.Serialize(r.Context())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
