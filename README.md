@@ -9,7 +9,9 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
 ### Install from source
 
 ```sh
-go install github.com/litesql/ha@latest
+git clone https://github.com/litesql/ha.git
+cd ha
+go install
 ```
 
 ## Usage
