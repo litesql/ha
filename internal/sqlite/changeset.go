@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -40,7 +39,6 @@ func (cs *ChangeSet) Send(pub CDCPublisher) error {
 	slog.Info("Sending changeset", "changes", len(cs.Changes))
 
 	cs.Timestamp = time.Now().UnixNano()
-	cs.setTableColumns(db)
 
 	return pub.Publish(cs)
 }
@@ -62,7 +60,6 @@ func (cs *ChangeSet) Apply() error {
 	disableCDCHooks(sconn)
 	defer enableCDCHooks(sconn)
 
-	cs.setTableColumns(conn)
 	tx, err := conn.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: sql.LevelReadCommitted,
 		ReadOnly:  false,
@@ -116,54 +113,6 @@ func placeholders(n int) string {
 	return strings.TrimRight(b.String(), ",")
 }
 
-func (cs *ChangeSet) setTableColumns(q querier) {
-	tableColumns := make(map[string][]string)
-	for i, change := range cs.Changes {
-		if len(change.Columns) > 0 {
-			continue
-		}
-		if _, ok := tableColumns[change.Table]; !ok {
-			columns, err := getTableColumns(q, change.Table)
-			if err != nil {
-				slog.Error("failed to get table columns", "table", change.Table, "error", err)
-				continue
-			}
-			tableColumns[change.Table] = columns
-			cs.Changes[i].Columns = columns
-		} else {
-			cs.Changes[i].Columns = tableColumns[change.Table]
-		}
-		for j := range len(cs.Changes[i].Columns) {
-			if len(change.OldValues) > 0 && j < len(change.OldValues) {
-				change.OldValues[j] = convert(change.OldValues[j])
-			}
-			if len(change.NewValues) > 0 && j < len(change.NewValues) {
-				change.NewValues[j] = convert(change.NewValues[j])
-			}
-		}
-	}
-}
-
-func getTableColumns(q querier, table string) ([]string, error) {
-	rows, err := q.QueryContext(context.Background(), "SELECT name FROM PRAGMA_table_info(?)", table)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var columns []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		columns = append(columns, name)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return columns, nil
-}
-
 type Change struct {
 	Database  string   `json:"database"`
 	Table     string   `json:"table"`
@@ -173,18 +122,4 @@ type Change struct {
 	NewRowID  int64    `json:"new_rowid,omitempty"`
 	OldValues []any    `json:"old_values,omitempty"`
 	NewValues []any    `json:"new_values,omitempty"`
-}
-
-func convert(src any) any {
-	switch v := src.(type) {
-	case string:
-		dst, err := base64.StdEncoding.DecodeString(v)
-		if err != nil {
-			slog.Error("converter from string", "error", err)
-			return v
-		}
-		return string(dst)
-	default:
-		return src
-	}
 }

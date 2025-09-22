@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"sync"
 
@@ -36,11 +37,34 @@ func RegisterDriver(extensions []string, name string, pub CDCPublisher) {
 
 func enableCDCHooks(conn *sqlite3.SQLiteConn) {
 	cs := NewChangeSet(nodeName)
+	tableColumns := make(map[string][]string)
 	conn.RegisterPreUpdateHook(func(d sqlite3.SQLitePreUpdateData) {
 		change, ok := getChange(&d)
 		if !ok {
 			return
 		}
+		fullTableName := fmt.Sprintf("%s.%s", change.Database, change.Table)
+		if cols, ok := tableColumns[fullTableName]; ok {
+			change.Columns = cols
+		} else {
+			rows, err := conn.Query(fmt.Sprintf("select * from %s.%s LIMIT 0", change.Database, change.Table), nil)
+			if err != nil {
+				slog.Error("failed to read columns", "error", err, "database", change.Database, "table", change.Table)
+				return
+			}
+			defer rows.Close()
+			change.Columns = rows.Columns()
+			tableColumns[fullTableName] = change.Columns
+		}
+		for i := range len(change.Columns) {
+			if len(change.OldValues) > 0 && i < len(change.OldValues) {
+				change.OldValues[i] = convert(change.OldValues[i])
+			}
+			if len(change.NewValues) > 0 && i < len(change.NewValues) {
+				change.NewValues[i] = convert(change.NewValues[i])
+			}
+		}
+
 		cs.AddChange(change)
 	})
 
@@ -60,4 +84,13 @@ func disableCDCHooks(conn *sqlite3.SQLiteConn) {
 	conn.RegisterPreUpdateHook(nil)
 	conn.RegisterCommitHook(nil)
 	conn.RegisterRollbackHook(nil)
+}
+
+func convert(src any) any {
+	switch v := src.(type) {
+	case []byte:
+		return string(v)
+	default:
+		return src
+	}
 }
