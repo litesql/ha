@@ -151,14 +151,15 @@ func run() error {
 	}
 
 	sqlite.RegisterDriver(sqlExtensions, nodeName, cdcPublisher)
-	db, err := sql.Open("sqlite3-ha", "file:ha.db?vfs=memdb")
+	db, err := sql.Open("sqlite3-ha", "file:/ha.db?vfs=memdb&_journal=WAL")
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	db.SetConnMaxIdleTime(-1)
-	db.SetConnMaxLifetime(-1)
+	db.SetConnMaxIdleTime(0)
+	db.SetConnMaxLifetime(0)
 	db.SetMaxOpenConns(*concurrentQueries)
+	db.SetMaxIdleConns(*concurrentQueries)
 
 	sqlite.SetGlobalDB(db)
 
