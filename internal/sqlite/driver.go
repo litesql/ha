@@ -2,7 +2,10 @@ package sqlite
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"sync"
 
@@ -10,7 +13,6 @@ import (
 )
 
 var (
-	Driver       = "sqlite3-dq"
 	nodeName     string
 	publisher    CDCPublisher
 	registerOnce sync.Once
@@ -35,33 +37,63 @@ func RegisterDriver(extensions []string, name string, pub CDCPublisher) {
 	})
 }
 
+type tableInfo struct {
+	columns []string
+	types   []string
+}
+
 func enableCDCHooks(conn *sqlite3.SQLiteConn) {
 	cs := NewChangeSet(nodeName)
-	tableColumns := make(map[string][]string)
+	tableColumns := make(map[string]tableInfo)
 	conn.RegisterPreUpdateHook(func(d sqlite3.SQLitePreUpdateData) {
 		change, ok := getChange(&d)
 		if !ok {
 			return
 		}
 		fullTableName := fmt.Sprintf("%s.%s", change.Database, change.Table)
-		if cols, ok := tableColumns[fullTableName]; ok {
-			change.Columns = cols
+		var types []string
+		if ti, ok := tableColumns[fullTableName]; ok {
+			change.Columns = ti.columns
+			types = ti.types
 		} else {
-			rows, err := conn.Query(fmt.Sprintf("select * from %s.%s LIMIT 0", change.Database, change.Table), nil)
+			rows, err := conn.Query(fmt.Sprintf("SELECT name, type FROM %s.PRAGMA_TABLE_INFO('%s')", change.Database, change.Table), nil)
 			if err != nil {
 				slog.Error("failed to read columns", "error", err, "database", change.Database, "table", change.Table)
 				return
 			}
 			defer rows.Close()
-			change.Columns = rows.Columns()
-			tableColumns[fullTableName] = change.Columns
-		}
-		for i := range len(change.Columns) {
-			if len(change.OldValues) > 0 && i < len(change.OldValues) {
-				change.OldValues[i] = convert(change.OldValues[i])
+			var columns []string
+			for {
+				dataRow := []driver.Value{new(string), new(string)}
+
+				err := rows.Next(dataRow)
+				if err != nil {
+					if !errors.Is(err, io.EOF) {
+						slog.Error("failed to read table columns", "error", err, "table", change.Table)
+					}
+					break
+				}
+				if v, ok := dataRow[0].(string); ok {
+					columns = append(columns, v)
+				}
+				if v, ok := dataRow[1].(string); ok {
+					types = append(types, v)
+				}
 			}
-			if len(change.NewValues) > 0 && i < len(change.NewValues) {
-				change.NewValues[i] = convert(change.NewValues[i])
+			change.Columns = columns
+			tableColumns[fullTableName] = tableInfo{
+				columns: columns,
+				types:   types,
+			}
+		}
+		for i, t := range types {
+			if t != "BLOB" {
+				if i < len(change.OldValues) && change.OldValues[i] != nil {
+					change.OldValues[i] = convert(change.OldValues[i])
+				}
+				if i < len(change.NewValues) && change.NewValues[i] != nil {
+					change.NewValues[i] = convert(change.NewValues[i])
+				}
 			}
 		}
 
