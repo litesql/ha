@@ -84,8 +84,8 @@ sqlite3 mydatabase.db 'CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT,
 
 ```sh
 docker run --name ha -e HA_ARGS=/tmp/ha.db \
--v $(pwd)/mydatabase.db:/tmp/ha.db \ 
+-v $(pwd)/mydatabase.db:/tmp/ha.db \
 -p 5432:5432 -p 8080:8080 ghcr.io/litesql/ha:latest
 ```
 
-- Create a volume to **/data** to persist nats streams state
+- Set up a volume at /data to store the NATS streams state.
