@@ -203,7 +203,7 @@ http://localhost:8080
 
 ### CDC message format
 
-```
+```json
 {
   "node": "ha_node_name",
   "changes": [
