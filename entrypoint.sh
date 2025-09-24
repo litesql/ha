@@ -2,4 +2,4 @@
 
 set -e
 
-exec /app/ha "$HA_ARGS"
+exec /app/ha ${HA_ARGS}
