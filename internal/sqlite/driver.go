@@ -43,7 +43,7 @@ var (
 	changeSetSessionsMu sync.Mutex
 )
 
-func AddSQLChange(conn *sqlite3.SQLiteConn, sql string, args ...any) error {
+func AddSQLChange(conn *sqlite3.SQLiteConn, sql string, args []any) error {
 	cs := changeSetSessions[conn]
 	if cs == nil {
 		return errors.New("no changeset session for the connection")
