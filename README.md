@@ -29,7 +29,7 @@ ha -m
 2. Start an another ha node
 
 ```sh
-ha -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222 mydatabase.db
+ha -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222
 ```
 
 3. Create a table
