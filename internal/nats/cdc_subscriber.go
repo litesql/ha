@@ -134,7 +134,8 @@ func (s *CDCSubscriber) handler(msg jetstream.Msg) {
 		s.ack(msg)
 		return
 	}
-	if cs.Node == s.node {
+	if cs.Node == s.node && cs.ProcessID == processID {
+		// Ignore changes originated from this process and node itself
 		s.ack(msg)
 		return
 	}

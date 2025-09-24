@@ -13,6 +13,8 @@ import (
 	"github.com/litesql/ha/internal/sqlite"
 )
 
+var processID = time.Now().UnixNano()
+
 type CDCPublisher struct {
 	nc      *nats.Conn
 	js      jetstream.JetStream
@@ -66,6 +68,7 @@ func NewCDCPublisher(nc *nats.Conn, url string, stream string, maxAge time.Durat
 }
 
 func (p *CDCPublisher) Publish(cs *sqlite.ChangeSet) error {
+	cs.ProcessID = processID
 	data, err := json.Marshal(cs)
 	if err != nil {
 		return err

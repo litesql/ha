@@ -4,13 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/mattn/go-sqlite3"
 )
 
-var db *sql.DB
+var (
+	db *sql.DB
+)
 
 type Request struct {
 	Sql    string         `json:"sql"`
@@ -33,16 +37,22 @@ func SetGlobalDB(database *sql.DB) {
 	db = database
 }
 
-func Exec(ctx context.Context, eq execerQuerier, stmt *Statement, params map[string]any) (*Response, error) {
+func Exec(ctx context.Context, conn *sql.Conn, eq execerQuerier, stmt *Statement, params map[string]any) (*Response, error) {
+	slog.Info("Executing statement", "type", stmt.Type(), "sql", stmt.Source(), "params", params)
 	if stmt.IsSelect() || stmt.IsExplain() || stmt.HasReturning() {
 		return doQuery(ctx, eq, stmt.Source(), params)
 	}
 
-	return doExec(ctx, eq, stmt.Source(), params)
+	return doExec(ctx, conn, eq, stmt, params)
 }
 
 func Transaction(ctx context.Context, req []Request) ([]*Response, error) {
-	tx, err := db.BeginTx(ctx, &sql.TxOptions{
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{
 		Isolation: sql.LevelReadCommitted,
 		ReadOnly:  false,
 	})
@@ -57,7 +67,7 @@ func Transaction(ctx context.Context, req []Request) ([]*Response, error) {
 		if err != nil {
 			return nil, err
 		}
-		res, err := Exec(ctx, tx, stmt, query.Params)
+		res, err := Exec(ctx, conn, tx, stmt, query.Params)
 		if err != nil {
 			return nil, err
 		}
@@ -69,18 +79,81 @@ func Transaction(ctx context.Context, req []Request) ([]*Response, error) {
 	return list, nil
 }
 
-func Serialize(ctx context.Context) ([]byte, error) {
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return nil, err
+func Backup(ctx context.Context, dsn string, memory bool, w io.Writer) error {
+	if memory {
+		return serialize(ctx, w)
 	}
-	defer conn.Close()
+	srcConn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer srcConn.Close()
 
-	sqlite3Conn, err := sqliteConn(conn)
+	sqliteSrcConn, err := sqliteConn(srcConn)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return sqlite3Conn.Serialize("")
+	dest, err := os.CreateTemp("", "ha-*.db")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(dest.Name())
+
+	destDb, err := sql.Open("sqlite3", dest.Name())
+	if err != nil {
+		return err
+	}
+	defer destDb.Close()
+
+	destConn, err := destDb.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer destConn.Close()
+
+	sqliteDestConn, err := sqliteConn(destConn)
+	if err != nil {
+		return err
+	}
+
+	bkp, err := sqliteDestConn.Backup("main", sqliteSrcConn, "main")
+	if err != nil {
+		return err
+	}
+
+	for more := true; more; {
+		more, err = bkp.Step(-1)
+		if err != nil {
+			return fmt.Errorf("backup step error: %w", err)
+		}
+		if bkp.Remaining() == 0 {
+			break
+		}
+	}
+
+	err = bkp.Finish()
+	if err != nil {
+		return fmt.Errorf("backup finish error: %w", err)
+	}
+
+	err = bkp.Close()
+	if err != nil {
+		return fmt.Errorf("backup close error: %w", err)
+	}
+
+	err = dest.Close()
+	if err != nil {
+		return err
+	}
+
+	final, err := os.Open(dest.Name())
+	if err != nil {
+		return err
+	}
+	defer final.Close()
+
+	_, err = io.Copy(w, final)
+	return err
 }
 
 func Deserialize(ctx context.Context, file string) error {
@@ -99,6 +172,25 @@ func Deserialize(ctx context.Context, file string) error {
 		return err
 	}
 	return sqlite3Conn.Deserialize(data, "")
+}
+
+func serialize(ctx context.Context, w io.Writer) error {
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	sqlite3Conn, err := sqliteConn(conn)
+	if err != nil {
+		return err
+	}
+	b, err := sqlite3Conn.Serialize("")
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(b)
+	return err
 }
 
 type querier interface {
@@ -147,17 +239,35 @@ type execer interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
-func doExec(ctx context.Context, execer execer, query string, params map[string]any) (*Response, error) {
+func doExec(ctx context.Context, conn *sql.Conn, execer execer, stmt *Statement, params map[string]any) (*Response, error) {
 	args := getArgs(params)
-	res, err := execer.ExecContext(ctx, query, args...)
+	sqlite3Conn, err := sqliteConn(conn)
 	if err != nil {
+		slog.Error("failed to get sqlite3 connection", "error", err, "sql", stmt.Source())
+		return nil, err
+	}
+	if stmt.DDL() {
+		err = AddSQLChange(sqlite3Conn, stmt.Source(), args)
+		if err != nil {
+			slog.Error("failed to record SQL change", "error", err, "sql", stmt.Source())
+			return nil, err
+		}
+	}
+
+	res, err := execer.ExecContext(ctx, stmt.Source(), args...)
+	if err != nil {
+		if stmt.DDL() {
+			err2 := RemoveLastChange(sqlite3Conn)
+			if err2 != nil {
+				slog.Error("failed to remove last SQL change after error", "error", err2, "sql", stmt.Source())
+			}
+		}
 		return nil, err
 	}
 	rowsAffected, _ := res.RowsAffected()
 	lastInsertID, _ := res.LastInsertId()
 
 	return &Response{
-
 		Columns:      []string{"rows_affected", "last_insert_id"},
 		Rows:         [][]any{{rowsAffected, lastInsertID}},
 		RowsAffected: rowsAffected,
@@ -165,6 +275,9 @@ func doExec(ctx context.Context, execer execer, query string, params map[string]
 }
 
 func getArgs(params map[string]any) []any {
+	if len(params) == 0 {
+		return nil
+	}
 	for k := range params {
 		if isPositional(rune(k[0])) {
 			return getPositionalArgs(params)

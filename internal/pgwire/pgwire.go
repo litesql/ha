@@ -33,13 +33,10 @@ const columnWidth = 256
 
 type Server struct {
 	*wire.Server
-	db *sql.DB
 }
 
 func NewServer(cfg Config, db *sql.DB) (*Server, error) {
-	server := Server{
-		db: db,
-	}
+	var server Server
 	opts := []wire.OptionFn{
 		wire.Version("17.0"),
 		wire.SessionMiddleware(server.session),
@@ -134,9 +131,10 @@ func parseFn(db *sql.DB) wire.ParseFn {
 			if err != nil {
 				return
 			}
-			statements = wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+			statements = wire.Prepared(wire.NewStatement(func(ctxHandler context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Empty()
 			}))
+
 			return
 		case stmt.Rollback():
 			err = rollback(ctx)
@@ -148,7 +146,6 @@ func parseFn(db *sql.DB) wire.ParseFn {
 			}))
 			return
 		}
-
 		statements, err = handler(ctx, stmt, db)
 		return
 
@@ -164,14 +161,24 @@ func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.Prep
 	if len(stmt.Parameters()) > 0 {
 		return handlerPrepared(ctx, stmt, db)
 	}
-	var eq execerQuerier
+	var (
+		eq   execerQuerier
+		conn *sql.Conn
+		err  error
+	)
 	if tx, ok := wire.GetAttribute(ctx, transactionAttribute); ok && tx != nil {
-		eq = tx.(execerQuerier)
+		ctxTx := tx.(*connAndTx)
+		eq = ctxTx.tx
+		conn = ctxTx.conn
 	} else {
-		eq = db
+		conn, err = db.Conn(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+		eq = conn
 	}
-
-	resp, err := sqlite.Exec(ctx, eq, stmt, nil)
+	resp, err := sqlite.Exec(ctx, conn, eq, stmt, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -190,9 +197,9 @@ func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.Prep
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete(fmt.Sprintf("UPDATE %d", resp.RowsAffected))
 			})), nil
-		case stmt.IsCreateTable():
+		case stmt.Type() != sqlite.TypeOther:
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
-				return writer.Complete(fmt.Sprintf("SELECT %d", resp.RowsAffected))
+				return writer.Complete(stmt.Type())
 			})), nil
 		default:
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
@@ -215,13 +222,13 @@ func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.Prep
 		for _, row := range resp.Rows {
 			err := writeRow(writer, row)
 			if err != nil {
-				slog.ErrorContext(ctx, "pg-wire: write row error", "error", err)
+				slog.ErrorContext(ctx, "pg-wire: write row", "error", err)
 				return err
 			}
 		}
 		err := writer.Complete(fmt.Sprintf("SELECT %d", len(resp.Rows)))
 		if err != nil {
-			slog.ErrorContext(ctx, "pg-wire: write data error", "error", err)
+			slog.ErrorContext(ctx, "pg-wire: write data", "error", err, "query", stmt.Source())
 			return err
 		}
 		return nil
@@ -230,12 +237,6 @@ func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.Prep
 }
 
 func handlerPrepared(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.PreparedStatements, error) {
-	var eq execerQuerier
-	if tx, ok := wire.GetAttribute(ctx, transactionAttribute); ok && tx != nil {
-		eq = tx.(execerQuerier)
-	} else {
-		eq = db
-	}
 	bindParameters := stmt.Parameters()
 	parameters := make([]oid.Oid, len(bindParameters))
 	for i := range parameters {
@@ -259,20 +260,41 @@ func handlerPrepared(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (w
 		}
 		options = append(options, wire.WithColumns(columns))
 	}
+	var (
+		eq      execerQuerier
+		conn    *sql.Conn
+		newConn bool
+		ctxTx   *connAndTx
+		err     error
+	)
+	if tx, ok := wire.GetAttribute(ctx, transactionAttribute); ok && tx != nil {
+		ctxTx = tx.(*connAndTx)
+		eq = ctxTx.tx
+		conn = ctxTx.conn
+	} else {
+		conn, err = db.Conn(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		eq = conn
+		newConn = true
+	}
 	handle := func(ctxHandle context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
-
+		if newConn {
+			defer conn.Close()
+		}
 		params := make(map[string]any)
 		for i, p := range parameters {
 			value, err := p.Scan(25) // postgresql OID type text -> oid.T_text
 			if err != nil {
-				slog.ErrorContext(ctx, "pg-wire: parameter scan error", "error", err)
+				slog.ErrorContext(ctx, "pg-wire: parameter scan", "error", err)
 				return err
 			}
 			params[bindParameters[i]] = value
 		}
-		resp, err := sqlite.Exec(ctxHandle, eq, stmt, params)
+		resp, err := sqlite.Exec(ctxHandle, conn, eq, stmt, params)
 		if err != nil {
-			slog.ErrorContext(ctx, "pg-wire: local exec error", "error", err)
+			slog.ErrorContext(ctx, "pg-wire: local exec", "error", err, "query", stmt.Source())
 			return err
 		}
 
@@ -284,8 +306,8 @@ func handlerPrepared(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (w
 				return writer.Complete(fmt.Sprintf("DELETE %d", resp.RowsAffected))
 			case stmt.IsUpdate():
 				return writer.Complete(fmt.Sprintf("UPDATE %d", resp.RowsAffected))
-			case stmt.IsCreateTable():
-				return writer.Complete(fmt.Sprintf("SELECT %d", resp.RowsAffected))
+			case stmt.Type() != sqlite.TypeOther:
+				return writer.Complete(stmt.Type())
 			default:
 				return writer.Empty()
 			}
@@ -294,13 +316,13 @@ func handlerPrepared(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (w
 		for _, row := range resp.Rows {
 			err := writeRow(writer, row)
 			if err != nil {
-				slog.ErrorContext(ctx, "pg-wire: write row error", "error", err)
+				slog.ErrorContext(ctx, "pg-wire: write row", "error", err)
 				return err
 			}
 		}
 		err = writer.Complete(fmt.Sprintf("SELECT %d", len(resp.Rows)))
 		if err != nil {
-			slog.ErrorContext(ctx, "pg-wire: write data error", "error", err)
+			slog.ErrorContext(ctx, "pg-wire: write data", "error", err)
 			return err
 		}
 		return nil
@@ -309,27 +331,38 @@ func handlerPrepared(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (w
 	return wire.Prepared(wire.NewStatement(handle, options...)), nil
 }
 
+type connAndTx struct {
+	conn *sql.Conn
+	tx   *sql.Tx
+}
+
 func begin(ctx context.Context, db *sql.DB) error {
 	existsTx, ok := wire.GetAttribute(ctx, transactionAttribute)
 	if ok && existsTx != nil {
 		return nil
 	}
-	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{
+	conn, err := db.Conn(context.Background())
+	if err != nil {
+		return err
+	}
+	tx, err := conn.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: sql.LevelReadCommitted,
 		ReadOnly:  false,
 	})
 	if err != nil {
 		return err
 	}
-	wire.SetAttribute(ctx, transactionAttribute, tx)
+	wire.SetAttribute(ctx, transactionAttribute, &connAndTx{conn: conn, tx: tx})
 	return nil
 }
 
 func commit(ctx context.Context) error {
-	tx, ok := wire.GetAttribute(ctx, transactionAttribute)
-	if ok && tx != nil {
+	txContext, ok := wire.GetAttribute(ctx, transactionAttribute)
+	if ok && txContext != nil {
+		ctxTx := txContext.(*connAndTx)
 		wire.SetAttribute(ctx, transactionAttribute, nil)
-		err := tx.(*sql.Tx).Commit()
+		defer ctxTx.conn.Close()
+		err := ctxTx.tx.Commit()
 		if err != nil {
 			return err
 		}
@@ -338,10 +371,12 @@ func commit(ctx context.Context) error {
 }
 
 func rollback(ctx context.Context) error {
-	tx, ok := wire.GetAttribute(ctx, transactionAttribute)
-	if ok && tx != nil {
+	txContext, ok := wire.GetAttribute(ctx, transactionAttribute)
+	if ok && txContext != nil {
+		ctxTx := txContext.(*connAndTx)
 		wire.SetAttribute(ctx, transactionAttribute, nil)
-		err := tx.(*sql.Tx).Rollback()
+		defer ctxTx.conn.Close()
+		err := ctxTx.tx.Rollback()
 		if err != nil {
 			return err
 		}

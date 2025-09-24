@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -50,13 +51,13 @@ type Statement struct {
 	ddl          bool
 }
 
-func NewUnverifiedStatement(sql string) *Statement {
-	return &Statement{
-		source: sql,
-	}
-}
-
 func NewStatement(ctx context.Context, sql string) (*Statement, error) {
+	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(sql)), "BEGIN") {
+		return &Statement{
+			source: sql,
+			typ:    TypeBegin,
+		}, nil
+	}
 	stmt := new(Statement)
 	stmt.source = sql
 	err := stmt.parse(ctx)

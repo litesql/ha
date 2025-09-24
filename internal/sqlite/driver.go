@@ -34,7 +34,37 @@ func RegisterDriver(extensions []string, name string, pub CDCPublisher) {
 					return nil
 				},
 			})
+
 	})
+}
+
+var (
+	changeSetSessions   = make(map[*sqlite3.SQLiteConn]*ChangeSet)
+	changeSetSessionsMu sync.Mutex
+)
+
+func AddSQLChange(conn *sqlite3.SQLiteConn, sql string, args ...any) error {
+	cs := changeSetSessions[conn]
+	if cs == nil {
+		return errors.New("no changeset session for the connection")
+	}
+	cs.AddChange(Change{
+		Operation: "SQL",
+		SQL:       sql,
+		SQLArgs:   args,
+	})
+	return nil
+}
+
+func RemoveLastChange(conn *sqlite3.SQLiteConn) error {
+	cs := changeSetSessions[conn]
+	if cs == nil {
+		return errors.New("no changeset session for the connection")
+	}
+	if len(cs.Changes) > 0 {
+		cs.Changes = cs.Changes[:len(cs.Changes)-1]
+	}
+	return nil
 }
 
 type tableInfo struct {
@@ -43,7 +73,11 @@ type tableInfo struct {
 }
 
 func enableCDCHooks(conn *sqlite3.SQLiteConn) {
+	changeSetSessionsMu.Lock()
+	defer changeSetSessionsMu.Unlock()
+
 	cs := NewChangeSet(nodeName)
+	changeSetSessions[conn] = cs
 	tableColumns := make(map[string]tableInfo)
 	conn.RegisterPreUpdateHook(func(d sqlite3.SQLitePreUpdateData) {
 		change, ok := getChange(&d)

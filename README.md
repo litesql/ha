@@ -20,28 +20,38 @@ go install
 
 ## Usage
 
-1. Create an sqlite database:
+1. Start the first ha node (-m flag if you want to use in-memory)
 
 ```sh
-sqlite3 mydatabase.db 'CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);'
+ha -m
 ```
 
-2. Start the first ha node 
+2. Start an another ha node
 
 ```sh
-ha mydatabase.db
+ha -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222 mydatabase.db
 ```
 
-3. Start an another ha node
+3. Create a table
 
 ```sh
-ha --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222 mydatabase.db
+curl -d '[
+  {
+    "sql": "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)"     
+  }
+]' \
+http://localhost:8080
 ```
 
 4. Insert some data using HTTP client
 
 ```sh
-curl -d '[{"sql": "INSERT INTO users(name) VALUES('\''HA user'\'')"}]' \
+curl -d '[
+  {
+    "sql": "INSERT INTO users(name) VALUES(:name)", 
+    "params": {"name": "HA User"} 
+  }
+]' \
 http://localhost:8080
 ```
 
@@ -64,6 +74,18 @@ PGPASSWORD="ha" psql -h localhost -U ha -p 5433
 
 ```sql
 SELECT * FROM users;
+```
+
+### Loading an database to memory
+
+```sh
+ha -m mydatabase.db
+```
+
+### Store database in disk
+
+```sh
+ha file:mydatabase.db?_journal=WAL&_busy_timeout=500
 ```
 
 ### Backup database
@@ -198,8 +220,9 @@ http://localhost:8080
 - You can write to any server
 - Uses embedded or external NATS JetStream cluster
 - NATS JetStream guarantees "at-least-once" message delivery
-- All operations are idempotent
+- All DML (INSERT, UPDATE, DELETE) operations are idempotent
 - Last writer wins
+- DDL commands are replicated (since v0.0.7)
 
 ### CDC message format
 
@@ -243,5 +266,6 @@ http://localhost:8080
 ### Replication limitations
 
 - Tables WITHOUT ROWID are not replicated
-- DDL (CREATE, ALTER, DROP) commands are not replicated
-- Truncate table commands (DELETE without WHERE) are not replicated
+- The replication not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
+- Nor is the replication invoked when rows are deleted using the [truncate optimization](https://sqlite.org/lang_delete.html#truncateopt).
+- Use idempotents DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS)

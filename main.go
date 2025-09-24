@@ -38,6 +38,8 @@ var (
 	name *string
 	port *uint
 
+	memDB *bool
+
 	pgPort *int
 	pgUser *string
 	pgPass *string
@@ -62,6 +64,7 @@ func main() {
 	fs = ff.NewFlagSet("ha")
 	name = fs.String('n', "name", "", "Node name")
 	port = fs.Uint('p', "port", 8080, "Server port")
+	memDB = fs.Bool('m', "memory", "Use database in memory only")
 
 	natsPort = fs.IntLong("nats-port", 4222, "Embedded NATS server port (0 to disable)")
 	natsStoreDir = fs.StringLong("nats-store-dir", "", "Embedded NATS server store directory")
@@ -151,37 +154,61 @@ func run() error {
 	}
 
 	sqlite.RegisterDriver(sqlExtensions, nodeName, cdcPublisher)
-	db, err := sql.Open("sqlite3-ha", "file:/ha.db?vfs=memdb&_journal=WAL")
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	db.SetConnMaxIdleTime(0)
-	db.SetConnMaxLifetime(0)
-	db.SetMaxOpenConns(*concurrentQueries)
-	db.SetMaxIdleConns(*concurrentQueries)
-
-	sqlite.SetGlobalDB(db)
-
+	var (
+		db  *sql.DB
+		dsn string
+	)
 	args := fs.GetArgs()
-	if len(args) > 0 {
-		filename := args[0]
-		slog.Info("loading database", "file", filename)
-		err := sqlite.Deserialize(context.Background(), filename)
+	if *memDB {
+		slog.Info("using in-memory database")
+		db, err = sql.Open("sqlite3-ha", "file:/ha.db?vfs=memdb")
 		if err != nil {
-			return fmt.Errorf("failed to load database %q: %w", filename, err)
+			return err
 		}
-		if *replicationPolicy == "" {
-			matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`, filepath.Base(filename))
-			if matched {
-				dateTime := filepath.Base(filename)[0:len(time.DateTime)]
-				_, err := time.Parse(time.DateTime, dateTime)
-				if err == nil {
-					policy := fmt.Sprintf("by_start_time=%s", dateTime)
-					replicationPolicy = &policy
+		defer db.Close()
+		db.SetConnMaxIdleTime(0)
+		db.SetConnMaxLifetime(0)
+		db.SetMaxOpenConns(*concurrentQueries)
+		db.SetMaxIdleConns(*concurrentQueries)
+
+		sqlite.SetGlobalDB(db)
+
+		if len(args) > 0 {
+			filename := args[0]
+			slog.Info("loading database", "file", filename)
+			err := sqlite.Deserialize(context.Background(), filename)
+			if err != nil {
+				return fmt.Errorf("failed to load database %q: %w", filename, err)
+			}
+			if *replicationPolicy == "" {
+				matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`, filepath.Base(filename))
+				if matched {
+					dateTime := filepath.Base(filename)[0:len(time.DateTime)]
+					_, err := time.Parse(time.DateTime, dateTime)
+					if err == nil {
+						policy := fmt.Sprintf("by_start_time=%s", dateTime)
+						replicationPolicy = &policy
+					}
 				}
 			}
 		}
+	} else {
+		dsn = "file:ha.db?_journal=WAL&_busy_timeout=5000"
+		if len(args) > 0 {
+			dsn = args[0]
+		}
+		slog.Info("using data source name", "dsn", dsn)
+		db, err = sql.Open("sqlite3-ha", dsn)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+		db.SetConnMaxIdleTime(0)
+		db.SetConnMaxLifetime(0)
+		db.SetMaxOpenConns(*concurrentQueries)
+		db.SetMaxIdleConns(*concurrentQueries)
+
+		sqlite.SetGlobalDB(db)
 	}
 
 	if natsConn != nil || *replicationURL != "" {
@@ -216,14 +243,13 @@ func run() error {
 	})
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		filename := fmt.Sprintf("%s_ha.db", time.Now().UTC().Format(time.DateTime))
-		data, err := sqlite.Serialize(r.Context())
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+		w.Header().Set("Content-Type", "application/octet-stream")
+		err := sqlite.Backup(r.Context(), dsn, *memDB, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Write(data)
 	})
 
 	pgServer, err := pgwire.NewServer(pgwire.Config{
