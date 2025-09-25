@@ -12,7 +12,7 @@ builds:
     flags:
       - -tags=zig
     ldflags:
-    - -s -w -X github.com/litesql/ha/main.version={{.Version}} -X github.com/litesql/ha/main.commit={{.Commit}} -X github.com/litesql/ha/main.date={{.Date}}
+    - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
     goos:
       - linux
     goarch:

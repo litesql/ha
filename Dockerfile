@@ -12,7 +12,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=1 go build -o ha -ldflags="-X github.com/litesql/ha/main.commit=$COMMIT -X github.com/litesql/ha/main.date=$DATE -X github.com/litesql/ha/main.version=$VERSION" .
+RUN CGO_ENABLED=1 go build -o ha -ldflags="-X main.commit=$COMMIT -X main.date=$DATE -X main.version=$VERSION" .
 
 # Production image
 FROM debian:trixie-slim AS production
