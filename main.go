@@ -10,6 +10,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -40,9 +41,9 @@ var (
 	name *string
 	port *uint
 
-	memDB                *bool
-	snapshotInterval     *time.Duration
-	ignoreLatestSnapshot *bool
+	memDB              *bool
+	snapshotInterval   *time.Duration
+	fromLatestSnapshot *bool
 
 	pgPort *int
 	pgUser *string
@@ -70,8 +71,8 @@ func main() {
 	name = fs.String('n', "name", "", "Node name")
 	port = fs.Uint('p', "port", 8080, "Server port")
 	memDB = fs.Bool('m', "memory", "Store database in memory")
-	ignoreLatestSnapshot = fs.Bool('i', "ignore-latest-snapshot", "Do not load latest snapshot at startup (for memory database)")
-	snapshotInterval = fs.DurationLong("snapshot-interval", 0, "Interval to create database snapshot to NATS Object Store (0 to disable)")
+	fromLatestSnapshot = fs.BoolLong("from-latest-snapshot", "Use the latest database snapshot from NATS JetStream Object Store (if available at startup)")
+	snapshotInterval = fs.DurationLong("snapshot-interval", 0, "Interval to create database snapshot to NATS JetStream Object Store (0 to disable)")
 
 	natsPort = fs.IntLong("nats-port", 4222, "Embedded NATS server port (0 to disable)")
 	natsStoreDir = fs.StringLong("nats-store-dir", "", "Embedded NATS server store directory")
@@ -229,16 +230,54 @@ func run() error {
 			return fmt.Errorf("failed to start snapshotter: %w", err)
 		}
 
-		if !*ignoreLatestSnapshot && *memDB {
-			slog.Info("loading latest snapshot")
+		if *fromLatestSnapshot {
+			slog.Info("loading latest snapshot from NATS JetStream Object Store")
 			sequence, reader, err := snapshotter.GetLatestSnapshot(context.Background())
 			if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
 				return fmt.Errorf("failed to load latest snapshot: %w", err)
 			}
 			if reader != nil {
-				err = sqlite.DeserializeFromReader(ctx, reader)
-				if err != nil {
-					return fmt.Errorf("failed to load latest snapshot: %w", err)
+				if *memDB {
+					err = sqlite.DeserializeFromReader(ctx, reader)
+					if err != nil {
+						return fmt.Errorf("failed to load latest snapshot: %w", err)
+					}
+				} else {
+					filename, err := sqlite.Filename(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get database filename: %w", err)
+					}
+					snapshotFilename := filepath.Join(filepath.Dir(filename), fmt.Sprintf("snapshot_%d_%s", sequence, filepath.Base(filename)))
+					u, err := url.Parse(dsn)
+					if err != nil {
+						return fmt.Errorf("failed to parse dsn: %w", err)
+					}
+					f, err := os.Create(snapshotFilename)
+					if err != nil {
+						return fmt.Errorf("failed to create snapshot file %q: %w", snapshotFilename, err)
+					}
+					_, err = io.Copy(f, reader)
+					if err != nil {
+						f.Close()
+						return fmt.Errorf("failed to write snapshot file %q: %w", snapshotFilename, err)
+					}
+					f.Close()
+					u.Path = snapshotFilename
+					dsn = u.String()
+					slog.Info("loading snapshot", "file", snapshotFilename)
+					db.Close()
+					db, err = sql.Open("sqlite3-ha", dsn)
+					if err != nil {
+						return fmt.Errorf("failed to open database %q: %w", dsn, err)
+					}
+					defer db.Close()
+					db.SetConnMaxIdleTime(0)
+					db.SetConnMaxLifetime(0)
+					db.SetMaxOpenConns(*concurrentQueries)
+					db.SetMaxIdleConns(*concurrentQueries)
+
+					sqlite.SetGlobalDB(db)
+
 				}
 				if sequence > 0 && *replicationPolicy == "" {
 					policy := fmt.Sprintf("by_start_sequence=%d", sequence)
