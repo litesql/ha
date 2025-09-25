@@ -156,6 +156,22 @@ func Backup(ctx context.Context, dsn string, memory bool, w io.Writer) error {
 	return err
 }
 
+func DeserializeFromReader(ctx context.Context, r io.Reader) error {
+	dest, err := os.CreateTemp("", "ha-*.db")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(dest.Name())
+
+	_, err = io.Copy(dest, r)
+	if err != nil {
+		return err
+	}
+	dest.Close()
+
+	return Deserialize(ctx, dest.Name())
+}
+
 func Deserialize(ctx context.Context, file string) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -171,6 +187,8 @@ func Deserialize(ctx context.Context, file string) error {
 	if err != nil {
 		return err
 	}
+	buf := make([]byte, len(data)*2)
+	data = append(data, buf...)
 	return sqlite3Conn.Deserialize(data, "")
 }
 

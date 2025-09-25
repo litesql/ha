@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -97,17 +98,22 @@ func NewCDCSubscriber(node string, nc *nats.Conn, url string, stream string, pol
 		db:     db,
 	}
 
-	consumer, err := s.js.CreateOrUpdateConsumer(context.Background(), s.stream, jetstream.ConsumerConfig{
+	consumer, err := s.js.CreateConsumer(context.Background(), s.stream, jetstream.ConsumerConfig{
 		AckPolicy:     jetstream.AckExplicitPolicy,
 		FilterSubject: s.stream,
 		Durable:       s.node,
 		DeliverPolicy: deliverPolicy,
-		Name:          s.node,
 		OptStartSeq:   startSeq,
 		OptStartTime:  startTime,
 	})
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, jetstream.ErrConsumerExists) {
+			return nil, err
+		}
+		consumer, err = s.js.Consumer(context.Background(), stream, s.node)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	_, err = consumer.Consume(s.handler)

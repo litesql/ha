@@ -3,7 +3,6 @@ package nats
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -13,7 +12,10 @@ import (
 	"github.com/litesql/ha/internal/sqlite"
 )
 
-var processID = time.Now().UnixNano()
+var (
+	processID = time.Now().UnixNano()
+	seq       uint64
+)
 
 type CDCPublisher struct {
 	nc      *nats.Conn
@@ -22,7 +24,7 @@ type CDCPublisher struct {
 	timeout time.Duration
 }
 
-func NewCDCPublisher(nc *nats.Conn, url string, stream string, maxAge time.Duration, timeout time.Duration) (*CDCPublisher, error) {
+func NewCDCPublisher(nc *nats.Conn, url string, replicas int, stream string, maxAge time.Duration, timeout time.Duration) (*CDCPublisher, error) {
 	var err error
 	if nc == nil {
 		nc, err = nats.Connect(url,
@@ -49,6 +51,7 @@ func NewCDCPublisher(nc *nats.Conn, url string, stream string, maxAge time.Durat
 	// Create a stream to hold the CDC messages
 	streamConfig := jetstream.StreamConfig{
 		Name:      stream,
+		Replicas:  replicas,
 		Subjects:  []string{stream},
 		Storage:   jetstream.FileStorage,
 		MaxAge:    maxAge,
@@ -57,7 +60,10 @@ func NewCDCPublisher(nc *nats.Conn, url string, stream string, maxAge time.Durat
 	}
 	_, err = js.CreateOrUpdateStream(ctx, streamConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create of update stream: %w", err)
+		if nc.ConnectedClusterName() == "" {
+			return nil, err
+		}
+		slog.Warn("failed to create of update stream", "error", err)
 	}
 	return &CDCPublisher{
 		nc:      nc,
@@ -79,6 +85,7 @@ func (p *CDCPublisher) Publish(cs *sqlite.ChangeSet) error {
 	if err != nil {
 		return err
 	}
+	seq = pubAck.Sequence
 	slog.Info("published CDC message", "stream", pubAck.Stream, "seq", pubAck.Sequence, "duplicate", pubAck.Duplicate)
 	return nil
 }

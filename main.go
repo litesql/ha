@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
@@ -38,7 +40,9 @@ var (
 	name *string
 	port *uint
 
-	memDB *bool
+	memDB                *bool
+	snapshotInterval     *time.Duration
+	ignoreLatestSnapshot *bool
 
 	pgPort *int
 	pgUser *string
@@ -58,13 +62,16 @@ var (
 	replicationMaxAge  *time.Duration
 	replicationURL     *string
 	replicationPolicy  *string
+	replicas           *int
 )
 
 func main() {
 	fs = ff.NewFlagSet("ha")
 	name = fs.String('n', "name", "", "Node name")
 	port = fs.Uint('p', "port", 8080, "Server port")
-	memDB = fs.Bool('m', "memory", "Use database in memory only")
+	memDB = fs.Bool('m', "memory", "Store database in memory")
+	ignoreLatestSnapshot = fs.Bool('i', "ignore-latest-snapshot", "Do not load latest snapshot at startup (for memory database)")
+	snapshotInterval = fs.DurationLong("snapshot-interval", 0, "Interval to create database snapshot to NATS Object Store (0 to disable)")
 
 	natsPort = fs.IntLong("nats-port", 4222, "Embedded NATS server port (0 to disable)")
 	natsStoreDir = fs.StringLong("nats-store-dir", "", "Embedded NATS server store directory")
@@ -79,6 +86,7 @@ func main() {
 	concurrentQueries = fs.IntLong("concurrent-queries", 50, "Number of concurrent queries")
 	extensions = fs.StringLong("extensions", "", "Comma-separated list of SQLite extensions to load")
 
+	replicas = fs.IntLong("replicas", 1, "Number of replicas to keep for the stream and object store in clustered jetstream. Defaults to 1, maximum is 5")
 	replicationTimeout = fs.DurationLong("replication-timeout", 5*time.Second, "Replication publisher timeout")
 	replicationStream = fs.StringLong("replication-stream", "ha_replication", "Replication stream name")
 	replicationMaxAge = fs.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
@@ -147,7 +155,7 @@ func run() error {
 	var cdcPublisher sqlite.CDCPublisher
 	if natsConn != nil || *replicationURL != "" {
 		slog.Info("starting replicator publisher", "stream", *replicationStream)
-		cdcPublisher, err = ha_nats.NewCDCPublisher(natsConn, *replicationURL, *replicationStream, *replicationMaxAge, *replicationTimeout)
+		cdcPublisher, err = ha_nats.NewCDCPublisher(natsConn, *replicationURL, *replicas, *replicationStream, *replicationMaxAge, *replicationTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to start CDC NATS publisher: %w", err)
 		}
@@ -211,13 +219,41 @@ func run() error {
 		sqlite.SetGlobalDB(db)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var snapshotter *ha_nats.Snapshotter
 	if natsConn != nil || *replicationURL != "" {
-		slog.Info("starting CDC subscriber", "stream", *replicationStream)
+		slog.Info("starting snapshotter", "interval", *snapshotInterval)
+		snapshotter, err = ha_nats.NewSnapshotter(ctx, natsConn, *replicationURL, *replicas, *replicationStream, "", *memDB, *snapshotInterval)
+		if err != nil {
+			return fmt.Errorf("failed to start snapshotter: %w", err)
+		}
+
+		if !*ignoreLatestSnapshot && *memDB {
+			slog.Info("loading latest snapshot")
+			sequence, reader, err := snapshotter.GetLatestSnapshot(context.Background())
+			if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
+				return fmt.Errorf("failed to load latest snapshot: %w", err)
+			}
+			if reader != nil {
+				err = sqlite.DeserializeFromReader(ctx, reader)
+				if err != nil {
+					return fmt.Errorf("failed to load latest snapshot: %w", err)
+				}
+				if sequence > 0 && *replicationPolicy == "" {
+					policy := fmt.Sprintf("by_start_sequence=%d", sequence)
+					replicationPolicy = &policy
+				}
+			}
+		}
+
+		slog.Info("starting CDC subscriber", "stream", *replicationStream, "deliverPolicy", *replicationPolicy)
 		cdcSubscriber, err := ha_nats.NewCDCSubscriber(nodeName, natsConn, *replicationURL, *replicationStream, *replicationPolicy, db)
 		if err != nil {
 			return fmt.Errorf("failed to start CDC NATS subscriber: %w", err)
 		}
 		defer cdcSubscriber.Close()
+
 	}
 
 	mux := http.NewServeMux()
@@ -248,6 +284,44 @@ func run() error {
 		err := sqlite.Backup(r.Context(), dsn, *memDB, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	})
+
+	mux.HandleFunc("POST /snapshot", func(w http.ResponseWriter, r *http.Request) {
+		if snapshotter == nil {
+			http.Error(w, "snapshotter not enabled", http.StatusNotImplemented)
+			return
+		}
+		sequence, err := snapshotter.TakeSnapshot(r.Context(), dsn, *memDB)
+		if err != nil {
+			slog.Error("take snapshot", "error", err)
+			http.Error(w, fmt.Sprintf("failed to take snapshot: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("X-Sequence", fmt.Sprint(sequence))
+		w.WriteHeader(http.StatusOK)
+	})
+
+	mux.HandleFunc("GET /snapshot", func(w http.ResponseWriter, r *http.Request) {
+		if snapshotter == nil {
+			http.Error(w, "snapshotter not enabled", http.StatusNotImplemented)
+			return
+		}
+		sequence, reader, err := snapshotter.GetLatestSnapshot(r.Context())
+		if err != nil {
+			slog.ErrorContext(r.Context(), "failed o get latest snapshot", "error", err)
+			http.Error(w, fmt.Sprintf("failed to get latest snapshot: %v", err), http.StatusInternalServerError)
+			return
+		}
+		defer reader.Close()
+		filename := fmt.Sprintf("%s_ha_snapshot.db", time.Now().UTC().Format(time.DateTime))
+		w.Header().Set("X-Sequence", fmt.Sprint(sequence))
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, err = io.Copy(w, reader)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to send latest snapshot: %v", err), http.StatusInternalServerError)
 			return
 		}
 	})

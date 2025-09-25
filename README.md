@@ -94,6 +94,18 @@ ha file:mydatabase.db?_journal=WAL&_busy_timeout=500
 curl -O -J http://localhost:8080
 ```
 
+### Take a snapshot and save on NATS Object Store
+
+```sh
+curl -X POST http://localhost:8080/snapshot
+```
+
+### Get latest snapshot from NATS Object Store
+
+```sh
+curl -O -J http://localhost:8080/snapshot
+```
+
 ## Local Read Replicas
 
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
