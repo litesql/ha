@@ -2,7 +2,7 @@ module github.com/litesql/ha
 
 go 1.25
 
-replace github.com/mattn/go-sqlite3 => github.com/litesql/go-sqlite3 v1.14.32
+replace github.com/mattn/go-sqlite3 => github.com/litesql/go-sqlite3 v1.14.33
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.1

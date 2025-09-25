@@ -271,6 +271,5 @@ http://localhost:8080
 ### Replication limitations
 
 - Tables WITHOUT ROWID are not replicated
-- The replication not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
-- Nor is the replication invoked when rows are deleted using the [truncate optimization](https://sqlite.org/lang_delete.html#truncateopt).
+- The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
 - Use idempotents DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS)

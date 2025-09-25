@@ -315,7 +315,7 @@ func run() error {
 			return
 		}
 		defer reader.Close()
-		filename := fmt.Sprintf("%s_ha_snapshot.db", time.Now().UTC().Format(time.DateTime))
+		filename := fmt.Sprintf("%s_ha_snapshot_%d.db", time.Now().UTC().Format(time.DateTime), sequence)
 		w.Header().Set("X-Sequence", fmt.Sprint(sequence))
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 		w.Header().Set("Content-Type", "application/octet-stream")
