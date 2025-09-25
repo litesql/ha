@@ -262,11 +262,9 @@ func run() error {
 						return fmt.Errorf("failed to write snapshot file %q: %w", snapshotFilename, err)
 					}
 					f.Close()
-					u.Path = snapshotFilename
-					dsn = u.String()
-					slog.Info("loading snapshot", "file", snapshotFilename)
+					slog.Info("loading snapshot", "filename", snapshotFilename)
 					db.Close()
-					db, err = sql.Open("sqlite3-ha", dsn)
+					db, err = sql.Open("sqlite3-ha", fmt.Sprintf("file:%s?%s", snapshotFilename, u.RawQuery))
 					if err != nil {
 						return fmt.Errorf("failed to open database %q: %w", dsn, err)
 					}
