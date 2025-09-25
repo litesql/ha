@@ -273,3 +273,4 @@ http://localhost:8080
 - Tables WITHOUT ROWID are not replicated
 - The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
 - Use idempotents DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS)
+- Writing to any node in the cluster improves availability, but it can lead to consistency issues in certain edge cases. If your application values Consistency more than Availability, it's better to route all write operations through a single cluster node.
