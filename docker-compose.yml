@@ -1,0 +1,63 @@
+services:
+  node1:
+    image: ghcr.io/litesql/ha:latest
+    volumes:
+      - ./testdata:/etc/nats
+      - node1_data:/data
+    ports:
+      - "4222:4222"
+      - "5432:5432"
+      - "8080:8080"
+    environment:
+      - HA_SNAPSHOT_INTERVAL=1h
+      - HA_NAME=node1
+      - HA_MEMORY=true
+      - HA_CONCURRENT_QUERIES=50
+      - HA_NATS_CONFIG=/etc/nats/node1.cfg
+      - HA_NATS_LOGS=true
+      - HA_FROM_LATEST_SNAPSHOT=true
+      - HA_REPLICAS=1
+
+  node2:
+    image: ghcr.io/litesql/ha:latest
+    volumes:
+      - ./testdata:/etc/nats
+      - node2_data:/data
+    ports:
+      - "4223:4222"
+      - "5433:5432"
+      - "8081:8080"
+    environment:
+      - HA_NAME=node2
+      - HA_MEMORY=true
+      - HA_CONCURRENT_QUERIES=50
+      - HA_NATS_CONFIG=/etc/nats/node2.cfg
+      - HA_NATS_LOGS=true
+      - HA_FROM_LATEST_SNAPSHOT=true      
+      - HA_REPLICAS=1
+
+  node3:
+    image: ghcr.io/litesql/ha:latest
+    volumes:
+      - ./testdata:/etc/nats
+      - node3_data:/data
+    ports:
+      - "4224:4222"
+      - "5434:5432"
+      - "8082:8080"
+    environment:
+      - HA_NAME=node3
+      - HA_MEMORY=true
+      - HA_CONCURRENT_QUERIES=50
+      - HA_NATS_CONFIG=/etc/nats/node3.cfg
+      - HA_NATS_LOGS=true
+      - HA_FROM_LATEST_SNAPSHOT=true      
+      - HA_REPLICAS=1
+
+volumes:
+  node1_data:
+    driver: local
+  node2_data:
+    driver: local
+  node3_data:
+    driver: local

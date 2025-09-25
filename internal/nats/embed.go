@@ -10,10 +10,13 @@ import (
 )
 
 type Config struct {
-	Name     string
-	Port     int
-	StoreDir string
-	File     string
+	Name       string
+	Port       int
+	StoreDir   string
+	User       string
+	Pass       string
+	File       string
+	EnableLogs bool
 }
 
 func RunEmbeddedNATSServer(cfg Config) (*nats.Conn, *server.Server, error) {
@@ -30,13 +33,35 @@ func RunEmbeddedNATSServer(cfg Config) (*nats.Conn, *server.Server, error) {
 		opts = &server.Options{
 			ServerName: cfg.Name,
 			Port:       cfg.Port,
-			JetStream:  true,
 			StoreDir:   cfg.StoreDir,
 		}
+		if cfg.User != "" && cfg.Pass != "" {
+			appAcct := server.NewAccount("app")
+			appAcct.EnableJetStream(map[string]server.JetStreamAccountLimits{
+				"": {
+					MaxMemory:    -1,
+					MaxStore:     -1,
+					MaxStreams:   -1,
+					MaxConsumers: -1,
+				},
+			})
+			opts.Accounts = []*server.Account{appAcct}
+			opts.Users = []*server.User{
+				{
+					Username: cfg.User,
+					Password: cfg.Pass,
+					Account:  appAcct,
+				},
+			}
+		}
 	}
+	opts.JetStream = true
 	ns, err := server.NewServer(opts)
 	if err != nil {
 		return nil, nil, err
+	}
+	if cfg.EnableLogs {
+		ns.ConfigureLogger()
 	}
 	slog.Info("starting NATS server", "port", opts.Port, "store_dir", opts.StoreDir)
 	go ns.Start()
@@ -44,7 +69,13 @@ func RunEmbeddedNATSServer(cfg Config) (*nats.Conn, *server.Server, error) {
 	if !ns.ReadyForConnections(5 * time.Second) {
 		return nil, nil, err
 	}
-	nc, err := nats.Connect(ns.ClientURL())
+
+	if ns.ClusterName() != "" {
+		time.Sleep(time.Second)
+	}
+
+	slog.Info("embedded NATS server is ready", "cluster", ns.ClusterName(), "jetstream", ns.JetStreamEnabled())
+	nc, err := nats.Connect("", nats.InProcessServer(ns))
 	if err != nil {
 		ns.Shutdown()
 		return nil, nil, err

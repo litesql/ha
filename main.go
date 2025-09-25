@@ -54,7 +54,10 @@ var (
 	concurrentQueries *int
 	extensions        *string
 
+	natsLogs     *bool
 	natsPort     *int
+	natsUser     *string
+	natsPass     *string
 	natsStoreDir *string
 	natsConfig   *string
 
@@ -74,8 +77,11 @@ func main() {
 	fromLatestSnapshot = fs.BoolLong("from-latest-snapshot", "Use the latest database snapshot from NATS JetStream Object Store (if available at startup)")
 	snapshotInterval = fs.DurationLong("snapshot-interval", 0, "Interval to create database snapshot to NATS JetStream Object Store (0 to disable)")
 
+	natsLogs = fs.BoolLong("nats-logs", "Enable NATS server logging")
 	natsPort = fs.IntLong("nats-port", 4222, "Embedded NATS server port (0 to disable)")
 	natsStoreDir = fs.StringLong("nats-store-dir", "", "Embedded NATS server store directory")
+	natsUser = fs.StringLong("nats-user", "", "Embedded NATS server user")
+	natsPass = fs.StringLong("nats-pass", "", "Embedded NATS server password")
 	natsConfig = fs.StringLong("nats-config", "", "Embedded NATS server config file")
 
 	pgPort = fs.IntLong("pg-port", 5432, "PostgreSQL Server port")
@@ -88,7 +94,7 @@ func main() {
 	extensions = fs.StringLong("extensions", "", "Comma-separated list of SQLite extensions to load")
 
 	replicas = fs.IntLong("replicas", 1, "Number of replicas to keep for the stream and object store in clustered jetstream. Defaults to 1, maximum is 5")
-	replicationTimeout = fs.DurationLong("replication-timeout", 5*time.Second, "Replication publisher timeout")
+	replicationTimeout = fs.DurationLong("replication-timeout", 15*time.Second, "Replication publisher timeout")
 	replicationStream = fs.StringLong("replication-stream", "ha_replication", "Replication stream name")
 	replicationMaxAge = fs.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
 	replicationURL = fs.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
@@ -143,10 +149,11 @@ func run() error {
 	)
 	if *natsPort > 0 || *natsConfig != "" {
 		natsConn, natsServer, err = ha_nats.RunEmbeddedNATSServer(ha_nats.Config{
-			Name:     nodeName,
-			Port:     *natsPort,
-			StoreDir: *natsStoreDir,
-			File:     *natsConfig,
+			Name:       nodeName,
+			Port:       *natsPort,
+			StoreDir:   *natsStoreDir,
+			File:       *natsConfig,
+			EnableLogs: *natsLogs,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to start embedded NATS server: %w", err)
@@ -222,7 +229,10 @@ func run() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var snapshotter *ha_nats.Snapshotter
+	var (
+		snapshotter   *ha_nats.Snapshotter
+		cdcSubscriber *ha_nats.CDCSubscriber
+	)
 	if natsConn != nil || *replicationURL != "" {
 		slog.Info("starting snapshotter", "interval", *snapshotInterval)
 		snapshotter, err = ha_nats.NewSnapshotter(ctx, natsConn, *replicationURL, *replicas, *replicationStream, "", *memDB, *snapshotInterval)
@@ -285,12 +295,12 @@ func run() error {
 		}
 
 		slog.Info("starting CDC subscriber", "stream", *replicationStream, "deliverPolicy", *replicationPolicy)
-		cdcSubscriber, err := ha_nats.NewCDCSubscriber(nodeName, natsConn, *replicationURL, *replicationStream, *replicationPolicy, db)
+		cdcSubscriber, err = ha_nats.NewCDCSubscriber(nodeName, natsConn, *replicationURL, *replicationStream, *replicationPolicy, db)
 		if err != nil {
 			return fmt.Errorf("failed to start CDC NATS subscriber: %w", err)
 		}
 		defer cdcSubscriber.Close()
-
+		snapshotter.SetSeqProvider(cdcSubscriber)
 	}
 
 	mux := http.NewServeMux()
@@ -361,6 +371,33 @@ func run() error {
 			http.Error(w, fmt.Sprintf("failed to send latest snapshot: %v", err), http.StatusInternalServerError)
 			return
 		}
+	})
+
+	mux.HandleFunc("GET /replications", func(w http.ResponseWriter, r *http.Request) {
+		info, err := cdcSubscriber.DeliveredInfo(r.Context(), "")
+		if err != nil {
+			slog.Error("failed to get replication info", "error", err)
+			http.Error(w, fmt.Sprintf("failed to get replication info: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string][]*jetstream.ConsumerInfo{
+			"replications": info,
+		})
+	})
+
+	mux.HandleFunc("GET /replications/{name}", func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		info, err := cdcSubscriber.DeliveredInfo(r.Context(), name)
+		if err != nil {
+			slog.Error("failed to get replication info", "error", err, "name", name)
+			http.Error(w, fmt.Sprintf("failed to get replication info: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string][]*jetstream.ConsumerInfo{
+			"replications": info,
+		})
 	})
 
 	pgServer, err := pgwire.NewServer(pgwire.Config{

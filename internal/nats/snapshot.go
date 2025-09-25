@@ -17,8 +17,13 @@ import (
 
 const latestSnapshotName = "latest"
 
+type SequenceProvider interface {
+	LatestSeq() uint64
+}
+
 type Snapshotter struct {
 	objectStore jetstream.ObjectStore
+	seqProvider SequenceProvider
 	mu          sync.Mutex
 }
 
@@ -68,6 +73,10 @@ func NewSnapshotter(ctx context.Context, nc *nats.Conn, url string, replicas int
 	return s, nil
 }
 
+func (s *Snapshotter) SetSeqProvider(p SequenceProvider) {
+	s.seqProvider = p
+}
+
 func (s *Snapshotter) start(ctx context.Context, dsn string, memdb bool, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	for {
@@ -89,7 +98,7 @@ func (s *Snapshotter) start(ctx context.Context, dsn string, memdb bool, interva
 func (s *Snapshotter) TakeSnapshot(ctx context.Context, dsn string, memdb bool) (sequence uint64, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	sequence = seq
+	sequence = s.seqProvider.LatestSeq()
 	headers := make(nats.Header)
 	headers.Set("seq", fmt.Sprint(sequence))
 	bkpFile := fmt.Sprintf("bkp_%d", time.Now().Nanosecond())

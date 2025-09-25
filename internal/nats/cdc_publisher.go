@@ -12,10 +12,7 @@ import (
 	"github.com/litesql/ha/internal/sqlite"
 )
 
-var (
-	processID = time.Now().UnixNano()
-	seq       uint64
-)
+var processID = time.Now().UnixNano()
 
 type CDCPublisher struct {
 	nc      *nats.Conn
@@ -60,10 +57,7 @@ func NewCDCPublisher(nc *nats.Conn, url string, replicas int, stream string, max
 	}
 	_, err = js.CreateOrUpdateStream(ctx, streamConfig)
 	if err != nil {
-		if nc.ConnectedClusterName() == "" {
-			return nil, err
-		}
-		slog.Warn("failed to create of update stream", "error", err)
+		return nil, err
 	}
 	return &CDCPublisher{
 		nc:      nc,
@@ -85,7 +79,6 @@ func (p *CDCPublisher) Publish(cs *sqlite.ChangeSet) error {
 	if err != nil {
 		return err
 	}
-	seq = pubAck.Sequence
 	slog.Info("published CDC message", "stream", pubAck.Stream, "seq", pubAck.Sequence, "duplicate", pubAck.Duplicate)
 	return nil
 }

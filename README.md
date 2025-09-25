@@ -6,11 +6,35 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
 - Use [ha-sync SQLite extension](https://github.com/litesql/ha-sync) to create live local read replicas
 - Change Data Capture (CDC)
 
-## Installation
+## Overview
+
+- [1. Installation](#1)
+  - [1.1 Install from source](#1.1)
+- [2 . Usage](#2)
+  - [2.1 Loading existed database to memory](#2.1)
+  - [2.2 Use database in disk](#2.2)
+  - [2.3 Load database from latest snapshot](#2.3)
+- [3. Local Read Replicas](#3)
+- [4. Using Docker](#4)
+- [5. PostgreSQL Wire Protocol](#5)
+- [6. HTTP API](#6)
+  - [6.1 Using bind parameters](#6.1)
+  - [6.2 Multiple commands (one transaction)](#6.2)
+  - [6.3 Backup database](#6.3)
+  - [6.4 Take a snapshot and save on NATS Object Store](#6.4)
+  - [6.5 Get latest snapshot from NATS Object Store](#6.5)
+  - [6.6 List all replications status](#6.6)
+  - [6.7 Get replication status](#6.7)
+- [7. Replication](#7)
+  - [7.1 CDC message format](#7.1)
+  - [7.2 Replication limitations](#7.2)
+
+
+## 1. Installation<a id='1'></a>
 
 - Download from [releases page](https://github.com/litesql/ha/releases).
 
-### Install from source
+### 1.1 Install from source<a id='1.1'></a>
 
 ```sh
 git clone https://github.com/litesql/ha.git
@@ -18,18 +42,18 @@ cd ha
 go install
 ```
 
-## Usage
+## 2. Usage<a id='2'></a>
 
 1. Start the first ha node (-m flag if you want to use in-memory)
 
 ```sh
-ha -m
+ha -n node1 -m
 ```
 
 2. Start an another ha node
 
 ```sh
-ha -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222
+ha -n node2 -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222
 ```
 
 3. Create a table
@@ -76,41 +100,25 @@ PGPASSWORD="ha" psql -h localhost -U ha -p 5433
 SELECT * FROM users;
 ```
 
-### Loading an database to memory
+### 2.1 Loading existed database to memory<a id='2.1'></a>
 
 ```sh
 ha -m mydatabase.db
 ```
 
-### Store database in disk
+### 2.2 Use database in disk<a id='2.2'></a>
 
 ```sh
 ha file:mydatabase.db?_journal=WAL&_busy_timeout=500
 ```
 
-### Backup database
+### 2.3 Load database from latest snapshot<a id='2.3'></a>
 
-```sh
-curl -O -J http://localhost:8080
-```
-
-### Take a snapshot and save on NATS Object Store
-
-```sh
-curl -X POST http://localhost:8080/snapshot
-```
-
-### Get latest snapshot from NATS Object Store
-
-```sh
-curl -O -J http://localhost:8080/snapshot
-```
-
-## Local Read Replicas
+## 3. Local Read Replicas<a id='3'></a>
 
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
 
-## Using Docker
+## 4. Using Docker<a id='4'></a>
 
 ```sh
 docker run --name ha \
@@ -121,15 +129,15 @@ ghcr.io/litesql/ha:latest
 
 - Set up a volume at /data to store the NATS streams state.
 
-## PostgreSQL Wire Protocol
+## 5. PostgreSQL Wire Protocol<a id='5'></a>
 
 - You can use any PostgreSQL driver to connect to ha.
 - The SQLite parser engine will proccess the commands.
 - PostgreSQL functions (and visual editors like pgadmim, dbeaver, etc) are not supported.
 
-## HTTP API
+## 6. HTTP API<a id='6'></a>
 
-- Using bind parameters:
+### 6.1 Using bind parameters<a id='6.1'></a>
 
 ```sh
 curl -d '[{
@@ -158,7 +166,7 @@ http://localhost:8080
 }
 ```
 
-- Multiple commands (one transaction)
+### 6.2 Multiple commands (one transaction)<a id='6.2'></a>
 
 ```sh
 curl -d '[
@@ -220,7 +228,37 @@ http://localhost:8080
 }
 ```
 
-## Replication
+### 6.3 Backup database<a id='6.3'></a>
+
+```sh
+curl -O -J http://localhost:8080
+```
+
+### 6.4 Take a snapshot and save on NATS Object Store<a id='6.4'></a>
+
+```sh
+curl -X POST http://localhost:8080/snapshot
+```
+
+### 6.5 Get latest snapshot from NATS Object Store<a id='6.5'></a>
+
+```sh
+curl -O -J http://localhost:8080/snapshot
+```
+
+### 6.6 List all replications status<a id='6.6'></a>
+
+```sh
+curl http://localhost:8080/replications
+```
+
+### 6.7 Get replication status<a id='6.7'></a>
+
+```sh
+curl http://localhost:8080/replications/{name}
+```
+
+## 7. Replication<a id='7'></a>
 
 - You can write to any server
 - Uses embedded or external NATS JetStream cluster
@@ -229,7 +267,7 @@ http://localhost:8080
 - Last writer wins
 - DDL commands are replicated (since v0.0.7)
 
-### CDC message format
+### 7.1 CDC message format<a id='7.1'></a>
 
 ```json
 {
@@ -268,7 +306,7 @@ http://localhost:8080
 }
 ```
 
-### Replication limitations
+### 7.2 Replication limitations<a id='7.2'></a>
 
 - Tables WITHOUT ROWID are not replicated
 - The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 

@@ -18,11 +18,13 @@ import (
 )
 
 type CDCSubscriber struct {
-	nc     *nats.Conn
-	js     jetstream.JetStream
-	node   string
-	stream string
-	db     *sql.DB
+	nc        *nats.Conn
+	js        jetstream.JetStream
+	consumer  jetstream.Consumer
+	node      string
+	stream    string
+	streamSeq uint64
+	db        *sql.DB
 }
 
 func NewCDCSubscriber(node string, nc *nats.Conn, url string, stream string, policy string, db *sql.DB) (*CDCSubscriber, error) {
@@ -121,7 +123,7 @@ func NewCDCSubscriber(node string, nc *nats.Conn, url string, stream string, pol
 		slog.Error("failed to start CDC consumer", "error", err, "node", s.node, "stream", s.stream)
 		return nil, err
 	}
-
+	s.consumer = consumer
 	return &s, nil
 }
 
@@ -130,6 +132,37 @@ func (s *CDCSubscriber) Close() {
 	if s.nc != nil && !s.nc.IsClosed() {
 		s.nc.Drain()
 	}
+}
+
+func (s *CDCSubscriber) DeliveredInfo(ctx context.Context, name string) ([]*jetstream.ConsumerInfo, error) {
+	stream, err := s.js.Stream(ctx, s.stream)
+	if err != nil {
+		return nil, err
+	}
+	if name != "" {
+		consumer, err := stream.Consumer(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		info, err := consumer.Info(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return []*jetstream.ConsumerInfo{info}, nil
+	}
+	listConsumers := stream.ListConsumers(ctx)
+	if listConsumers.Err() != nil {
+		return nil, listConsumers.Err()
+	}
+	listInfo := make([]*jetstream.ConsumerInfo, 0)
+	for info := range listConsumers.Info() {
+		listInfo = append(listInfo, info)
+	}
+	return listInfo, nil
+}
+
+func (s *CDCSubscriber) LatestSeq() uint64 {
+	return s.streamSeq
 }
 
 func (s *CDCSubscriber) handler(msg jetstream.Msg) {
@@ -159,4 +192,11 @@ func (s *CDCSubscriber) ack(msg jetstream.Msg) {
 	if err != nil {
 		slog.Error("failed to ack message", "error", err, "subject", msg.Subject())
 	}
+	meta, err := msg.Metadata()
+	if err != nil {
+		slog.Error("failed to get message metadata", "error", err, "subject", msg.Subject())
+		return
+	}
+	s.streamSeq = meta.Sequence.Stream
+
 }
