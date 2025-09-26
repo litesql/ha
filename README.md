@@ -116,6 +116,10 @@ ha file:mydatabase.db?_journal=WAL&_busy_timeout=500
 
 ### 2.3 Load database from latest snapshot<a id='2.3'></a>
 
+```sh
+ha --from-latest-snapsot
+```
+
 ## 3. Local Read Replicas<a id='3'></a>
 
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
