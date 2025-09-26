@@ -16,6 +16,7 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
   - [2.3 Load database from latest snapshot](#2.3)
 - [3. Local Read Replicas](#3)
 - [4. Using Docker](#4)
+  - [4.1 Cluster example](#4.1)
 - [5. PostgreSQL Wire Protocol](#5)
 - [6. HTTP API](#6)
   - [6.1 Using bind parameters](#6.1)
@@ -28,6 +29,7 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
 - [7. Replication](#7)
   - [7.1 CDC message format](#7.1)
   - [7.2 Replication limitations](#7.2)
+- [8. Configuration](#8)
 
 
 ## 1. Installation<a id='1'></a>
@@ -125,9 +127,25 @@ docker run --name ha \
 -e HA_MEMORY=true \
 -p 5432:5432 -p 8080:8080 -p 4222:4222 \
 ghcr.io/litesql/ha:latest
-```
 
 - Set up a volume at /data to store the NATS streams state.
+
+```
+### 4.1 Cluster example<a id='4.1'></a>
+
+- [Docker compose cluster](https://github.com/litesql/ha/blob/main/docker-compose.yml) example
+
+```sh
+docker compose up
+```
+
+- Services:
+
+| Instance | HTTP | PostgreSQL | NATS |
+|----------|------|------------|------|
+|node1     | 8080 | 5432       | 4222 |
+|node2     | 8081 | 5433       | 4223 |
+|node3     | 8082 | 5434       | 4224 |
 
 ## 5. PostgreSQL Wire Protocol<a id='5'></a>
 
@@ -312,3 +330,34 @@ curl http://localhost:8080/replications/{name}
 - The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
 - Use idempotents DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS)
 - Writing to any node in the cluster improves availability, but it can lead to consistency issues in certain edge cases. If your application values Consistency more than Availability, it's better to route all write operations through a single cluster node.
+
+## 8. Configuration<a id='8'></a>
+
+| Flag | Environment Variable | Default | Description |
+|------|----------------------|---------|-------------|
+| -n, --name | HA_NAME        | random  | Node name   |
+| -p, --port | HA_PORT        | 8080    | HTTP API tcp port |
+| -m, --memory | HA_MEMORY    | false   | Store database in memory |
+| --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
+| --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
+| --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS Server logging |
+| --nats-port | HA_NATS_PORT | 4222 | Embedded NATS server port (0 to disable) |
+| --nats-store-dir | HA_NATS_STORE_DIR | /tmp/nats | Embedded NATS server store directory |
+| --nats-user | HA_NATS_USER |  | Embedded NATS server user |
+| --nats-pass | HA_NATS_PASS |  | Embedded NATS server password |
+| --nats-config | HA_NATS_CONFIG | | Path to embedded NATS server config file (override other nats configurations) |
+| --pg-port | HA_PG_PORT | 5432 | Port to PostgreSQL Wire Protocol server |
+| --pg-user | HA_PG_USER | ha   | PostgreSQL Auth user |
+| --pg-pass | HA_PG_PASS | ha   | PostgreSQL Auth password |
+| --pg-cert | HA_PG_CERT |      | Path to PostgreSQL TLS certificate file |
+| --pg-key  | HA_PG_KEY  |      | Path to PostgreSQL TLS key file |
+| --concurrent-queries | HA_CONCURRENT_QUERIES | 50 | Number of concurrent queries (DB pool max) |
+| --extensions | HA_EXTENSIONS |  | Comma-separated list of SQLite extensions path to load |
+| --replicas | HA_REPLICAS | 1 | Number of replicas to keep for the stream and object store in clustered jetstream |
+| --replication-timeout | HA_REPLICATION_TIMEOUT | 15s | Replication publisher timeout |
+| --replication-stream | HA_REPLICATION_STREAM | ha_replication | Replication stream name |
+| --replication-max-age | HA_REPLICATION_MAX_AGE | 24h | Replication stream max age |
+| --replication-url | HA_REPLICATION_URL |  | Replication NATS url (defaults to embedded NATS server) |
+| --replication-policy | HA_REPLICATION_POLICY | all | eplication subscriver delivery policy (all|last|new|by_start_sequence=X|by_start_time=x) |
+| --version | HA_VERSION | false | Print version information and exit |
+| -c, --config | | | config file (optional) |
