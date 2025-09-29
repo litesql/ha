@@ -42,13 +42,14 @@ const (
 )
 
 type Statement struct {
-	source       string
-	hasDistinct  bool
-	hasReturning bool
-	typ          string
-	parameters   []string
-	columns      []string
-	ddl          bool
+	source         string
+	hasDistinct    bool
+	hasReturning   bool
+	typ            string
+	parameters     []string
+	columns        []string
+	ddl            bool
+	statementCount int
 }
 
 func NewStatement(ctx context.Context, sql string) (*Statement, error) {
@@ -63,6 +64,9 @@ func NewStatement(ctx context.Context, sql string) (*Statement, error) {
 	err := stmt.parse(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if stmt.statementCount > 1 {
+		return nil, fmt.Errorf("multiple SQL statements are not allowed: %w", ErrInvalidSQL)
 	}
 	cache.Add(sql, stmt)
 	return stmt, nil
@@ -198,6 +202,7 @@ func (s *sqlListener) ExitSelect_stmt(c *parser.Select_stmtContext) {
 }
 
 func (s *sqlListener) ExitSql_stmt(c *parser.Sql_stmtContext) {
+	s.statement.statementCount++
 	if c.EXPLAIN_() != nil {
 		s.statement.typ = TypeExplain
 		s.statement.columns = []string{"id", "parent", "notused", "detail"}
