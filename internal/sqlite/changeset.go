@@ -15,6 +15,7 @@ type ChangeSet struct {
 	ProcessID int64    `json:"process_id"`
 	Changes   []Change `json:"changes"`
 	Timestamp int64    `json:"timestamp_ns"`
+	StreamSeq uint64   `json:"-"`
 }
 
 func NewChangeSet(node string) *ChangeSet {
@@ -96,7 +97,7 @@ func (cs *ChangeSet) Apply() error {
 			continue
 		}
 		if err != nil {
-			slog.Error("failed to apply change", "error", err, "operation", change.Operation, "table", change.Table)
+			slog.Error("failed to apply change", "error", err, "stream_seq", cs.StreamSeq, "sql", sql)
 			err = errors.Join(err, tx.Rollback())
 			return err
 		}

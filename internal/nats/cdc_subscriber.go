@@ -134,6 +134,14 @@ func (s *CDCSubscriber) Close() {
 	}
 }
 
+func (s *CDCSubscriber) RemoveConsumer(ctx context.Context, name string) error {
+	stream, err := s.js.Stream(ctx, s.stream)
+	if err != nil {
+		return err
+	}
+	return stream.DeleteConsumer(ctx, name)
+}
+
 func (s *CDCSubscriber) DeliveredInfo(ctx context.Context, name string) ([]*jetstream.ConsumerInfo, error) {
 	stream, err := s.js.Stream(ctx, s.stream)
 	if err != nil {
@@ -166,37 +174,37 @@ func (s *CDCSubscriber) LatestSeq() uint64 {
 }
 
 func (s *CDCSubscriber) handler(msg jetstream.Msg) {
-	var cs sqlite.ChangeSet
-	err := json.Unmarshal(msg.Data(), &cs)
-	if err != nil {
-		slog.Error("failed to unmarshal CDC message", "error", err)
-		s.ack(msg)
-		return
-	}
-	if cs.Node == s.node && cs.ProcessID == processID {
-		// Ignore changes originated from this process and node itself
-		s.ack(msg)
-		return
-	}
-	slog.Info("received CDC message", "subject", msg.Subject(), "node", cs.Node, "changes", len(cs.Changes))
-	err = cs.Apply()
-	if err != nil {
-		slog.Error("failed to apply CDC message", "error", err)
-		return
-	}
-	s.ack(msg)
-}
-
-func (s *CDCSubscriber) ack(msg jetstream.Msg) {
-	err := msg.Ack()
-	if err != nil {
-		slog.Error("failed to ack message", "error", err, "subject", msg.Subject())
-	}
 	meta, err := msg.Metadata()
 	if err != nil {
 		slog.Error("failed to get message metadata", "error", err, "subject", msg.Subject())
 		return
 	}
-	s.streamSeq = meta.Sequence.Stream
+	var cs sqlite.ChangeSet
+	cs.StreamSeq = meta.Sequence.Stream
+	err = json.Unmarshal(msg.Data(), &cs)
+	if err != nil {
+		slog.Error("failed to unmarshal CDC message", "error", err, "stream_seq", cs.StreamSeq)
+		s.ack(msg, meta)
+		return
+	}
+	if cs.Node == s.node && cs.ProcessID == processID {
+		// Ignore changes originated from this process and node itself
+		s.ack(msg, meta)
+		return
+	}
+	slog.Info("received CDC message", "subject", msg.Subject(), "node", cs.Node, "changes", len(cs.Changes), "seq", meta.Sequence.Stream)
+	err = cs.Apply()
+	if err != nil {
+		slog.Error("failed to apply CDC message", "error", err, "stream_seq", cs.StreamSeq)
+		return
+	}
+	s.ack(msg, meta)
+}
 
+func (s *CDCSubscriber) ack(msg jetstream.Msg, meta *jetstream.MsgMetadata) {
+	err := msg.Ack()
+	if err != nil {
+		slog.Error("failed to ack message", "error", err, "subject", msg.Subject(), "stream_seq", meta.Sequence.Stream)
+	}
+	s.streamSeq = meta.Sequence.Stream
 }

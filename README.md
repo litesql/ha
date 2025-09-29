@@ -26,6 +26,7 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
   - [6.5 Get latest snapshot from NATS Object Store](#6.5)
   - [6.6 List all replications status](#6.6)
   - [6.7 Get replication status](#6.7)
+  - [6.8 Remove replication (consumer)](#6.8)
 - [7. Replication](#7)
   - [7.1 CDC message format](#7.1)
   - [7.2 Replication limitations](#7.2)
@@ -145,11 +146,11 @@ docker compose up
 
 - Services:
 
-| Instance | HTTP | PostgreSQL | NATS |
-|----------|------|------------|------|
-|node1     | 8080 | 5432       | 4222 |
-|node2     | 8081 | 5433       | 4223 |
-|node3     | 8082 | 5434       | 4224 |
+| Instance | HTTP | Pg Wire | NATS |
+|----------|------|---------|------|
+|node1     | 8080 | 5432    | 4222 |
+|node2     | 8081 | 5433    | 4223 |
+|node3     | 8082 | 5434    | 4224 |
 
 ## 5. PostgreSQL Wire Protocol<a id='5'></a>
 
@@ -278,6 +279,12 @@ curl http://localhost:8080/replications
 
 ```sh
 curl http://localhost:8080/replications/{name}
+```
+
+### 6.8 Remove replication (consumer)<a id='6.8'></a>
+
+```sh
+curl -X DELETE http://localhost:8080/replications/{name}
 ```
 
 ## 7. Replication<a id='7'></a>

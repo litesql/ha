@@ -17,6 +17,8 @@ import (
 
 const latestSnapshotName = "latest"
 
+var latestSnapshotSeq uint64
+
 type SequenceProvider interface {
 	LatestSeq() uint64
 }
@@ -67,6 +69,7 @@ func NewSnapshotter(ctx context.Context, nc *nats.Conn, url string, replicas int
 	s := &Snapshotter{
 		objectStore: objectStore,
 	}
+	latestSnapshotSeq, _ = s.LatestSnapshotSequence(ctx)
 	if interval > 0 {
 		go s.start(ctx, dsn, memdb, interval)
 	}
@@ -85,7 +88,7 @@ func (s *Snapshotter) start(ctx context.Context, dsn string, memdb bool, interva
 			sequence, err := s.TakeSnapshot(ctx, dsn, memdb)
 			if err != nil {
 				slog.Error("failed to take snapshot", "error", err)
-			} else {
+			} else if sequence > 0 {
 				slog.Info("snapshot taken", "sequence", sequence)
 			}
 		case <-ctx.Done():
@@ -99,6 +102,9 @@ func (s *Snapshotter) TakeSnapshot(ctx context.Context, dsn string, memdb bool) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	sequence = s.seqProvider.LatestSeq()
+	if sequence <= latestSnapshotSeq {
+		return 0, nil
+	}
 	headers := make(nats.Header)
 	headers.Set("seq", fmt.Sprint(sequence))
 	bkpFile := fmt.Sprintf("bkp_%d", time.Now().Nanosecond())
@@ -132,6 +138,7 @@ func (s *Snapshotter) TakeSnapshot(ctx context.Context, dsn string, memdb bool) 
 		if err != nil {
 			errReaderCh <- err
 		} else {
+			latestSnapshotSeq = sequence
 			slog.Info("snapshot stored", "bucket", info.Bucket, "name", info.Name, "size", info.Size, "modTime", info.ModTime)
 			errReaderCh <- nil
 		}
@@ -171,7 +178,7 @@ func (s *Snapshotter) TakeSnapshot(ctx context.Context, dsn string, memdb bool) 
 	return
 }
 
-func (s *Snapshotter) GetLatestSnapshot(ctx context.Context) (uint64, io.ReadCloser, error) {
+func (s *Snapshotter) LatestSnapshot(ctx context.Context) (uint64, io.ReadCloser, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -190,4 +197,23 @@ func (s *Snapshotter) GetLatestSnapshot(ctx context.Context) (uint64, io.ReadClo
 
 	reader, err := s.objectStore.Get(ctx, latestSnapshotName)
 	return sequence, reader, err
+}
+
+func (s *Snapshotter) LatestSnapshotSequence(ctx context.Context) (uint64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	info, err := s.objectStore.GetInfo(ctx, latestSnapshotName)
+	if err != nil {
+		return 0, err
+	}
+	sequenceStr := info.Headers.Get("seq")
+	var sequence uint64
+	if sequenceStr != "" {
+		sequence, err = strconv.ParseUint(sequenceStr, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("convert sequence header: %w", err)
+		}
+	}
+	return sequence, err
 }

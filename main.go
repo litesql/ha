@@ -242,7 +242,7 @@ func run() error {
 
 		if *fromLatestSnapshot {
 			slog.Info("loading latest snapshot from NATS JetStream Object Store")
-			sequence, reader, err := snapshotter.GetLatestSnapshot(context.Background())
+			sequence, reader, err := snapshotter.LatestSnapshot(context.Background())
 			if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
 				return fmt.Errorf("failed to load latest snapshot: %w", err)
 			}
@@ -355,7 +355,7 @@ func run() error {
 			http.Error(w, "snapshotter not enabled", http.StatusNotImplemented)
 			return
 		}
-		sequence, reader, err := snapshotter.GetLatestSnapshot(r.Context())
+		sequence, reader, err := snapshotter.LatestSnapshot(r.Context())
 		if err != nil {
 			slog.ErrorContext(r.Context(), "failed o get latest snapshot", "error", err)
 			http.Error(w, fmt.Sprintf("failed to get latest snapshot: %v", err), http.StatusInternalServerError)
@@ -398,6 +398,21 @@ func run() error {
 		json.NewEncoder(w).Encode(map[string][]*jetstream.ConsumerInfo{
 			"replications": info,
 		})
+	})
+
+	mux.HandleFunc("DELETE /replications/{name}", func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		if name == "" {
+			http.Error(w, "name is required", http.StatusInternalServerError)
+			return
+		}
+		err := cdcSubscriber.RemoveConsumer(r.Context(), name)
+		if err != nil {
+			slog.Error("failed remove consumer", "error", err, "name", name)
+			http.Error(w, fmt.Sprintf("failed to remove consumer: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	pgServer, err := pgwire.NewServer(pgwire.Config{

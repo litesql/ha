@@ -56,6 +56,7 @@ func RunEmbeddedNATSServer(cfg Config) (*nats.Conn, *server.Server, error) {
 		}
 	}
 	opts.JetStream = true
+	opts.DisableJetStreamBanner = true
 	ns, err := server.NewServer(opts)
 	if err != nil {
 		return nil, nil, err
@@ -71,7 +72,8 @@ func RunEmbeddedNATSServer(cfg Config) (*nats.Conn, *server.Server, error) {
 	}
 
 	if ns.ClusterName() != "" {
-		time.Sleep(time.Second)
+		// wait for the leader
+		waitForLeader(ns, opts.Cluster.PoolSize)
 	}
 
 	slog.Info("embedded NATS server is ready", "cluster", ns.ClusterName(), "jetstream", ns.JetStreamEnabled())
@@ -81,4 +83,21 @@ func RunEmbeddedNATSServer(cfg Config) (*nats.Conn, *server.Server, error) {
 		return nil, nil, err
 	}
 	return nc, ns, nil
+}
+
+func waitForLeader(ns *server.Server, size int) {
+	for {
+		raftz := ns.Raftz(&server.RaftzOptions{})
+		if raftz != nil {
+			for _, raftGroup := range *raftz {
+				for _, raft := range raftGroup {
+					if raft.Leader != "" {
+						return
+					}
+				}
+			}
+		}
+		slog.Info("waiting for the cluster leader", "peers", len(ns.JetStreamClusterPeers()), "size", size)
+		time.Sleep(500 * time.Millisecond)
+	}
 }
