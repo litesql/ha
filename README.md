@@ -5,6 +5,8 @@
 [![receives](https://img.shields.io/liberapay/receives/walterwanderley.svg?logo=liberapay)](https://liberapay.com/walterwanderley/donate)
 [![patrons](https://img.shields.io/liberapay/patrons/walterwanderley.svg?logo=liberapay)](https://liberapay.com/walterwanderley/donate)
 
+![](ha.png)
+
 
 Highly available leaderless SQLite cluster powered by embedded NATS JetStream server.
 
