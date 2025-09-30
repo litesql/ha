@@ -1,10 +1,11 @@
+---
+# Feel free to add content and custom Front Matter to this file.
+# To modify the layout, see https://jekyllrb.com/docs/themes/#overriding-theme-defaults
+
+layout: home
+---
+
 # ha
-
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![LiberaPay](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/walterwanderley/donate)
-[![receives](https://img.shields.io/liberapay/receives/walterwanderley.svg?logo=liberapay)](https://liberapay.com/walterwanderley/donate)
-[![patrons](https://img.shields.io/liberapay/patrons/walterwanderley.svg?logo=liberapay)](https://liberapay.com/walterwanderley/donate)
-
 
 Highly available leaderless SQLite cluster powered by embedded NATS JetStream server.
 
@@ -375,6 +376,6 @@ curl -X DELETE http://localhost:8080/replications/{name}
 | --replication-stream | HA_REPLICATION_STREAM | ha_replication | Replication stream name |
 | --replication-max-age | HA_REPLICATION_MAX_AGE | 24h | Replication stream max age |
 | --replication-url | HA_REPLICATION_URL |  | Replication NATS url (defaults to embedded NATS server) |
-| --replication-policy | HA_REPLICATION_POLICY | all | eplication subscriver delivery policy (all|last|new|by_start_sequence=X|by_start_time=x) |
+| --replication-policy | HA_REPLICATION_POLICY | all | eplication subscriver delivery policy (all, last, new, by_start_sequence=X, by_start_time=x) |
 | --version | HA_VERSION | false | Print version information and exit |
 | -c, --config | | | config file (optional) |
