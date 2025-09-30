@@ -8,11 +8,11 @@ permalink: /downloads/
 
 | Operational System | Architecture |  |
 |--------------------|------|------|
-| Linux              | amd64 (x86)| [ha_Linux_x86_64.tar.gz](https://github.com/litesql/ha/releases/download/latest/ha_Linux_x86_64.tar.gz) |
-| Linux              | arm64 | [ha_Linux_arm64.tar.gz](https://github.com/litesql/ha/releases/download/latest/ha_Linux_arm64.tar.gz) |
-| MacOS              | amd64 (x86)| [ha_Darwin_x86_64.tar.gz](https://github.com/litesql/ha/releases/download/latest/ha_Darwin_x86_64.tar.gz) |
-| MacOS              | arm64 | [ha_Darwin_arm64.tar.gz](https://github.com/litesql/ha/releases/download/latest/ha_Darwin_arm64.tar.gz) |
-| Windows            | amd64 (x86) | [ha_Windows_x86_64.zip](https://github.com/litesql/ha/releases/download/latest/ha_Windows_x86_64.zip) |
+| Linux              | amd64 (x86)| [ha_Linux_x86_64.tar.gz](https://github.com/litesql/ha/releases/latest/download/ha_Linux_x86_64.tar.gz) |
+| Linux              | arm64 | [ha_Linux_arm64.tar.gz](https://github.com/litesql/ha/releases/latest/download/ha_Linux_arm64.tar.gz) |
+| MacOS              | amd64 (x86)| [ha_Darwin_x86_64.tar.gz](https://github.com/litesql/ha/releases/latest/download/ha_Darwin_x86_64.tar.gz) |
+| MacOS              | arm64 | [ha_Darwin_arm64.tar.gz](https://github.com/litesql/ha/releases/latest/download/ha_Darwin_arm64.tar.gz) |
+| Windows            | amd64 (x86) | [ha_Windows_x86_64.zip](https://github.com/litesql/ha/releases/latest/download/ha_Windows_x86_64.zip) |
 
 ## Install from source
 
