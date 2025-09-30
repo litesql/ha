@@ -5,8 +5,6 @@
 layout: home
 ---
 
-# ha
-
 Highly available leaderless SQLite cluster powered by embedded NATS JetStream server.
 
 - Connect using HTTP API or PostgreSQL Wire Protocol
