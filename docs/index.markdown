@@ -5,6 +5,8 @@
 layout: home
 ---
 
+![](https://github.com/litesql/ha/blob/main/ha.png?raw=true)
+
 Highly available leaderless SQLite cluster powered by embedded NATS JetStream server.
 
 - Connect using HTTP API or PostgreSQL Wire Protocol
