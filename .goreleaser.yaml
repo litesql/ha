@@ -68,8 +68,7 @@ archives:
     ids: [ha, ha_linux_arm64, ha_windows, ha_darwin]
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
-      ha_v
-      {{- .Version }}_
+      ha_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
