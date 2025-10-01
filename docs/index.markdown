@@ -18,6 +18,7 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
 
 - [1. Installation](#1)
   - [1.1 Install from source](#1.1)
+  - [1.2 Install using Helm](#1.2)
 - [2 . Usage](#2)
   - [2.1 Loading existed database to memory](#2.1)
   - [2.2 Use database in disk](#2.2)
@@ -52,6 +53,28 @@ git clone https://github.com/litesql/ha.git
 cd ha
 go install
 ```
+
+### 1.2 Install using Helm<a id='1.2'></a>
+
+1. Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
+
+```sh
+helm repo add litesql https://litesql.github.io/helm-charts
+```
+
+2. Update the chart repository:
+
+```sh
+helm repo update
+```
+
+3. Deploy ha to kubernetes:
+
+```sh
+helm install ha litesql/ha
+```
+
+- Visit [litesql helm charts repository](https://litesql.github.io/helm-charts) to customize the installation;
 
 ## 2. Usage<a id='2'></a>
 
