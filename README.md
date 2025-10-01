@@ -355,7 +355,7 @@ curl -X DELETE http://localhost:8080/replications/{name}
 
 | Flag | Environment Variable | Default | Description |
 |------|----------------------|---------|-------------|
-| -n, --name | HA_NAME        | random  | Node name   |
+| -n, --name | HA_NAME        | $HOSTNAME  | Node name   |
 | -p, --port | HA_PORT        | 8080    | HTTP API tcp port |
 | -m, --memory | HA_MEMORY    | false   | Store database in memory |
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |

@@ -138,10 +138,12 @@ func run() error {
 
 	nodeName := *name
 	if nodeName == "" {
-		// generate node name
-		nodeName = fmt.Sprintf("ha_%d", time.Now().UnixNano())
+		var err error
+		nodeName, err = os.Hostname()
+		if err != nil {
+			return fmt.Errorf("failed to get hostname: %w", err)
+		}
 	}
-
 	var (
 		natsConn   *nats.Conn
 		natsServer *server.Server
@@ -152,6 +154,8 @@ func run() error {
 			Name:       nodeName,
 			Port:       *natsPort,
 			StoreDir:   *natsStoreDir,
+			User:       *natsUser,
+			Pass:       *natsPass,
 			File:       *natsConfig,
 			EnableLogs: *natsLogs,
 		})
