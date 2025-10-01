@@ -3,6 +3,7 @@ package nats
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
@@ -57,6 +58,12 @@ func RunEmbeddedNATSServer(cfg Config) (*nats.Conn, *server.Server, error) {
 	}
 	opts.JetStream = true
 	opts.DisableJetStreamBanner = true
+	if opts.Cluster.Name != "" && opts.ServerName == "" {
+		opts.ServerName, err = os.Hostname()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get hostname for nats server name: %w", err)
+		}
+	}
 	ns, err := server.NewServer(opts)
 	if err != nil {
 		return nil, nil, err
