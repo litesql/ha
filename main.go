@@ -98,7 +98,7 @@ func main() {
 	replicationStream = fs.StringLong("replication-stream", "ha_replication", "Replication stream name")
 	replicationMaxAge = fs.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
 	replicationURL = fs.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
-	replicationPolicy = fs.StringLong("replication-policy", "", "Replication subscriver delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
+	replicationPolicy = fs.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
 	printVersion := fs.BoolLong("version", "Print version information and exit")
 	_ = fs.String('c', "config", "", "config file (optional)")
 
