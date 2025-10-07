@@ -18,7 +18,7 @@ Powered by an embedded NATS JetStream server.
 - 🔁 Replicate data using embedded or external NATS server  
 - 📚 Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)  
 - 🔄 Supports Change Data Capture (CDC)  
-- 📖 Full documentation: [https://litesql.github.io/ha/](https://litesql.github.io/ha/)\w
+- 📖 Full documentation: [https://litesql.github.io/ha/](https://litesql.github.io/ha/)
 
 ## 🚀 Getting Started
 
