@@ -18,28 +18,27 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
 
 - [1. Installation](#1)
   - [1.1 Install from source](#1.1)
-  - [1.2 Install using Helm](#1.2)
+  - [1.2 Install using Docker](#1.2)
+  - [1.3 Install using Helm](#1.3)
 - [2 . Usage](#2)
   - [2.1 Loading existed database to memory](#2.1)
   - [2.2 Use database in disk](#2.2)
   - [2.3 Load database from latest snapshot](#2.3)
 - [3. Local Read Replicas](#3)
-- [4. Using Docker](#4)
-  - [4.1 Cluster example](#4.1)
-- [5. PostgreSQL Wire Protocol](#5)
-- [6. HTTP API](#6)
-  - [6.1 Using bind parameters](#6.1)
-  - [6.2 Multiple commands (one transaction)](#6.2)
-  - [6.3 Backup database](#6.3)
-  - [6.4 Take a snapshot and save on NATS Object Store](#6.4)
-  - [6.5 Get latest snapshot from NATS Object Store](#6.5)
-  - [6.6 List all replications status](#6.6)
-  - [6.7 Get replication status](#6.7)
-  - [6.8 Remove replication (consumer)](#6.8)
-- [7. Replication](#7)
-  - [7.1 CDC message format](#7.1)
-  - [7.2 Replication limitations](#7.2)
-- [8. Configuration](#8)
+- [4. PostgreSQL Wire Protocol](#4)
+- [5. HTTP API](#5)
+  - [5.1 Using bind parameters](#5.1)
+  - [5.2 Multiple commands (one transaction)](#5.2)
+  - [5.3 Backup database](#5.3)
+  - [5.4 Take a snapshot and save on NATS Object Store](#5.4)
+  - [5.5 Get latest snapshot from NATS Object Store](#5.5)
+  - [5.6 List all replications status](#5.6)
+  - [5.7 Get replication status](#5.7)
+  - [5.8 Remove replication (consumer)](#5.8)
+- [6. Replication](#6)
+  - [6.1 CDC message format](#6.1)
+  - [6.2 Replication limitations](#6.2)
+- [7. Configuration](#7)
 
 
 ## 1. Installation<a id='1'></a>
@@ -54,7 +53,35 @@ cd ha
 go install
 ```
 
-### 1.2 Install using Helm<a id='1.2'></a>
+### 1.2 Install using Docker<a id='1.2'></a>
+
+```sh
+docker run --name ha \
+-e HA_MEMORY=true \
+-p 5432:5432 -p 8080:8080 -p 4222:4222 \
+ghcr.io/litesql/ha:latest
+
+- Set up a volume at /data to store the NATS streams state.
+
+```
+#### Cluster example
+
+- [Docker compose cluster](https://github.com/litesql/ha/blob/main/docker-compose.yml) example
+
+```sh
+docker compose up
+```
+
+- Services:
+
+| Instance | HTTP | Pg Wire | NATS |
+|----------|------|---------|------|
+|node1     | 8080 | 5432    | 4222 |
+|node2     | 8081 | 5433    | 4223 |
+|node3     | 8082 | 5434    | 4224 |
+
+
+### 1.3 Install using Helm<a id='1.2'></a>
 
 1. Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
 
@@ -156,42 +183,15 @@ ha --from-latest-snapsot
 
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
 
-## 4. Using Docker<a id='4'></a>
-
-```sh
-docker run --name ha \
--e HA_MEMORY=true \
--p 5432:5432 -p 8080:8080 -p 4222:4222 \
-ghcr.io/litesql/ha:latest
-
-- Set up a volume at /data to store the NATS streams state.
-
-```
-### 4.1 Cluster example<a id='4.1'></a>
-
-- [Docker compose cluster](https://github.com/litesql/ha/blob/main/docker-compose.yml) example
-
-```sh
-docker compose up
-```
-
-- Services:
-
-| Instance | HTTP | Pg Wire | NATS |
-|----------|------|---------|------|
-|node1     | 8080 | 5432    | 4222 |
-|node2     | 8081 | 5433    | 4223 |
-|node3     | 8082 | 5434    | 4224 |
-
-## 5. PostgreSQL Wire Protocol<a id='5'></a>
+## 4. PostgreSQL Wire Protocol<a id='4'></a>
 
 - You can use any PostgreSQL driver to connect to ha.
 - The SQLite parser engine will proccess the commands.
 - PostgreSQL functions (and visual editors like pgadmim, dbeaver, etc) are not supported.
 
-## 6. HTTP API<a id='6'></a>
+## 5. HTTP API<a id='5'></a>
 
-### 6.1 Using bind parameters<a id='6.1'></a>
+### 5.1 Using bind parameters<a id='5.1'></a>
 
 ```sh
 curl -d '[{
@@ -220,7 +220,7 @@ http://localhost:8080
 }
 ```
 
-### 6.2 Multiple commands (one transaction)<a id='6.2'></a>
+### 5.2 Multiple commands (one transaction)<a id='5.2'></a>
 
 ```sh
 curl -d '[
@@ -282,43 +282,43 @@ http://localhost:8080
 }
 ```
 
-### 6.3 Backup database<a id='6.3'></a>
+### 5.3 Backup database<a id='5.3'></a>
 
 ```sh
 curl -O -J http://localhost:8080
 ```
 
-### 6.4 Take a snapshot and save on NATS Object Store<a id='6.4'></a>
+### 5.4 Take a snapshot and save on NATS Object Store<a id='5.4'></a>
 
 ```sh
 curl -X POST http://localhost:8080/snapshot
 ```
 
-### 6.5 Get latest snapshot from NATS Object Store<a id='6.5'></a>
+### 5.5 Get latest snapshot from NATS Object Store<a id='5.5'></a>
 
 ```sh
 curl -O -J http://localhost:8080/snapshot
 ```
 
-### 6.6 List all replications status<a id='6.6'></a>
+### 5.6 List all replications status<a id='5.6'></a>
 
 ```sh
 curl http://localhost:8080/replications
 ```
 
-### 6.7 Get replication status<a id='6.7'></a>
+### 5.7 Get replication status<a id='5.7'></a>
 
 ```sh
 curl http://localhost:8080/replications/{name}
 ```
 
-### 6.8 Remove replication (consumer)<a id='6.8'></a>
+### 5.8 Remove replication (consumer)<a id='5.8'></a>
 
 ```sh
 curl -X DELETE http://localhost:8080/replications/{name}
 ```
 
-## 7. Replication<a id='7'></a>
+## 6. Replication<a id='6'></a>
 
 - You can write to any server
 - Uses embedded or external NATS JetStream cluster
@@ -327,7 +327,7 @@ curl -X DELETE http://localhost:8080/replications/{name}
 - Last writer wins
 - DDL commands are replicated (since v0.0.7)
 
-### 7.1 CDC message format<a id='7.1'></a>
+### 6.1 CDC message format<a id='6.1'></a>
 
 ```json
 {
@@ -366,14 +366,14 @@ curl -X DELETE http://localhost:8080/replications/{name}
 }
 ```
 
-### 7.2 Replication limitations<a id='7.2'></a>
+### 6.2 Replication limitations<a id='6.2'></a>
 
 - Tables WITHOUT ROWID are not replicated
 - The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
 - Use idempotents DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS)
 - Writing to any node in the cluster improves availability, but it can lead to consistency issues in certain edge cases. If your application values Consistency more than Availability, it's better to route all write operations through a single cluster node.
 
-## 8. Configuration<a id='8'></a>
+## 7. Configuration<a id='7'></a>
 
 | Flag | Environment Variable | Default | Description |
 |------|----------------------|---------|-------------|
@@ -400,6 +400,6 @@ curl -X DELETE http://localhost:8080/replications/{name}
 | --replication-stream | HA_REPLICATION_STREAM | ha_replication | Replication stream name |
 | --replication-max-age | HA_REPLICATION_MAX_AGE | 24h | Replication stream max age |
 | --replication-url | HA_REPLICATION_URL |  | Replication NATS url (defaults to embedded NATS server) |
-| --replication-policy | HA_REPLICATION_POLICY | all | eplication subscriver delivery policy (all, last, new, by_start_sequence=X, by_start_time=x) |
+| --replication-policy | HA_REPLICATION_POLICY | all | Replication subscriber delivery policy (all, last, new, by_start_sequence=X, by_start_time=x) |
 | --version | HA_VERSION | false | Print version information and exit |
 | -c, --config | | | config file (optional) |
