@@ -3,7 +3,7 @@ package sqlite
 import (
 	"fmt"
 
-	"github.com/mattn/go-sqlite3"
+	"github.com/litesql/go-sqlite3"
 )
 
 func getChange(d *sqlite3.SQLitePreUpdateData) (c Change, ok bool) {

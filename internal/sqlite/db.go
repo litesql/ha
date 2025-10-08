@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mattn/go-sqlite3"
+	"github.com/litesql/go-sqlite3"
 )
 
 var (

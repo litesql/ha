@@ -2,15 +2,13 @@ module github.com/litesql/ha
 
 go 1.25
 
-replace github.com/mattn/go-sqlite3 => github.com/litesql/go-sqlite3 v1.14.33
-
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jeroenrinzema/psql-wire v0.15.0
 	github.com/lib/pq v1.10.9
-	github.com/mattn/go-sqlite3 v1.14.32
+	github.com/litesql/go-sqlite3 v1.14.34
 	github.com/nats-io/nats-server/v2 v2.12.0
 	github.com/nats-io/nats.go v1.46.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
