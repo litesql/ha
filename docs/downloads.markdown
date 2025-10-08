@@ -35,19 +35,19 @@ ghcr.io/litesql/ha:latest
 
 ## Install from helm
 
-1. Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
+- Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
 
 ```sh
 helm repo add litesql https://litesql.github.io/helm-charts
 ```
 
-2. Update the chart repository:
+- Update the chart repository:
 
 ```sh
 helm repo update
 ```
 
-3. Deploy ha to kubernetes:
+- Deploy ha to kubernetes:
 
 ```sh
 helm install ha litesql/ha

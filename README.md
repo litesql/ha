@@ -27,7 +27,7 @@ Download and install the [latest release](https://github.com/litesql/ha/releases
 ### 1. Start the first **ha** instance
 
 ```sh
-ha -n node1 file:mydatabase.db?_journal=WAL&_busy_timeout=5000
+ha -n node1 "file:mydatabase.db?_journal=WAL&_busy_timeout=5000"
 ```
 
 This command launches:
@@ -39,7 +39,7 @@ This command launches:
 ### 2. Start a second **ha** instance
 
 ```sh
-ha -n node2 -p 8081 --nats-port 0 --pg-port 5433 --replication-url nats://localhost:4222 file:mydatabase2.db?_journal=WAL&_busy_timeout=5000
+ha -n node2 -p 8081 --nats-port 0 --pg-port 5433 --replication-url nats://localhost:4222 "file:mydatabase2.db?_journal=WAL&_busy_timeout=5000"
 ```
 
 This command starts:
@@ -76,7 +76,7 @@ SELECT * FROM users;
 
 ```
 
-### 5. Checkout the full documentation for the HTTP API
+### 5. Please refer to the complete documentation for the HTTP API
 
 [HTTP API](https://litesql.github.io/ha/#5)
 

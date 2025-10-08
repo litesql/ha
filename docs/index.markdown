@@ -83,19 +83,19 @@ docker compose up
 
 ### 1.3 Install using Helm<a id='1.2'></a>
 
-1. Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
+- Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
 
 ```sh
 helm repo add litesql https://litesql.github.io/helm-charts
 ```
 
-2. Update the chart repository:
+- Update the chart repository:
 
 ```sh
 helm repo update
 ```
 
-3. Deploy ha to kubernetes:
+- Deploy ha to kubernetes:
 
 ```sh
 helm install ha litesql/ha
@@ -105,19 +105,19 @@ helm install ha litesql/ha
 
 ## 2. Usage<a id='2'></a>
 
-1. Start the first ha node (-m flag if you want to use in-memory)
+- Start the first ha node (-m flag if you want to use in-memory)
 
 ```sh
 ha -n node1 -m
 ```
 
-2. Start an another ha node
+- Start an another ha node
 
 ```sh
 ha -n node2 -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222
 ```
 
-3. Create a table
+- Create a table
 
 ```sh
 curl -d '[
@@ -128,7 +128,7 @@ curl -d '[
 http://localhost:8080
 ```
 
-4. Insert some data using HTTP client
+- Insert some data using HTTP client
 
 ```sh
 curl -d '[
@@ -140,7 +140,7 @@ curl -d '[
 http://localhost:8080
 ```
 
-5. Or use a PostgreSQL client
+- Or use a PostgreSQL client
 
 ```sh
 PGPASSWORD="ha" psql -h localhost -U ha
@@ -151,7 +151,7 @@ INSERT INTO users(name) VALUES('HA user from PostgreSQL Wire Protocol');
 SELECT * FROM users;
 ```
 
-6. Connect to another server and check the values
+- Connect to another server and check the values
 
 ```sh
 PGPASSWORD="ha" psql -h localhost -U ha -p 5433
@@ -170,7 +170,7 @@ ha -m mydatabase.db
 ### 2.2 Use database in disk<a id='2.2'></a>
 
 ```sh
-ha file:mydatabase.db?_journal=WAL&_busy_timeout=500
+ha "file:mydatabase.db?_journal=WAL&_busy_timeout=500"
 ```
 
 ### 2.3 Load database from latest snapshot<a id='2.3'></a>
@@ -380,6 +380,7 @@ curl -X DELETE http://localhost:8080/replications/{name}
 | -n, --name | HA_NAME        | $HOSTNAME | Node name   |
 | -p, --port | HA_PORT        | 8080    | HTTP API tcp port |
 | -m, --memory | HA_MEMORY    | false   | Store database in memory |
+| --log-level | HA_LOG_LEVEL  | info    | Log level (info, warn, error or debug) |
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
 | --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS Server logging |

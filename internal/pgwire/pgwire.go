@@ -14,6 +14,7 @@ import (
 	"github.com/jeroenrinzema/psql-wire/codes"
 	psqlerr "github.com/jeroenrinzema/psql-wire/errors"
 	"github.com/lib/pq/oid"
+	"github.com/litesql/go-ha"
 
 	"github.com/litesql/ha/internal/sqlite"
 )
@@ -110,7 +111,7 @@ func parseFn(db *sql.DB) wire.ParseFn {
 			}))
 		}
 
-		stmt, err := sqlite.NewStatement(ctx, sql)
+		stmt, err := ha.Parse(ctx, sql)
 		if err != nil {
 			err = psqlerr.WithCode(err, codes.SyntaxErrorOrAccessRuleViolation)
 			return
@@ -157,7 +158,7 @@ type execerQuerier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
-func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.PreparedStatements, error) {
+func handler(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.PreparedStatements, error) {
 	if len(stmt.Parameters()) > 0 {
 		return handlerPrepared(ctx, stmt, db)
 	}
@@ -169,7 +170,6 @@ func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.Prep
 	if tx, ok := wire.GetAttribute(ctx, transactionAttribute); ok && tx != nil {
 		ctxTx := tx.(*connAndTx)
 		eq = ctxTx.tx
-		conn = ctxTx.conn
 	} else {
 		conn, err = db.Conn(context.Background())
 		if err != nil {
@@ -178,7 +178,7 @@ func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.Prep
 		defer conn.Close()
 		eq = conn
 	}
-	resp, err := sqlite.Exec(ctx, conn, eq, stmt, nil)
+	resp, err := sqlite.Exec(ctx, eq, stmt, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.Prep
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete(fmt.Sprintf("UPDATE %d", resp.RowsAffected))
 			})), nil
-		case stmt.Type() != sqlite.TypeOther:
+		case stmt.Type() != ha.TypeOther:
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete(stmt.Type())
 			})), nil
@@ -236,7 +236,7 @@ func handler(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.Prep
 	return wire.Prepared(wire.NewStatement(handle, wire.WithColumns(columns))), nil
 }
 
-func handlerPrepared(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (wire.PreparedStatements, error) {
+func handlerPrepared(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.PreparedStatements, error) {
 	bindParameters := stmt.Parameters()
 	parameters := make([]oid.Oid, len(bindParameters))
 	for i := range parameters {
@@ -292,7 +292,7 @@ func handlerPrepared(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (w
 			}
 			params[bindParameters[i]] = value
 		}
-		resp, err := sqlite.Exec(ctxHandle, conn, eq, stmt, params)
+		resp, err := sqlite.Exec(ctxHandle, eq, stmt, params)
 		if err != nil {
 			slog.ErrorContext(ctx, "pg-wire: local exec", "error", err, "query", stmt.Source())
 			return err
@@ -306,7 +306,7 @@ func handlerPrepared(ctx context.Context, stmt *sqlite.Statement, db *sql.DB) (w
 				return writer.Complete(fmt.Sprintf("DELETE %d", resp.RowsAffected))
 			case stmt.IsUpdate():
 				return writer.Complete(fmt.Sprintf("UPDATE %d", resp.RowsAffected))
-			case stmt.Type() != sqlite.TypeOther:
+			case stmt.Type() != ha.TypeOther:
 				return writer.Complete(stmt.Type())
 			default:
 				return writer.Empty()

@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/litesql/go-ha"
 	"github.com/litesql/ha/internal/pgwire"
-	"github.com/litesql/ha/internal/sqlite"
 )
 
 func TestServe(t *testing.T) {
@@ -98,6 +98,13 @@ func TestServe(t *testing.T) {
 		},
 	}
 
+	pub := new(fakePublisher)
+	connector, err := ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connector.Close()
+
 	for name, tc := range tt {
 		t.Run(name, func(t *testing.T) {
 			listener, err := net.Listen("tcp", ":0")
@@ -105,11 +112,7 @@ func TestServe(t *testing.T) {
 				t.Fatalf("failed to create listener: %v", err)
 			}
 			defer listener.Close()
-			sqlite.RegisterDriver(nil, "", nil)
-			db, err := sql.Open("sqlite3-ha", "file:test.db?vfs=memdb")
-			if err != nil {
-				t.Fatalf("open database: %v", err)
-			}
+			db := sql.OpenDB(connector)
 			defer db.Close()
 
 			server, err := pgwire.NewServer(pgwire.Config{
@@ -188,11 +191,13 @@ func TestTransaction(t *testing.T) {
 		t.Fatalf("failed to create listener: %v", err)
 	}
 	defer listener.Close()
-	sqlite.RegisterDriver(nil, "", nil)
-	db, err := sql.Open("sqlite3-ha", "file:test.db?vfs=memdb")
+	pub := new(fakePublisher)
+	connector, err := ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
 	if err != nil {
-		t.Fatalf("open database: %v", err)
+		t.Fatal(err)
 	}
+	defer connector.Close()
+	db := sql.OpenDB(connector)
 	defer db.Close()
 
 	server, err := pgwire.NewServer(pgwire.Config{
@@ -298,11 +303,13 @@ func TestTransactionPrepared(t *testing.T) {
 		t.Fatalf("failed to create listener: %v", err)
 	}
 	defer listener.Close()
-	sqlite.RegisterDriver(nil, "", nil)
-	db, err := sql.Open("sqlite3-ha", "file:/test.db?vfs=memdb")
+	pub := new(fakePublisher)
+	connector, err := ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
 	if err != nil {
-		t.Fatalf("open database: %v", err)
+		t.Fatal(err)
 	}
+	defer connector.Close()
+	db := sql.OpenDB(connector)
 	defer db.Close()
 
 	server, err := pgwire.NewServer(pgwire.Config{
@@ -400,4 +407,14 @@ func TestTransactionPrepared(t *testing.T) {
 	if name2 != name {
 		t.Fatalf("unexpected name: want %q got %q", name, name2)
 	}
+}
+
+type fakePublisher struct {
+	err     error
+	changes []ha.Change
+}
+
+func (f *fakePublisher) Publish(cs *ha.ChangeSet) error {
+	f.changes = cs.Changes
+	return f.err
 }

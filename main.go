@@ -19,13 +19,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nats-io/nats-server/v2/server"
+	ha "github.com/litesql/go-ha"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
-	ha_nats "github.com/litesql/ha/internal/nats"
 	"github.com/litesql/ha/internal/pgwire"
 	"github.com/litesql/ha/internal/sqlite"
 )
@@ -37,9 +36,10 @@ var (
 )
 
 var (
-	fs   *ff.FlagSet
-	name *string
-	port *uint
+	fs       *ff.FlagSet
+	name     *string
+	port     *uint
+	logLevel *string
 
 	memDB              *bool
 	snapshotInterval   *time.Duration
@@ -73,6 +73,8 @@ func main() {
 	fs = ff.NewFlagSet("ha")
 	name = fs.String('n', "name", "", "Node name")
 	port = fs.Uint('p', "port", 8080, "Server port")
+	logLevel = fs.StringLong("log-level", "info", "Log level (info, warn, error, debug)")
+
 	memDB = fs.Bool('m', "memory", "Store database in memory")
 	fromLatestSnapshot = fs.BoolLong("from-latest-snapshot", "Use the latest database snapshot from NATS JetStream Object Store (if available at startup)")
 	snapshotInterval = fs.DurationLong("snapshot-interval", 0, "Interval to create database snapshot to NATS JetStream Object Store (0 to disable)")
@@ -127,9 +129,17 @@ func main() {
 }
 
 func run() error {
-	var sqlExtensions []string
-	if *extensions != "" {
-		sqlExtensions = strings.Split(*extensions, ",")
+	switch strings.ToUpper(*logLevel) {
+	case "INFO":
+		slog.SetLogLoggerLevel(slog.LevelInfo)
+	case "DEBUG":
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	case "ERROR":
+		slog.SetLogLoggerLevel(slog.LevelError)
+	case "WARN":
+		slog.SetLogLoggerLevel(slog.LevelWarn)
+	default:
+		return fmt.Errorf("invalid log-level! Valid values: info, debug, error, warm")
 	}
 
 	if *concurrentQueries < 1 {
@@ -144,13 +154,42 @@ func run() error {
 			return fmt.Errorf("failed to get hostname: %w", err)
 		}
 	}
+
 	var (
-		natsConn   *nats.Conn
-		natsServer *server.Server
-		err        error
+		db  *sql.DB
+		dsn string
+		err error
 	)
+	opts := []ha.Option{
+		ha.WithName(nodeName),
+		ha.WithReplicas(*replicas),
+		ha.WithStreamMaxAge(*replicationMaxAge),
+		ha.WithReplicationURL(*replicationURL),
+		ha.WithReplicationSubject(*replicationStream),
+		ha.WithPublisherTimeout(*replicationTimeout),
+		ha.WithDeliverPolicy(*replicationPolicy),
+		ha.WithSnapshotInterval(*snapshotInterval),
+		ha.WithNatsOptions(
+			nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
+				if err != nil {
+					slog.Error("Got disconnected!", "reason", err)
+				}
+			}),
+			nats.ReconnectHandler(func(nc *nats.Conn) {
+				slog.Info("Got reconnected!", "url", nc.ConnectedUrl())
+			}),
+			nats.ClosedHandler(func(nc *nats.Conn) {
+				if err := nc.LastError(); err != nil {
+					slog.Error("Connection closed.", "reason", err)
+				}
+			}),
+		),
+	}
+	if *extensions != "" {
+		opts = append(opts, ha.WithExtensions(strings.Split(*extensions, ",")...))
+	}
 	if *natsPort > 0 || *natsConfig != "" {
-		natsConn, natsServer, err = ha_nats.RunEmbeddedNATSServer(ha_nats.Config{
+		opts = append(opts, ha.WithEmbeddedNatsConfig(&ha.EmbeddedNatsConfig{
 			Name:       nodeName,
 			Port:       *natsPort,
 			StoreDir:   *natsStoreDir,
@@ -158,58 +197,43 @@ func run() error {
 			Pass:       *natsPass,
 			File:       *natsConfig,
 			EnableLogs: *natsLogs,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to start embedded NATS server: %w", err)
-		}
+		}))
 	}
 
-	var cdcPublisher sqlite.CDCPublisher
-	if natsConn != nil || *replicationURL != "" {
-		slog.Info("starting replicator publisher", "stream", *replicationStream)
-		cdcPublisher, err = ha_nats.NewCDCPublisher(natsConn, *replicationURL, *replicas, *replicationStream, *replicationMaxAge, *replicationTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to start CDC NATS publisher: %w", err)
-		}
-	}
-
-	sqlite.RegisterDriver(sqlExtensions, nodeName, cdcPublisher)
-	var (
-		db  *sql.DB
-		dsn string
-	)
+	var connector *ha.Connector
 	args := fs.GetArgs()
 	if *memDB {
 		slog.Info("using in-memory database")
-		db, err = sql.Open("sqlite3-ha", "file:/ha.db?vfs=memdb")
+		var filename string
+		if len(args) > 0 {
+			filename = args[0]
+		}
+		if filename != "" && *replicationPolicy == "" {
+			matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`, filepath.Base(filename))
+			if matched {
+				dateTime := filepath.Base(filename)[0:len(time.DateTime)]
+				_, err := time.Parse(time.DateTime, dateTime)
+				if err == nil {
+					policy := fmt.Sprintf("by_start_time=%s", dateTime)
+					opts = append(opts, ha.WithDeliverPolicy(policy))
+				}
+			}
+		}
+
+		connector, err = ha.NewConnector("file:/ha.db?vfs=memdb", opts...)
 		if err != nil {
 			return err
 		}
+		defer connector.Close()
+		db = sql.OpenDB(connector)
 		defer db.Close()
-		db.SetConnMaxIdleTime(0)
-		db.SetConnMaxLifetime(0)
-		db.SetMaxOpenConns(*concurrentQueries)
-		db.SetMaxIdleConns(*concurrentQueries)
+		configDB(db)
 
-		sqlite.SetGlobalDB(db)
-
-		if len(args) > 0 {
-			filename := args[0]
+		if filename != "" {
 			slog.Info("loading database", "file", filename)
 			err := sqlite.Deserialize(context.Background(), filename)
 			if err != nil {
 				return fmt.Errorf("failed to load database %q: %w", filename, err)
-			}
-			if *replicationPolicy == "" {
-				matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`, filepath.Base(filename))
-				if matched {
-					dateTime := filepath.Base(filename)[0:len(time.DateTime)]
-					_, err := time.Parse(time.DateTime, dateTime)
-					if err == nil {
-						policy := fmt.Sprintf("by_start_time=%s", dateTime)
-						replicationPolicy = &policy
-					}
-				}
 			}
 		}
 	} else {
@@ -218,93 +242,75 @@ func run() error {
 			dsn = args[0]
 		}
 		slog.Info("using data source name", "dsn", dsn)
-		db, err = sql.Open("sqlite3-ha", dsn)
+		connector, err = ha.NewConnector(dsn, opts...)
 		if err != nil {
 			return err
 		}
+		defer connector.Close()
+		db = sql.OpenDB(connector)
 		defer db.Close()
-		db.SetConnMaxIdleTime(0)
-		db.SetConnMaxLifetime(0)
-		db.SetMaxOpenConns(*concurrentQueries)
-		db.SetMaxIdleConns(*concurrentQueries)
-
-		sqlite.SetGlobalDB(db)
+		configDB(db)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var (
-		snapshotter   *ha_nats.Snapshotter
-		cdcSubscriber *ha_nats.CDCSubscriber
-	)
-	if natsConn != nil || *replicationURL != "" {
-		slog.Info("starting snapshotter", "interval", *snapshotInterval)
-		snapshotter, err = ha_nats.NewSnapshotter(ctx, natsConn, *replicationURL, *replicas, *replicationStream, "", *memDB, *snapshotInterval)
-		if err != nil {
-			return fmt.Errorf("failed to start snapshotter: %w", err)
-		}
 
-		if *fromLatestSnapshot {
-			slog.Info("loading latest snapshot from NATS JetStream Object Store")
-			sequence, reader, err := snapshotter.LatestSnapshot(context.Background())
-			if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
-				return fmt.Errorf("failed to load latest snapshot: %w", err)
-			}
-			if reader != nil {
-				if *memDB {
-					err = sqlite.DeserializeFromReader(ctx, reader)
-					if err != nil {
-						return fmt.Errorf("failed to load latest snapshot: %w", err)
-					}
-				} else {
-					filename, err := sqlite.Filename(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get database filename: %w", err)
-					}
-					snapshotFilename := filepath.Join(filepath.Dir(filename), fmt.Sprintf("snapshot_%d_%s", sequence, filepath.Base(filename)))
-					u, err := url.Parse(dsn)
-					if err != nil {
-						return fmt.Errorf("failed to parse dsn: %w", err)
-					}
-					f, err := os.Create(snapshotFilename)
-					if err != nil {
-						return fmt.Errorf("failed to create snapshot file %q: %w", snapshotFilename, err)
-					}
-					_, err = io.Copy(f, reader)
-					if err != nil {
-						f.Close()
-						return fmt.Errorf("failed to write snapshot file %q: %w", snapshotFilename, err)
-					}
+	if *fromLatestSnapshot {
+		slog.Info("loading latest snapshot from NATS JetStream Object Store")
+		sequence, reader, err := connector.LatestSnapshot(context.Background())
+		if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
+			return fmt.Errorf("failed to load latest snapshot: %w", err)
+		}
+		if sequence > 0 && *replicationPolicy == "" {
+			policy := fmt.Sprintf("by_start_sequence=%d", sequence)
+			opts = append(opts, ha.WithDeliverPolicy(policy))
+
+		}
+		if reader != nil {
+			if *memDB {
+				connector.Close()
+				connector, err = ha.NewConnector("file:/ha.db?vfs=memdb", opts...)
+				if err != nil {
+					return err
+				}
+				defer connector.Close()
+				err = sqlite.DeserializeFromReader(ctx, reader)
+				if err != nil {
+					return fmt.Errorf("failed to load latest snapshot: %w", err)
+				}
+			} else {
+				filename, err := sqlite.Filename(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get database filename: %w", err)
+				}
+				snapshotFilename := filepath.Join(filepath.Dir(filename), fmt.Sprintf("snapshot_%d_%s", sequence, filepath.Base(filename)))
+				u, err := url.Parse(dsn)
+				if err != nil {
+					return fmt.Errorf("failed to parse dsn: %w", err)
+				}
+				f, err := os.Create(snapshotFilename)
+				if err != nil {
+					return fmt.Errorf("failed to create snapshot file %q: %w", snapshotFilename, err)
+				}
+				_, err = io.Copy(f, reader)
+				if err != nil {
 					f.Close()
-					slog.Info("loading snapshot", "filename", snapshotFilename)
-					db.Close()
-					db, err = sql.Open("sqlite3-ha", fmt.Sprintf("file:%s?%s", snapshotFilename, u.RawQuery))
-					if err != nil {
-						return fmt.Errorf("failed to open database %q: %w", dsn, err)
-					}
-					defer db.Close()
-					db.SetConnMaxIdleTime(0)
-					db.SetConnMaxLifetime(0)
-					db.SetMaxOpenConns(*concurrentQueries)
-					db.SetMaxIdleConns(*concurrentQueries)
-
-					sqlite.SetGlobalDB(db)
-
+					return fmt.Errorf("failed to write snapshot file %q: %w", snapshotFilename, err)
 				}
-				if sequence > 0 && *replicationPolicy == "" {
-					policy := fmt.Sprintf("by_start_sequence=%d", sequence)
-					replicationPolicy = &policy
+				f.Close()
+				slog.Info("loading snapshot", "filename", snapshotFilename)
+				db.Close()
+				connector.Close()
+				connector, err = ha.NewConnector(fmt.Sprintf("file:%s?%s", snapshotFilename, u.RawQuery), opts...)
+				if err != nil {
+					return err
 				}
+				defer connector.Close()
+				db = sql.OpenDB(connector)
+				defer db.Close()
+				configDB(db)
 			}
 		}
-
-		slog.Info("starting CDC subscriber", "stream", *replicationStream, "deliverPolicy", *replicationPolicy)
-		cdcSubscriber, err = ha_nats.NewCDCSubscriber(nodeName, natsConn, *replicationURL, *replicationStream, *replicationPolicy, db)
-		if err != nil {
-			return fmt.Errorf("failed to start CDC NATS subscriber: %w", err)
-		}
-		defer cdcSubscriber.Close()
-		snapshotter.SetSeqProvider(cdcSubscriber)
 	}
 
 	mux := http.NewServeMux()
@@ -332,7 +338,7 @@ func run() error {
 		filename := fmt.Sprintf("%s_ha.db", time.Now().UTC().Format(time.DateTime))
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 		w.Header().Set("Content-Type", "application/octet-stream")
-		err := sqlite.Backup(r.Context(), dsn, *memDB, w)
+		err := ha.Backup(r.Context(), db, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -340,11 +346,7 @@ func run() error {
 	})
 
 	mux.HandleFunc("POST /snapshot", func(w http.ResponseWriter, r *http.Request) {
-		if snapshotter == nil {
-			http.Error(w, "snapshotter not enabled", http.StatusNotImplemented)
-			return
-		}
-		sequence, err := snapshotter.TakeSnapshot(r.Context(), dsn, *memDB)
+		sequence, err := connector.TakeSnapshot(r.Context(), db)
 		if err != nil {
 			slog.Error("take snapshot", "error", err)
 			http.Error(w, fmt.Sprintf("failed to take snapshot: %v", err), http.StatusInternalServerError)
@@ -355,11 +357,7 @@ func run() error {
 	})
 
 	mux.HandleFunc("GET /snapshot", func(w http.ResponseWriter, r *http.Request) {
-		if snapshotter == nil {
-			http.Error(w, "snapshotter not enabled", http.StatusNotImplemented)
-			return
-		}
-		sequence, reader, err := snapshotter.LatestSnapshot(r.Context())
+		sequence, reader, err := connector.LatestSnapshot(r.Context())
 		if err != nil {
 			slog.ErrorContext(r.Context(), "failed o get latest snapshot", "error", err)
 			http.Error(w, fmt.Sprintf("failed to get latest snapshot: %v", err), http.StatusInternalServerError)
@@ -378,7 +376,7 @@ func run() error {
 	})
 
 	mux.HandleFunc("GET /replications", func(w http.ResponseWriter, r *http.Request) {
-		info, err := cdcSubscriber.DeliveredInfo(r.Context(), "")
+		info, err := connector.DeliveredInfo(r.Context(), "")
 		if err != nil {
 			slog.Error("failed to get replication info", "error", err)
 			http.Error(w, fmt.Sprintf("failed to get replication info: %v", err), http.StatusInternalServerError)
@@ -392,7 +390,7 @@ func run() error {
 
 	mux.HandleFunc("GET /replications/{name}", func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
-		info, err := cdcSubscriber.DeliveredInfo(r.Context(), name)
+		info, err := connector.DeliveredInfo(r.Context(), name)
 		if err != nil {
 			slog.Error("failed to get replication info", "error", err, "name", name)
 			http.Error(w, fmt.Sprintf("failed to get replication info: %v", err), http.StatusInternalServerError)
@@ -410,7 +408,7 @@ func run() error {
 			http.Error(w, "name is required", http.StatusInternalServerError)
 			return
 		}
-		err := cdcSubscriber.RemoveConsumer(r.Context(), name)
+		err := connector.RemoveConsumer(r.Context(), name)
 		if err != nil {
 			slog.Error("failed remove consumer", "error", err, "name", name)
 			http.Error(w, fmt.Sprintf("failed to remove consumer: %v", err), http.StatusInternalServerError)
@@ -445,26 +443,33 @@ func run() error {
 	}
 
 	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-done
 		slog.Warn("signal detected...", "signal", sig)
 		if err := pgServer.Close(); err != nil {
 			slog.Error("PostgreSQL server shutdown failed", "error", err)
 		}
-		if natsConn != nil {
-			natsConn.Close()
-		}
-		if natsServer != nil {
-			natsServer.WaitForShutdown()
+		if connector != nil {
+			connector.Close()
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("HTTP server shutdown failed", "error", err)
 		}
+
 	}()
 
 	slog.Info("starting HA HTTP server", "port", *port, "version", version, "commit", commit, "date", date)
 	return server.ListenAndServe()
+}
+
+func configDB(db *sql.DB) {
+	db.SetConnMaxIdleTime(0)
+	db.SetConnMaxLifetime(0)
+	db.SetMaxOpenConns(*concurrentQueries)
+	db.SetMaxIdleConns(*concurrentQueries)
+
+	sqlite.SetGlobalDB(db)
 }
