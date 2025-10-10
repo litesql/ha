@@ -11,7 +11,7 @@ services:
     environment:
       - HA_SNAPSHOT_INTERVAL=60s
       - HA_NAME=node1
-      - HA_ARGS=file:/data/db1.sql?_journal=WAL&_timeout=5000&_sync=NORMAL
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node1.cfg
       - HA_REPLICAS=1
@@ -27,7 +27,7 @@ services:
       - "8081:8080"
     environment:
       - HA_NAME=node2
-      - HA_ARGS=file:/data/db2.sql?_journal=WAL&_timeout=5000&_sync=NORMAL
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node2.cfg
       - HA_REPLICAS=1
@@ -43,7 +43,7 @@ services:
       - "8082:8080"
     environment:
       - HA_NAME=node3
-      - HA_ARGS=file:/data/db3.sql?_journal=WAL&_timeout=5000&_sync=NORMAL
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node3.cfg
       - HA_REPLICAS=1
