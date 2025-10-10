@@ -370,7 +370,7 @@ curl -X DELETE http://localhost:8080/replications/{name}
 
 - Tables WITHOUT ROWID are not replicated
 - The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
-- Use idempotents DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS)
+- Uses "automatic idempotency" for DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS). But it's dificult to do with ALTER TABLE commands. 
 - Writing to any node in the cluster improves availability, but it can lead to consistency issues in certain edge cases. If your application values Consistency more than Availability, it's better to route all write operations through a single cluster node.
 
 ## 7. Configuration<a id='7'></a>
@@ -383,6 +383,7 @@ curl -X DELETE http://localhost:8080/replications/{name}
 | --log-level | HA_LOG_LEVEL  | info    | Log level (info, warn, error or debug) |
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
+| --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
 | --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS Server logging |
 | --nats-port | HA_NATS_PORT | 4222 | Embedded NATS server port (0 to disable) |
 | --nats-store-dir | HA_NATS_STORE_DIR | /tmp/nats | Embedded NATS server store directory |

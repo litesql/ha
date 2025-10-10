@@ -44,6 +44,7 @@ var (
 	memDB              *bool
 	snapshotInterval   *time.Duration
 	fromLatestSnapshot *bool
+	disableDDLSync     *bool
 
 	pgPort *int
 	pgUser *string
@@ -78,6 +79,7 @@ func main() {
 	memDB = fs.Bool('m', "memory", "Store database in memory")
 	fromLatestSnapshot = fs.BoolLong("from-latest-snapshot", "Use the latest database snapshot from NATS JetStream Object Store (if available at startup)")
 	snapshotInterval = fs.DurationLong("snapshot-interval", 0, "Interval to create database snapshot to NATS JetStream Object Store (0 to disable)")
+	disableDDLSync = fs.BoolLong("disable-ddl-sync", "Disable DDL commands publisher")
 
 	natsLogs = fs.BoolLong("nats-logs", "Enable NATS server logging")
 	natsPort = fs.IntLong("nats-port", 4222, "Embedded NATS server port (0 to disable)")
@@ -184,6 +186,9 @@ func run() error {
 				}
 			}),
 		),
+	}
+	if *disableDDLSync {
+		opts = append(opts, ha.WithDisableDDLSync())
 	}
 	if *extensions != "" {
 		opts = append(opts, ha.WithExtensions(strings.Split(*extensions, ",")...))
