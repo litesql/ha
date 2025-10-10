@@ -111,7 +111,7 @@ func parseFn(db *sql.DB) wire.ParseFn {
 			}))
 		}
 
-		stmt, err := ha.Parse(ctx, sql)
+		stmt, err := ha.ParseStatement(ctx, sql)
 		if err != nil {
 			err = psqlerr.WithCode(err, codes.SyntaxErrorOrAccessRuleViolation)
 			return

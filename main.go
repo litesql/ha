@@ -201,63 +201,10 @@ func run() error {
 	}
 
 	var connector *ha.Connector
-	args := fs.GetArgs()
-	if *memDB {
-		slog.Info("using in-memory database")
-		var filename string
-		if len(args) > 0 {
-			filename = args[0]
-		}
-		if filename != "" && *replicationPolicy == "" {
-			matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`, filepath.Base(filename))
-			if matched {
-				dateTime := filepath.Base(filename)[0:len(time.DateTime)]
-				_, err := time.Parse(time.DateTime, dateTime)
-				if err == nil {
-					policy := fmt.Sprintf("by_start_time=%s", dateTime)
-					opts = append(opts, ha.WithDeliverPolicy(policy))
-				}
-			}
-		}
-
-		connector, err = ha.NewConnector("file:/ha.db?vfs=memdb", opts...)
-		if err != nil {
-			return err
-		}
-		defer connector.Close()
-		db = sql.OpenDB(connector)
-		defer db.Close()
-		configDB(db)
-
-		if filename != "" {
-			slog.Info("loading database", "file", filename)
-			err := sqlite.Deserialize(context.Background(), filename)
-			if err != nil {
-				return fmt.Errorf("failed to load database %q: %w", filename, err)
-			}
-		}
-	} else {
-		dsn = "file:ha.db?_journal=WAL&_busy_timeout=5000"
-		if len(args) > 0 {
-			dsn = args[0]
-		}
-		slog.Info("using data source name", "dsn", dsn)
-		connector, err = ha.NewConnector(dsn, opts...)
-		if err != nil {
-			return err
-		}
-		defer connector.Close()
-		db = sql.OpenDB(connector)
-		defer db.Close()
-		configDB(db)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	if *fromLatestSnapshot {
 		slog.Info("loading latest snapshot from NATS JetStream Object Store")
-		sequence, reader, err := connector.LatestSnapshot(context.Background())
+		sequence, reader, err := ha.LatestSnapshot(context.Background(), opts...)
 		if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
 			return fmt.Errorf("failed to load latest snapshot: %w", err)
 		}
@@ -268,18 +215,17 @@ func run() error {
 		}
 		if reader != nil {
 			if *memDB {
-				connector.Close()
 				connector, err = ha.NewConnector("file:/ha.db?vfs=memdb", opts...)
 				if err != nil {
 					return err
 				}
 				defer connector.Close()
-				err = sqlite.DeserializeFromReader(ctx, reader)
+				err = sqlite.DeserializeFromReader(context.Background(), reader)
 				if err != nil {
 					return fmt.Errorf("failed to load latest snapshot: %w", err)
 				}
 			} else {
-				filename, err := sqlite.Filename(ctx)
+				filename, err := sqlite.Filename(context.Background())
 				if err != nil {
 					return fmt.Errorf("failed to get database filename: %w", err)
 				}
@@ -300,7 +246,6 @@ func run() error {
 				f.Close()
 				slog.Info("loading snapshot", "filename", snapshotFilename)
 				db.Close()
-				connector.Close()
 				connector, err = ha.NewConnector(fmt.Sprintf("file:%s?%s", snapshotFilename, u.RawQuery), opts...)
 				if err != nil {
 					return err
@@ -310,6 +255,57 @@ func run() error {
 				defer db.Close()
 				configDB(db)
 			}
+		}
+	} else {
+		args := fs.GetArgs()
+		if *memDB {
+			slog.Info("using in-memory database")
+			var filename string
+			if len(args) > 0 {
+				filename = args[0]
+			}
+			if filename != "" && *replicationPolicy == "" {
+				matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`, filepath.Base(filename))
+				if matched {
+					dateTime := filepath.Base(filename)[0:len(time.DateTime)]
+					_, err := time.Parse(time.DateTime, dateTime)
+					if err == nil {
+						policy := fmt.Sprintf("by_start_time=%s", dateTime)
+						opts = append(opts, ha.WithDeliverPolicy(policy))
+					}
+				}
+			}
+
+			connector, err = ha.NewConnector("file:/ha.db?vfs=memdb", opts...)
+			if err != nil {
+				return err
+			}
+			defer connector.Close()
+			db = sql.OpenDB(connector)
+			defer db.Close()
+			configDB(db)
+
+			if filename != "" {
+				slog.Info("loading database", "file", filename)
+				err := sqlite.Deserialize(context.Background(), filename)
+				if err != nil {
+					return fmt.Errorf("failed to load database %q: %w", filename, err)
+				}
+			}
+		} else {
+			dsn = "file:ha.db?_journal=WAL&_busy_timeout=5000"
+			if len(args) > 0 {
+				dsn = args[0]
+			}
+			slog.Info("using data source name", "dsn", dsn)
+			connector, err = ha.NewConnector(dsn, opts...)
+			if err != nil {
+				return err
+			}
+			defer connector.Close()
+			db = sql.OpenDB(connector)
+			defer db.Close()
+			configDB(db)
 		}
 	}
 

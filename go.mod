@@ -6,7 +6,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jeroenrinzema/psql-wire v0.15.0
 	github.com/lib/pq v1.10.9
-	github.com/litesql/go-ha v0.0.1
+	github.com/litesql/go-ha v0.0.5
 	github.com/litesql/go-sqlite3 v1.14.34
 	github.com/nats-io/nats.go v1.46.1
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
@@ -28,7 +28,7 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/exp v0.0.0-20251002181428-27f1f14c8bb9 // indirect
+	golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect

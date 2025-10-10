@@ -64,7 +64,7 @@ func Transaction(ctx context.Context, req []Request) ([]*Response, error) {
 
 	var list []*Response
 	for _, query := range req {
-		stmt, err := ha.Parse(ctx, query.Sql)
+		stmt, err := ha.ParseStatement(ctx, query.Sql)
 		if err != nil {
 			return nil, err
 		}
