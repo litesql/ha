@@ -16,7 +16,8 @@ Powered by an embedded NATS JetStream server.
 
 - 🔌 Connect via HTTP API or PostgreSQL Wire Protocol  
 - 🔁 Replicate data using embedded or external NATS server
-- 📚 Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)  
+- 📝 Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
+- 📚 Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)
 - 🔄 Supports Change Data Capture (CDC)
 - ⚙️ Configure custom strategies for resolving replication data conflicts
 - 📖 Full documentation: [https://litesql.github.io/ha/](https://litesql.github.io/ha/)

@@ -10,6 +10,7 @@ layout: home
 Highly available leaderless SQLite cluster powered by embedded NATS JetStream server.
 
 - Connect using HTTP API or PostgreSQL Wire Protocol
+- Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
 - Use [ha-sync SQLite extension](https://github.com/litesql/ha-sync) to create live local read replicas
 - Change Data Capture (CDC)
 - [Open Source](https://github.com/litesql/ha)
