@@ -162,12 +162,25 @@ func run() error {
 		dsn string
 		err error
 	)
+	args := fs.GetArgs()
+	if *memDB {
+		dsn = "file:/ha.db?vfs=memdb"
+		if len(args) > 0 {
+			dsn = fmt.Sprintf("file:/%s?vfs=memdb", strings.TrimPrefix(args[0], "/"))
+		}
+	} else {
+		dsn = "file:ha.db?_journal=WAL&_timeout=5000"
+		if len(args) > 0 {
+			dsn = args[0]
+		}
+	}
+
 	opts := []ha.Option{
 		ha.WithName(nodeName),
 		ha.WithReplicas(*replicas),
 		ha.WithStreamMaxAge(*replicationMaxAge),
 		ha.WithReplicationURL(*replicationURL),
-		ha.WithReplicationSubject(*replicationStream),
+		ha.WithReplicationStream(*replicationStream),
 		ha.WithPublisherTimeout(*replicationTimeout),
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
@@ -209,18 +222,17 @@ func run() error {
 
 	if *fromLatestSnapshot {
 		slog.Info("loading latest snapshot from NATS JetStream Object Store")
-		sequence, reader, err := ha.LatestSnapshot(context.Background(), opts...)
+		sequence, reader, err := ha.LatestSnapshot(context.Background(), dsn, opts...)
 		if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
 			return fmt.Errorf("failed to load latest snapshot: %w", err)
 		}
 		if sequence > 0 && *replicationPolicy == "" {
 			policy := fmt.Sprintf("by_start_sequence=%d", sequence)
 			opts = append(opts, ha.WithDeliverPolicy(policy))
-
 		}
 		if reader != nil {
 			if *memDB {
-				connector, err = ha.NewConnector("file:/ha.db?vfs=memdb", opts...)
+				connector, err = ha.NewConnector(dsn, opts...)
 				if err != nil {
 					return err
 				}
@@ -230,28 +242,20 @@ func run() error {
 					return fmt.Errorf("failed to load latest snapshot: %w", err)
 				}
 			} else {
-				filename, err := sqlite.Filename(context.Background())
+				filename := filenameFromDSN(dsn)
+				f, err := os.Create(filename)
 				if err != nil {
-					return fmt.Errorf("failed to get database filename: %w", err)
-				}
-				snapshotFilename := filepath.Join(filepath.Dir(filename), fmt.Sprintf("snapshot_%d_%s", sequence, filepath.Base(filename)))
-				u, err := url.Parse(dsn)
-				if err != nil {
-					return fmt.Errorf("failed to parse dsn: %w", err)
-				}
-				f, err := os.Create(snapshotFilename)
-				if err != nil {
-					return fmt.Errorf("failed to create snapshot file %q: %w", snapshotFilename, err)
+					return fmt.Errorf("failed to create snapshot file %q: %w", filename, err)
 				}
 				_, err = io.Copy(f, reader)
 				if err != nil {
 					f.Close()
-					return fmt.Errorf("failed to write snapshot file %q: %w", snapshotFilename, err)
+					return fmt.Errorf("failed to write snapshot file %q: %w", filename, err)
 				}
 				f.Close()
-				slog.Info("loading snapshot", "filename", snapshotFilename)
+				slog.Info("loading snapshot", "filename", filename)
 				db.Close()
-				connector, err = ha.NewConnector(fmt.Sprintf("file:%s?%s", snapshotFilename, u.RawQuery), opts...)
+				connector, err = ha.NewConnector(dsn, opts...)
 				if err != nil {
 					return err
 				}
@@ -262,7 +266,6 @@ func run() error {
 			}
 		}
 	} else {
-		args := fs.GetArgs()
 		if *memDB {
 			slog.Info("using in-memory database")
 			var filename string
@@ -281,7 +284,7 @@ func run() error {
 				}
 			}
 
-			connector, err = ha.NewConnector("file:/ha.db?vfs=memdb", opts...)
+			connector, err = ha.NewConnector(dsn, opts...)
 			if err != nil {
 				return err
 			}
@@ -298,10 +301,6 @@ func run() error {
 				}
 			}
 		} else {
-			dsn = "file:ha.db?_journal=WAL&_busy_timeout=5000"
-			if len(args) > 0 {
-				dsn = args[0]
-			}
 			slog.Info("using data source name", "dsn", dsn)
 			connector, err = ha.NewConnector(dsn, opts...)
 			if err != nil {
@@ -384,7 +383,7 @@ func run() error {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string][]*jetstream.ConsumerInfo{
+		json.NewEncoder(w).Encode(map[string]any{
 			"replications": info,
 		})
 	})
@@ -398,7 +397,7 @@ func run() error {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string][]*jetstream.ConsumerInfo{
+		json.NewEncoder(w).Encode(map[string]any{
 			"replications": info,
 		})
 	})
@@ -473,4 +472,22 @@ func configDB(db *sql.DB) {
 	db.SetMaxIdleConns(*concurrentQueries)
 
 	sqlite.SetGlobalDB(db)
+}
+
+func filenameFromDSN(dsn string) string {
+	var filename string
+	u, err := url.Parse(dsn)
+	if err == nil {
+		filename = u.Path
+	}
+	if filename == "" {
+		filename = strings.TrimPrefix(dsn, "file:")
+		if i := strings.Index(filename, "?"); i > 0 {
+			filename = filename[0:i]
+		}
+	}
+	if filename != "" {
+		return filepath.Base(filename)
+	}
+	return ""
 }
