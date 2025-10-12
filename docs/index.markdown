@@ -380,6 +380,7 @@ curl -X DELETE http://localhost:8080/replications/{name}
 | -n, --name | HA_NAME        | $HOSTNAME | Node name   |
 | -p, --port | HA_PORT        | 8080    | HTTP API tcp port |
 | -m, --memory | HA_MEMORY    | false   | Store database in memory |
+| -i, --interceptor | HA_INTERCEPTOR | | Path to a Go script for customizing replication behavior |
 | --log-level | HA_LOG_LEVEL  | info    | Log level (info, warn, error or debug) |
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |

@@ -25,6 +25,7 @@ import (
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
+	"github.com/litesql/ha/internal/interceptor"
 	"github.com/litesql/ha/internal/pgwire"
 	"github.com/litesql/ha/internal/sqlite"
 )
@@ -68,12 +69,15 @@ var (
 	replicationURL     *string
 	replicationPolicy  *string
 	replicas           *int
+
+	interceptorPath *string
 )
 
 func main() {
 	fs = ff.NewFlagSet("ha")
 	name = fs.String('n', "name", "", "Node name")
 	port = fs.Uint('p', "port", 8080, "Server port")
+	interceptorPath = fs.String('i', "interceptor", "", "Path to a golang script to customize replication behaviour")
 	logLevel = fs.StringLong("log-level", "info", "Log level (info, warn, error, debug)")
 
 	memDB = fs.Bool('m', "memory", "Store database in memory")
@@ -103,6 +107,7 @@ func main() {
 	replicationMaxAge = fs.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
 	replicationURL = fs.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
 	replicationPolicy = fs.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
+
 	printVersion := fs.BoolLong("version", "Print version information and exit")
 	_ = fs.String('c', "config", "", "config file (optional)")
 
@@ -216,6 +221,14 @@ func run() error {
 			File:       *natsConfig,
 			EnableLogs: *natsLogs,
 		}))
+	}
+
+	if *interceptorPath != "" {
+		changeSetInterceptor, err := interceptor.Load(*interceptorPath)
+		if err != nil {
+			return fmt.Errorf("failed to load custom interceptor: %w", err)
+		}
+		opts = append(opts, ha.WithChangeSetInterceptor(changeSetInterceptor))
 	}
 
 	var connector *ha.Connector
