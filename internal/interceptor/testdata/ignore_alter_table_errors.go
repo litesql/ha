@@ -7,11 +7,11 @@ import (
 	"github.com/litesql/go-ha"
 )
 
-func Before(cs *ha.ChangeSet, db *sql.DB) (skip bool, err error) {
+func Before(cs *ha.ChangeSet, conn *sql.Conn) (skip bool, err error) {
 	return false, nil
 }
 
-func After(cs *ha.ChangeSet, db *sql.DB, err error) error {
+func After(cs *ha.ChangeSet, conn *sql.Conn, err error) error {
 	if err != nil {
 		for _, change := range cs.Changes {
 			if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(change.Command)), "ALTER TABLE") {

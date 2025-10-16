@@ -5,22 +5,22 @@ package interceptor
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"github.com/litesql/go-ha"
 	"go/constant"
 	"go/token"
 	"io"
 	"reflect"
-
-	"github.com/litesql/go-ha"
 )
 
 func init() {
 	Symbols["github.com/litesql/go-ha/ha"] = map[string]reflect.Value{
 		// function, constant and variable definitions
-		"Backup":                   reflect.ValueOf(ha.Backup),
 		"DefaultStream":            reflect.ValueOf(constant.MakeFromLiteral("\"ha_replication\"", token.STRING, 0)),
 		"ErrInvalidSQL":            reflect.ValueOf(&ha.ErrInvalidSQL).Elem(),
 		"ErrNatsNotConfigured":     reflect.ValueOf(&ha.ErrNatsNotConfigured).Elem(),
 		"LatestSnapshot":           reflect.ValueOf(ha.LatestSnapshot),
+		"NameToOptions":            reflect.ValueOf(ha.NameToOptions),
 		"NewChangeSet":             reflect.ValueOf(ha.NewChangeSet),
 		"NewConnector":             reflect.ValueOf(ha.NewConnector),
 		"NewJSONPublisher":         reflect.ValueOf(ha.NewJSONPublisher),
@@ -56,7 +56,6 @@ func init() {
 		"WithCDCPublisher":         reflect.ValueOf(ha.WithCDCPublisher),
 		"WithCDCSubscriber":        reflect.ValueOf(ha.WithCDCSubscriber),
 		"WithChangeSetInterceptor": reflect.ValueOf(ha.WithChangeSetInterceptor),
-		"WithConnectHook":          reflect.ValueOf(ha.WithConnectHook),
 		"WithDBSnapshotter":        reflect.ValueOf(ha.WithDBSnapshotter),
 		"WithDeliverPolicy":        reflect.ValueOf(ha.WithDeliverPolicy),
 		"WithDisableDDLSync":       reflect.ValueOf(ha.WithDisableDDLSync),
@@ -73,17 +72,18 @@ func init() {
 		"WithWaitFor":              reflect.ValueOf(ha.WithWaitFor),
 
 		// type definitions
+		"BackupFn":             reflect.ValueOf((*ha.BackupFn)(nil)),
 		"CDCPublisher":         reflect.ValueOf((*ha.CDCPublisher)(nil)),
 		"CDCSubscriber":        reflect.ValueOf((*ha.CDCSubscriber)(nil)),
 		"Change":               reflect.ValueOf((*ha.Change)(nil)),
 		"ChangeSet":            reflect.ValueOf((*ha.ChangeSet)(nil)),
 		"ChangeSetInterceptor": reflect.ValueOf((*ha.ChangeSetInterceptor)(nil)),
 		"ChangeSetSerializer":  reflect.ValueOf((*ha.ChangeSetSerializer)(nil)),
-		"Conn":                 reflect.ValueOf((*ha.Conn)(nil)),
-		"ConnectHookFn":        reflect.ValueOf((*ha.ConnectHookFn)(nil)),
+		"ConnHooksFactory":     reflect.ValueOf((*ha.ConnHooksFactory)(nil)),
+		"ConnHooksProvider":    reflect.ValueOf((*ha.ConnHooksProvider)(nil)),
 		"Connector":            reflect.ValueOf((*ha.Connector)(nil)),
 		"DBSnapshotter":        reflect.ValueOf((*ha.DBSnapshotter)(nil)),
-		"Driver":               reflect.ValueOf((*ha.Driver)(nil)),
+		"DriverProvider":       reflect.ValueOf((*ha.DriverProvider)(nil)),
 		"EmbeddedNatsConfig":   reflect.ValueOf((*ha.EmbeddedNatsConfig)(nil)),
 		"JSONPublisher":        reflect.ValueOf((*ha.JSONPublisher)(nil)),
 		"NATSPublisher":        reflect.ValueOf((*ha.NATSPublisher)(nil)),
@@ -101,7 +101,9 @@ func init() {
 		"_CDCPublisher":         reflect.ValueOf((*_github_com_litesql_go_ha_CDCPublisher)(nil)),
 		"_CDCSubscriber":        reflect.ValueOf((*_github_com_litesql_go_ha_CDCSubscriber)(nil)),
 		"_ChangeSetInterceptor": reflect.ValueOf((*_github_com_litesql_go_ha_ChangeSetInterceptor)(nil)),
+		"_ConnHooksProvider":    reflect.ValueOf((*_github_com_litesql_go_ha_ConnHooksProvider)(nil)),
 		"_DBSnapshotter":        reflect.ValueOf((*_github_com_litesql_go_ha_DBSnapshotter)(nil)),
+		"_DriverProvider":       reflect.ValueOf((*_github_com_litesql_go_ha_DriverProvider)(nil)),
 		"_SequenceProvider":     reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
 	}
 }
@@ -141,15 +143,33 @@ func (W _github_com_litesql_go_ha_CDCSubscriber) Start() error {
 // _github_com_litesql_go_ha_ChangeSetInterceptor is an interface wrapper for ChangeSetInterceptor type
 type _github_com_litesql_go_ha_ChangeSetInterceptor struct {
 	IValue       interface{}
-	WAfterApply  func(a0 *ha.ChangeSet, a1 *sql.DB, a2 error) error
-	WBeforeApply func(a0 *ha.ChangeSet, a1 *sql.DB) (skip bool, err error)
+	WAfterApply  func(a0 *ha.ChangeSet, a1 *sql.Conn, a2 error) error
+	WBeforeApply func(a0 *ha.ChangeSet, a1 *sql.Conn) (skip bool, err error)
 }
 
-func (W _github_com_litesql_go_ha_ChangeSetInterceptor) AfterApply(a0 *ha.ChangeSet, a1 *sql.DB, a2 error) error {
+func (W _github_com_litesql_go_ha_ChangeSetInterceptor) AfterApply(a0 *ha.ChangeSet, a1 *sql.Conn, a2 error) error {
 	return W.WAfterApply(a0, a1, a2)
 }
-func (W _github_com_litesql_go_ha_ChangeSetInterceptor) BeforeApply(a0 *ha.ChangeSet, a1 *sql.DB) (skip bool, err error) {
+func (W _github_com_litesql_go_ha_ChangeSetInterceptor) BeforeApply(a0 *ha.ChangeSet, a1 *sql.Conn) (skip bool, err error) {
 	return W.WBeforeApply(a0, a1)
+}
+
+// _github_com_litesql_go_ha_ConnHooksProvider is an interface wrapper for ConnHooksProvider type
+type _github_com_litesql_go_ha_ConnHooksProvider struct {
+	IValue         interface{}
+	WDisableHooks  func(a0 *sql.Conn) error
+	WEnableHooks   func(a0 *sql.Conn) error
+	WRegisterHooks func(a0 driver.Conn) (driver.Conn, error)
+}
+
+func (W _github_com_litesql_go_ha_ConnHooksProvider) DisableHooks(a0 *sql.Conn) error {
+	return W.WDisableHooks(a0)
+}
+func (W _github_com_litesql_go_ha_ConnHooksProvider) EnableHooks(a0 *sql.Conn) error {
+	return W.WEnableHooks(a0)
+}
+func (W _github_com_litesql_go_ha_ConnHooksProvider) RegisterHooks(a0 driver.Conn) (driver.Conn, error) {
+	return W.WRegisterHooks(a0)
 }
 
 // _github_com_litesql_go_ha_DBSnapshotter is an interface wrapper for DBSnapshotter type
@@ -164,6 +184,28 @@ func (W _github_com_litesql_go_ha_DBSnapshotter) LatestSnapshot(ctx context.Cont
 }
 func (W _github_com_litesql_go_ha_DBSnapshotter) TakeSnapshot(ctx context.Context, db *sql.DB) (sequence uint64, err error) {
 	return W.WTakeSnapshot(ctx, db)
+}
+
+// _github_com_litesql_go_ha_DriverProvider is an interface wrapper for DriverProvider type
+type _github_com_litesql_go_ha_DriverProvider struct {
+	IValue            interface{}
+	WConnWithoutHooks func() (*sql.Conn, error)
+	WEnableHooks      func(conn *sql.Conn)
+	WOnConnect        func(c driver.Conn) (driver.Conn, error)
+	WOpen             func(name string) (driver.Conn, error)
+}
+
+func (W _github_com_litesql_go_ha_DriverProvider) ConnWithoutHooks() (*sql.Conn, error) {
+	return W.WConnWithoutHooks()
+}
+func (W _github_com_litesql_go_ha_DriverProvider) EnableHooks(conn *sql.Conn) {
+	W.WEnableHooks(conn)
+}
+func (W _github_com_litesql_go_ha_DriverProvider) OnConnect(c driver.Conn) (driver.Conn, error) {
+	return W.WOnConnect(c)
+}
+func (W _github_com_litesql_go_ha_DriverProvider) Open(name string) (driver.Conn, error) {
+	return W.WOpen(name)
 }
 
 // _github_com_litesql_go_ha_SequenceProvider is an interface wrapper for SequenceProvider type

@@ -39,6 +39,7 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
 - [6. Replication](#6)
   - [6.1 CDC message format](#6.1)
   - [6.2 Replication limitations](#6.2)
+  - [6.3 Conflict resolution](#6.3)
 - [7. Configuration](#7)
 
 
@@ -373,6 +374,18 @@ curl -X DELETE http://localhost:8080/replications/{name}
 - The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
 - Uses "automatic idempotency" for DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS). But it's dificult to do with ALTER TABLE commands. 
 - Writing to any node in the cluster improves availability, but it can lead to consistency issues in certain edge cases. If your application values Consistency more than Availability, it's better to route all write operations through a single cluster node.
+
+### 6.3 Conflict Resolution<a id='6.3'></a>
+
+In the event of conflicting writes, the following conflict resolution strategy is applied:
+
+1. **Last Writer Wins**: The most recent write operation is retained. This ensures that the latest data is propagated across the cluster.
+
+2. **Idempotent Operations**: All DML (INSERT, UPDATE, DELETE) operations are idempotent, meaning that applying the same operation multiple times will yield the same result. This helps maintain consistency during replication.
+
+3. **Custom Conflict Resolution**: You can implement a custom conflict resolution strategy by using the `--interceptor` flag to provide a Go script. This script allows you to define how conflicts are resolved based on your application's specific requirements.
+
+See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/testdata/ignore_alter_table_errors.go).
 
 ## 7. Configuration<a id='7'></a>
 

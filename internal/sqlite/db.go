@@ -11,6 +11,7 @@ import (
 
 	"github.com/litesql/go-ha"
 	"github.com/litesql/go-sqlite3"
+	sqlite3ha "github.com/litesql/go-sqlite3-ha"
 )
 
 var (
@@ -231,7 +232,7 @@ func sqliteConn(conn *sql.Conn) (*sqlite3.SQLiteConn, error) {
 	var sqlite3Conn *sqlite3.SQLiteConn
 	err := conn.Raw(func(driverConn any) error {
 		switch c := driverConn.(type) {
-		case *ha.Conn:
+		case *sqlite3ha.Conn:
 			sqlite3Conn = c.SQLiteConn
 			return nil
 		case *sqlite3.SQLiteConn:

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/litesql/go-ha"
+	sqlite3ha "github.com/litesql/go-sqlite3-ha"
 	"github.com/litesql/ha/internal/pgwire"
 )
 
@@ -99,7 +100,7 @@ func TestServe(t *testing.T) {
 	}
 
 	pub := new(fakePublisher)
-	connector, err := ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
+	connector, err := sqlite3ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +193,7 @@ func TestTransaction(t *testing.T) {
 	}
 	defer listener.Close()
 	pub := new(fakePublisher)
-	connector, err := ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
+	connector, err := sqlite3ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +305,7 @@ func TestTransactionPrepared(t *testing.T) {
 	}
 	defer listener.Close()
 	pub := new(fakePublisher)
-	connector, err := ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
+	connector, err := sqlite3ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
 	if err != nil {
 		t.Fatal(err)
 	}

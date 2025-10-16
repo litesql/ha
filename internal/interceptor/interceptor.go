@@ -13,9 +13,9 @@ import (
 //go:generate go run github.com/traefik/yaegi/cmd/yaegi extract github.com/litesql/go-ha
 var Symbols = stdlib.Symbols
 
-type beforeFn func(changeSet *ha.ChangeSet, db *sql.DB) (bool, error)
+type beforeFn func(changeSet *ha.ChangeSet, conn *sql.Conn) (bool, error)
 
-type afterFn func(changeSet *ha.ChangeSet, db *sql.DB, err error) error
+type afterFn func(changeSet *ha.ChangeSet, conn *sql.Conn, err error) error
 
 func Load(filename string) (ha.ChangeSetInterceptor, error) {
 	src, err := os.ReadFile(filename)
@@ -36,7 +36,7 @@ func Load(filename string) (ha.ChangeSetInterceptor, error) {
 	)
 	beforeReflect, err := i.Eval("ha.Before")
 	if err == nil {
-		before, ok = beforeReflect.Interface().(func(changeSet *ha.ChangeSet, db *sql.DB) (bool, error))
+		before, ok = beforeReflect.Interface().(func(changeSet *ha.ChangeSet, conn *sql.Conn) (bool, error))
 		if !ok {
 			return nil, fmt.Errorf("invalid ha.Before signature")
 		}
@@ -44,7 +44,7 @@ func Load(filename string) (ha.ChangeSetInterceptor, error) {
 
 	afterReflect, err := i.Eval("ha.After")
 	if err == nil {
-		after, ok = afterReflect.Interface().(func(changeSet *ha.ChangeSet, db *sql.DB, err error) error)
+		after, ok = afterReflect.Interface().(func(changeSet *ha.ChangeSet, conn *sql.Conn, err error) error)
 		if !ok {
 			return nil, fmt.Errorf("invalid ha.After signature")
 		}
@@ -74,17 +74,17 @@ type baseInterceptor struct {
 	after  afterFn
 }
 
-func (i *baseInterceptor) BeforeApply(cs *ha.ChangeSet, db *sql.DB) (skip bool, err error) {
-	return i.before(cs, db)
+func (i *baseInterceptor) BeforeApply(cs *ha.ChangeSet, conn *sql.Conn) (skip bool, err error) {
+	return i.before(cs, conn)
 }
-func (i *baseInterceptor) AfterApply(cs *ha.ChangeSet, db *sql.DB, err error) error {
-	return i.after(cs, db, err)
+func (i *baseInterceptor) AfterApply(cs *ha.ChangeSet, conn *sql.Conn, err error) error {
+	return i.after(cs, conn, err)
 }
 
-func noopBefore(cs *ha.ChangeSet, db *sql.DB) (bool, error) {
+func noopBefore(cs *ha.ChangeSet, conn *sql.Conn) (bool, error) {
 	return false, nil
 }
 
-func noopAfter(cs *ha.ChangeSet, db *sql.DB, err error) error {
+func noopAfter(cs *ha.ChangeSet, conn *sql.Conn, err error) error {
 	return err
 }

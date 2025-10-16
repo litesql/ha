@@ -20,6 +20,7 @@ import (
 	"time"
 
 	ha "github.com/litesql/go-ha"
+	sqlite3ha "github.com/litesql/go-sqlite3-ha"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/peterbourgon/ff/v4"
@@ -245,7 +246,7 @@ func run() error {
 		}
 		if reader != nil {
 			if *memDB {
-				connector, err = ha.NewConnector(dsn, opts...)
+				connector, err = sqlite3ha.NewConnector(dsn, opts...)
 				if err != nil {
 					return err
 				}
@@ -268,7 +269,7 @@ func run() error {
 				f.Close()
 				slog.Info("loading snapshot", "filename", filename)
 				db.Close()
-				connector, err = ha.NewConnector(dsn, opts...)
+				connector, err = sqlite3ha.NewConnector(dsn, opts...)
 				if err != nil {
 					return err
 				}
@@ -297,7 +298,7 @@ func run() error {
 				}
 			}
 
-			connector, err = ha.NewConnector(dsn, opts...)
+			connector, err = sqlite3ha.NewConnector(dsn, opts...)
 			if err != nil {
 				return err
 			}
@@ -315,7 +316,7 @@ func run() error {
 			}
 		} else {
 			slog.Info("using data source name", "dsn", dsn)
-			connector, err = ha.NewConnector(dsn, opts...)
+			connector, err = sqlite3ha.NewConnector(dsn, opts...)
 			if err != nil {
 				return err
 			}
@@ -351,7 +352,7 @@ func run() error {
 		filename := fmt.Sprintf("%s_ha.db", time.Now().UTC().Format(time.DateTime))
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 		w.Header().Set("Content-Type", "application/octet-stream")
-		err := ha.Backup(r.Context(), db, w)
+		err := sqlite3ha.Backup(r.Context(), db, w)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

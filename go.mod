@@ -6,10 +6,12 @@ require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jeroenrinzema/psql-wire v0.15.0
 	github.com/lib/pq v1.10.9
-	github.com/litesql/go-ha v0.0.9
+	github.com/litesql/go-ha v0.0.11
 	github.com/litesql/go-sqlite3 v1.14.34
-	github.com/nats-io/nats.go v1.46.1
+	github.com/litesql/go-sqlite3-ha v0.0.1
+	github.com/nats-io/nats.go v1.47.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
+	github.com/traefik/yaegi v0.16.1
 )
 
 require (
@@ -23,11 +25,10 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect
 	github.com/nats-io/jwt/v2 v2.8.0 // indirect
-	github.com/nats-io/nats-server/v2 v2.12.0 // indirect
+	github.com/nats-io/nats-server/v2 v2.12.1 // indirect
 	github.com/nats-io/nkeys v0.4.11 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/traefik/yaegi v0.16.1 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/exp v0.0.0-20251009144603-d2f985daa21b // indirect
 	golang.org/x/sync v0.17.0 // indirect
