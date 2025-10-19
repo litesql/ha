@@ -25,7 +25,9 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
   - [2.1 Loading existed database to memory](#2.1)
   - [2.2 Use database in disk](#2.2)
   - [2.3 Load database from latest snapshot](#2.3)
-- [3. Local Read Replicas](#3)
+- [3. Local Replicas](#3)
+  - [3.1 Local Read/Write Replicas](#3.1)
+  - [3.2 Local Read Replicas](#3.2)
 - [4. PostgreSQL Wire Protocol](#4)
 - [5. HTTP API](#5)
   - [5.1 Using bind parameters](#5.1)
@@ -181,9 +183,17 @@ ha "file:mydatabase.db?_journal=WAL&_busy_timeout=500"
 ha --from-latest-snapsot
 ```
 
-## 3. Local Read Replicas<a id='3'></a>
+## 3. Local Replicas<a id='3'></a>
+
+## 3.1 Local Read/Write Replicas<a id='3.1'></a>
+
+- Use [go-ha](https://github.com/litesql/go-ha) database/sql driver to create embedded read/write replicas
+- Use with go
+
+## 3.2 Local Read Replicas<a id='3.2'></a>
 
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
+- Use with any programming language
 
 ## 4. PostgreSQL Wire Protocol<a id='4'></a>
 
@@ -381,7 +391,7 @@ In the event of conflicting writes, the following conflict resolution strategy i
 
 1. **Last Writer Wins**: The most recent write operation is retained. This ensures that the latest data is propagated across the cluster.
 
-2. **Idempotent Operations**: All DML (INSERT, UPDATE, DELETE) operations are idempotent, meaning that applying the same operation multiple times will yield the same result. This helps maintain consistency during replication.
+2. **Idempotent Operations**: All DML (INSERT, UPDATE, DELETE) and DDL (CREATE, DROP) operations are converted to idempotent operations on replica nodes, meaning that applying the same operation multiple times will yield the same result. This helps maintain consistency during replication.
 
 3. **Custom Conflict Resolution**: You can implement a custom conflict resolution strategy by using the `--interceptor` flag to provide a Go script. This script allows you to define how conflicts are resolved based on your application's specific requirements.
 
