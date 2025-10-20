@@ -185,12 +185,12 @@ ha --from-latest-snapsot
 
 ## 3. Local Replicas<a id='3'></a>
 
-## 3.1 Local Read/Write Replicas<a id='3.1'></a>
+### 3.1 Local Read/Write Replicas<a id='3.1'></a>
 
 - Use [go-ha](https://github.com/litesql/go-ha) database/sql driver to create embedded read/write replicas
 - Use with go
 
-## 3.2 Local Read Replicas<a id='3.2'></a>
+### 3.2 Local Read Replicas<a id='3.2'></a>
 
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
 - Use with any programming language
