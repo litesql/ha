@@ -117,21 +117,6 @@ func Deserialize(ctx context.Context, file string) error {
 	return sqlite3Conn.Deserialize(data, "")
 }
 
-func Filename(ctx context.Context) (string, error) {
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return "", err
-	}
-	defer conn.Close()
-
-	sqlite3Conn, err := sqliteConn(conn)
-	if err != nil {
-		return "", err
-	}
-	return sqlite3Conn.GetFilename(""), nil
-
-}
-
 type querier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
