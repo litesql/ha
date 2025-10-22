@@ -163,20 +163,14 @@ func handler(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.Prepared
 		return handlerPrepared(ctx, stmt, db)
 	}
 	var (
-		eq   execerQuerier
-		conn *sql.Conn
-		err  error
+		eq  execerQuerier
+		err error
 	)
 	if tx, ok := wire.GetAttribute(ctx, transactionAttribute); ok && tx != nil {
-		ctxTx := tx.(*connAndTx)
-		eq = ctxTx.tx
+		ctxTx := tx.(*sql.Tx)
+		eq = ctxTx
 	} else {
-		conn, err = db.Conn(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		defer conn.Close()
-		eq = conn
+		eq = db
 	}
 	resp, err := sqlite.Exec(ctx, eq, stmt, nil)
 	if err != nil {
@@ -261,28 +255,14 @@ func handlerPrepared(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.
 		options = append(options, wire.WithColumns(columns))
 	}
 	var (
-		eq      execerQuerier
-		conn    *sql.Conn
-		newConn bool
-		ctxTx   *connAndTx
-		err     error
+		eq execerQuerier
 	)
 	if tx, ok := wire.GetAttribute(ctx, transactionAttribute); ok && tx != nil {
-		ctxTx = tx.(*connAndTx)
-		eq = ctxTx.tx
-		conn = ctxTx.conn
+		eq = tx.(*sql.Tx)
 	} else {
-		conn, err = db.Conn(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		eq = conn
-		newConn = true
+		eq = db
 	}
 	handle := func(ctxHandle context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
-		if newConn {
-			defer conn.Close()
-		}
 		params := make(map[string]any)
 		for i, p := range parameters {
 			value, err := p.Scan(25) // postgresql OID type text -> oid.T_text
@@ -331,38 +311,28 @@ func handlerPrepared(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.
 	return wire.Prepared(wire.NewStatement(handle, options...)), nil
 }
 
-type connAndTx struct {
-	conn *sql.Conn
-	tx   *sql.Tx
-}
-
 func begin(ctx context.Context, db *sql.DB) error {
 	existsTx, ok := wire.GetAttribute(ctx, transactionAttribute)
 	if ok && existsTx != nil {
 		return nil
 	}
-	conn, err := db.Conn(context.Background())
-	if err != nil {
-		return err
-	}
-	tx, err := conn.BeginTx(context.Background(), &sql.TxOptions{
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{
 		Isolation: sql.LevelReadCommitted,
 		ReadOnly:  false,
 	})
 	if err != nil {
 		return err
 	}
-	wire.SetAttribute(ctx, transactionAttribute, &connAndTx{conn: conn, tx: tx})
+	wire.SetAttribute(ctx, transactionAttribute, tx)
 	return nil
 }
 
 func commit(ctx context.Context) error {
 	txContext, ok := wire.GetAttribute(ctx, transactionAttribute)
 	if ok && txContext != nil {
-		ctxTx := txContext.(*connAndTx)
+		tx := txContext.(*sql.Tx)
 		wire.SetAttribute(ctx, transactionAttribute, nil)
-		defer ctxTx.conn.Close()
-		err := ctxTx.tx.Commit()
+		err := tx.Commit()
 		if err != nil {
 			return err
 		}
@@ -373,10 +343,9 @@ func commit(ctx context.Context) error {
 func rollback(ctx context.Context) error {
 	txContext, ok := wire.GetAttribute(ctx, transactionAttribute)
 	if ok && txContext != nil {
-		ctxTx := txContext.(*connAndTx)
+		tx := txContext.(*sql.Tx)
 		wire.SetAttribute(ctx, transactionAttribute, nil)
-		defer ctxTx.conn.Close()
-		err := ctxTx.tx.Rollback()
+		err := tx.Rollback()
 		if err != nil {
 			return err
 		}

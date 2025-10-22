@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/litesql/go-ha"
-	"github.com/litesql/go-sqlite3"
 	sqlite3ha "github.com/litesql/go-sqlite3-ha"
 )
 
@@ -48,13 +47,8 @@ func Exec(ctx context.Context, eq execerQuerier, stmt *ha.Statement, params map[
 	return doExec(ctx, eq, stmt.Source(), params)
 }
 
-func Transaction(ctx context.Context, req []Request) ([]*Response, error) {
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-	tx, err := conn.BeginTx(ctx, &sql.TxOptions{
+func Transaction(ctx context.Context, queries []Request) ([]*Response, error) {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{
 		Isolation: sql.LevelReadCommitted,
 		ReadOnly:  false,
 	})
@@ -64,7 +58,7 @@ func Transaction(ctx context.Context, req []Request) ([]*Response, error) {
 	defer tx.Rollback()
 
 	var list []*Response
-	for _, query := range req {
+	for _, query := range queries {
 		stmt, err := ha.ParseStatement(ctx, query.Sql)
 		if err != nil {
 			return nil, err
@@ -108,13 +102,13 @@ func Deserialize(ctx context.Context, file string) error {
 	}
 	defer conn.Close()
 
-	sqlite3Conn, err := sqliteConn(conn)
+	deserializerConn, err := deserializerConn(conn)
 	if err != nil {
 		return err
 	}
-	buf := make([]byte, len(data)*2)
+	buf := make([]byte, len(data))
 	data = append(data, buf...)
-	return sqlite3Conn.Deserialize(data, "")
+	return deserializerConn.Deserialize(data, "")
 }
 
 type querier interface {
@@ -213,19 +207,23 @@ func getPositionalArgs(params map[string]any) []any {
 	return args
 }
 
-func sqliteConn(conn *sql.Conn) (*sqlite3.SQLiteConn, error) {
-	var sqlite3Conn *sqlite3.SQLiteConn
+type deserializer interface {
+	Deserialize(b []byte, schema string) error
+}
+
+func deserializerConn(conn *sql.Conn) (deserializer, error) {
+	var deserializerConn deserializer
 	err := conn.Raw(func(driverConn any) error {
 		switch c := driverConn.(type) {
 		case *sqlite3ha.Conn:
-			sqlite3Conn = c.SQLiteConn
+			deserializerConn = c.SQLiteConn
 			return nil
-		case *sqlite3.SQLiteConn:
-			sqlite3Conn = c
+		case deserializer:
+			deserializerConn = c
 			return nil
 		default:
 			return fmt.Errorf("not a sqlite3 connection")
 		}
 	})
-	return sqlite3Conn, err
+	return deserializerConn, err
 }
