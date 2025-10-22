@@ -206,28 +206,24 @@ ha --from-latest-snapsot
 ### 5.1 Using bind parameters<a id='5.1'></a>
 
 ```sh
-curl -d '[{
+curl -d '{
     "sql": "INSERT INTO users(name) VALUES(:name)", 
     "params": {"name": "HA user"}
-}]' \
+}' \
 http://localhost:8080
 ```
 
 ```json
 {
-  "results": [
-    {
-      "columns": [
-        "rows_affected",
-        "last_insert_id"
-      ],
-      "rows": [
-        [
-          1,
-          3
-        ]
-      ]
-    }
+  "columns": [
+    "rows_affected",
+    "last_insert_id"
+  ],
+  "rows": [
+    [
+      1,
+      3
+    ]
   ]
 }
 ```

@@ -332,13 +332,41 @@ func run() error {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("POST /", func(w http.ResponseWriter, r *http.Request) {
-		var req []sqlite.Request
+		var req QueriesRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		res, err := sqlite.Transaction(r.Context(), req)
+
+		if len(req.Queries) == 0 {
+			http.Error(w, "no queries found", http.StatusBadRequest)
+			return
+		}
+
+		if len(req.Queries) == 1 {
+			stmt, err := ha.ParseStatement(r.Context(), req.Queries[0].Sql)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			res, err := sqlite.Exec(r.Context(), db, stmt, req.Queries[0].Params)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if !req.slice {
+				json.NewEncoder(w).Encode(res)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string][]*sqlite.Response{
+				"results": {res},
+			})
+			return
+		}
+
+		res, err := sqlite.Transaction(r.Context(), req.Queries)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -477,6 +505,32 @@ func run() error {
 
 	slog.Info("starting HA HTTP server", "port", *port, "version", version, "commit", commit, "date", date)
 	return server.ListenAndServe()
+}
+
+type QueriesRequest struct {
+	Queries []sqlite.Request
+	slice   bool
+}
+
+func (r *QueriesRequest) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 {
+		return fmt.Errorf("empty")
+	}
+	switch b[0] {
+	case '{':
+		var query sqlite.Request
+		err := json.Unmarshal(b, &query)
+		if err != nil {
+			return err
+		}
+		r.Queries = []sqlite.Request{
+			query,
+		}
+	case '[':
+		r.slice = true
+		return json.Unmarshal(b, &r.Queries)
+	}
+	return nil
 }
 
 func configDB(db *sql.DB) {
