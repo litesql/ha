@@ -21,7 +21,7 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
   - [1.1 Install from source](#1.1)
   - [1.2 Install using Docker](#1.2)
   - [1.3 Install using Helm](#1.3)
-- [2 . Usage](#2)
+- [2. Usage](#2)
   - [2.1 Loading existed database to memory](#2.1)
   - [2.2 Use database in disk](#2.2)
   - [2.3 Load database from latest snapshot](#2.3)
