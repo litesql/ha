@@ -1,0 +1,260 @@
+openapi: 3.0.4
+info:
+  title: HA SQLite Cluster API
+  description: API for executing queries, managing databases, snapshots, and replications in HA. Access [litesql.github.io/ha/](https://litesql.github.io/ha/) to read the full documentation.
+  version: 1.0.0
+tags:
+  - name: Main Database
+    description: Operations on the main database.
+  - name: All Databases
+    description: Operations on all databases.
+paths:
+  /:
+    post:
+      summary: Query the main database.      
+      operationId: queryMainDatabase
+      tags:
+        - Main Database
+      requestBody:
+        description: Payload for the query request.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueryRequest"              
+      responses:
+        '200':
+          description: Result of the query.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueryResponse"
+  /databases:
+    get:
+      summary: List all databases.
+      operationId: listDatabases
+      tags:
+        - All Databases      
+      responses:
+        '200':
+          description: A list of databases.
+  /databases/{id}:
+    get:
+      summary: Download a specific database.
+      operationId: downloadDatabase
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Database file.
+    post:
+      summary: Query a specific database.
+      operationId: queryDatabase
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        description: Payload for the query request.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueryRequest"
+      responses:
+        '200':
+          description: Result of the query.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueryResponse"
+  /download:
+    get:
+      summary: Download the main database.
+      operationId: downloadMainDatabase
+      tags:
+        - Main Database
+      responses:
+        '200':
+          description: Main database file.
+  /databases/{id}/snapshot:
+    post:
+      summary: Take a snapshot of a specific database.
+      operationId: takeDatabaseSnapshot
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Snapshot created.
+    get:
+      summary: Download a snapshot of a specific database.
+      operationId: downloadDatabaseSnapshot
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Snapshot file.
+  /snapshot:
+    post:
+      summary: Take a snapshot of the main database.
+      operationId: takeMainDatabaseSnapshot
+      tags:
+        - Main Database
+      responses:
+        '200':
+          description: Snapshot created.
+    get:
+      summary: Download a snapshot of the main database.
+      operationId: downloadMainDatabaseSnapshot
+      tags:
+        - Main Database
+      responses:
+        '200':
+          description: Snapshot file.
+  /databases/{id}/replications:
+    get:
+      summary: List replications for a specific database.
+      operationId: listDatabaseReplications
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of replications.
+  /replications:
+    get:
+      summary: List all replication consumers for the main database.
+      operationId: listMainReplications
+      tags:
+        - Main Database
+      responses:
+        '200':
+          description: A list of replications.
+  /databases/{id}/replications/{name}:
+    get:
+      summary: Get details of a specific replication for a database.
+      operationId: getDatabaseReplication
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Replication details.
+    delete:
+      summary: Delete a specific replication for a database.
+      operationId: deleteDatabaseReplication
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Replication deleted.
+  /replications/{name}:
+    get:
+      summary: Get details of a specific replication.
+      operationId: getReplication
+      tags:
+        - Main Database
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Replication details.
+    delete:
+      summary: Delete a specific replication.
+      operationId: deleteReplication
+      tags:
+        - Main Database
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Replication deleted.
+components:
+  schemas:
+    QueryRequest:
+      type: array
+      items:
+        type: object
+        properties:
+          sql:
+            type: string
+          params:
+            type: object
+            additionalProperties:
+              oneOf:
+                - type: string
+                - type: integer
+    QueryResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              columns:
+                type: array
+                items:
+                  type: string
+              rows:
+                type: array
+                items:
+                  type: array
+                  items:
+                    type: string

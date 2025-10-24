@@ -25,6 +25,7 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
   - [2.1 Loading existed database to memory](#2.1)
   - [2.2 Use database in disk](#2.2)
   - [2.3 Load database from latest snapshot](#2.3)
+  - [2.4 Loading multiple databases](#2.4)
 - [3. Local Replicas](#3)
   - [3.1 Local Read/Write Replicas](#3.1)
   - [3.2 Local Read Replicas](#3.2)
@@ -181,6 +182,12 @@ ha "file:mydatabase.db?_journal=WAL&_busy_timeout=500"
 
 ```sh
 ha --from-latest-snapsot
+```
+
+### 2.4 Loading multiple databases<a id='2.4'></a>
+
+```sh
+ha *.db
 ```
 
 ## 3. Local Replicas<a id='3'></a>

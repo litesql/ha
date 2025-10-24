@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
@@ -32,7 +34,7 @@ var (
 )
 
 var (
-	fs       *ff.FlagSet
+	flagSet  *ff.FlagSet
 	dbParams *string
 	name     *string
 	port     *uint
@@ -69,51 +71,54 @@ var (
 	interceptorPath *string
 )
 
+//go:embed static
+var staticFiles embed.FS
+
 func main() {
-	fs = ff.NewFlagSet("ha")
-	dbParams = fs.StringLong("db-params", "_journal=WAL&_timeout=5000", "SQLite DSN parameters (added to each database file DSN if not defined)")
-	name = fs.String('n', "name", "", "Node name")
-	port = fs.Uint('p', "port", 8080, "Server port")
-	interceptorPath = fs.String('i', "interceptor", "", "Path to a golang script to customize replication behaviour")
-	logLevel = fs.StringLong("log-level", "info", "Log level (info, warn, error, debug)")
+	flagSet = ff.NewFlagSet("ha")
+	dbParams = flagSet.StringLong("db-params", "_journal=WAL&_timeout=5000&_sync=NORMAL", "SQLite DSN parameters (added to each database file DSN if not defined)")
+	name = flagSet.String('n', "name", "", "Node name")
+	port = flagSet.Uint('p', "port", 8080, "Server port")
+	interceptorPath = flagSet.String('i', "interceptor", "", "Path to a golang script to customize replication behaviour")
+	logLevel = flagSet.StringLong("log-level", "info", "Log level (info, warn, error, debug)")
 
-	memDB = fs.Bool('m', "memory", "Store database in memory")
-	fromLatestSnapshot = fs.BoolLong("from-latest-snapshot", "Use the latest database snapshot from NATS JetStream Object Store (if available at startup)")
-	snapshotInterval = fs.DurationLong("snapshot-interval", 0, "Interval to create database snapshot to NATS JetStream Object Store (0 to disable)")
-	disableDDLSync = fs.BoolLong("disable-ddl-sync", "Disable DDL commands publisher")
+	memDB = flagSet.Bool('m', "memory", "Store database in memory")
+	fromLatestSnapshot = flagSet.BoolLong("from-latest-snapshot", "Use the latest database snapshot from NATS JetStream Object Store (if available at startup)")
+	snapshotInterval = flagSet.DurationLong("snapshot-interval", 0, "Interval to create database snapshot to NATS JetStream Object Store (0 to disable)")
+	disableDDLSync = flagSet.BoolLong("disable-ddl-sync", "Disable DDL commands publisher")
 
-	natsLogs = fs.BoolLong("nats-logs", "Enable NATS server logging")
-	natsPort = fs.IntLong("nats-port", 4222, "Embedded NATS server port (0 to disable)")
-	natsStoreDir = fs.StringLong("nats-store-dir", "", "Embedded NATS server store directory")
-	natsUser = fs.StringLong("nats-user", "", "Embedded NATS server user")
-	natsPass = fs.StringLong("nats-pass", "", "Embedded NATS server password")
-	natsConfig = fs.StringLong("nats-config", "", "Embedded NATS server config file")
+	natsLogs = flagSet.BoolLong("nats-logs", "Enable NATS server logging")
+	natsPort = flagSet.IntLong("nats-port", 4222, "Embedded NATS server port (0 to disable)")
+	natsStoreDir = flagSet.StringLong("nats-store-dir", "", "Embedded NATS server store directory")
+	natsUser = flagSet.StringLong("nats-user", "", "Embedded NATS server user")
+	natsPass = flagSet.StringLong("nats-pass", "", "Embedded NATS server password")
+	natsConfig = flagSet.StringLong("nats-config", "", "Embedded NATS server config file")
 
-	pgPort = fs.IntLong("pg-port", 5432, "PostgreSQL Server port")
-	pgUser = fs.StringLong("pg-user", "ha", "PostgreSQL Auth user")
-	pgPass = fs.StringLong("pg-pass", "ha", "PostgreSQL Auth password")
-	pgCert = fs.StringLong("pg-cert", "", "PostgreSQL TLS certificate file")
-	pgKey = fs.StringLong("pg-key", "", "PostgreSQL TLS key file")
+	pgPort = flagSet.IntLong("pg-port", 5432, "PostgreSQL Server port")
+	pgUser = flagSet.StringLong("pg-user", "ha", "PostgreSQL Auth user")
+	pgPass = flagSet.StringLong("pg-pass", "ha", "PostgreSQL Auth password")
+	pgCert = flagSet.StringLong("pg-cert", "", "PostgreSQL TLS certificate file")
+	pgKey = flagSet.StringLong("pg-key", "", "PostgreSQL TLS key file")
 
-	concurrentQueries = fs.IntLong("concurrent-queries", 50, "Number of concurrent queries")
-	extensions = fs.StringLong("extensions", "", "Comma-separated list of SQLite extensions to load")
+	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Number of concurrent queries")
+	extensions = flagSet.StringLong("extensions", "", "Comma-separated list of SQLite extensions to load")
 
-	replicas = fs.IntLong("replicas", 1, "Number of replicas to keep for the stream and object store in clustered jetstream. Defaults to 1, maximum is 5")
-	replicationTimeout = fs.DurationLong("replication-timeout", 15*time.Second, "Replication publisher timeout")
-	replicationStream = fs.StringLong("replication-stream", "ha_replication", "Replication stream name")
-	replicationMaxAge = fs.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
-	replicationURL = fs.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
-	replicationPolicy = fs.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
+	replicas = flagSet.IntLong("replicas", 1, "Number of replicas to keep for the stream and object store in clustered jetstream. Defaults to 1, maximum is 5")
+	replicationTimeout = flagSet.DurationLong("replication-timeout", 15*time.Second, "Replication publisher timeout")
+	replicationStream = flagSet.StringLong("replication-stream", "ha_replication", "Replication stream name")
+	replicationMaxAge = flagSet.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
+	replicationURL = flagSet.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
+	replicationPolicy = flagSet.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
 
-	printVersion := fs.BoolLong("version", "Print version information and exit")
-	_ = fs.String('c', "config", "", "config file (optional)")
+	printVersion := flagSet.BoolLong("version", "Print version information and exit")
+	_ = flagSet.String('c', "config", "", "config file (optional)")
 
-	if err := ff.Parse(fs, os.Args[1:],
+	if err := ff.Parse(flagSet, os.Args[1:],
 		ff.WithEnvVarPrefix("HA"),
 		ff.WithConfigFileFlag("config"),
 		ff.WithConfigFileParser(ff.PlainParser),
 	); err != nil {
-		fmt.Printf("%s\n", ffhelp.Flags(fs))
+		fmt.Printf("%s\n", ffhelp.Flags(flagSet))
 		fmt.Printf("err=%v\n", err)
 		return
 	}
@@ -166,7 +171,7 @@ func run() error {
 		dsnParams = "vfs=memdb"
 		dsnPrefix = "file:/"
 	}
-	for _, pattern := range fs.GetArgs() {
+	for _, pattern := range flagSet.GetArgs() {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
 			log.Fatal(err)
@@ -244,7 +249,15 @@ func run() error {
 		return fmt.Errorf("failed to load database: %w", err)
 	}
 
+	staticFs, err := fs.Sub(staticFiles, "static")
+	if err != nil {
+		return err
+	}
+	fileServer := http.FileServer(http.FS(staticFs))
+
 	mux := http.NewServeMux()
+	mux.Handle("GET /", fileServer)
+
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -254,7 +267,7 @@ func run() error {
 	mux.HandleFunc("POST /", hahttp.QueryHandler)
 
 	mux.HandleFunc("GET /databases/{id}", hahttp.DownloadHandler)
-	mux.HandleFunc("GET /", hahttp.DownloadHandler)
+	mux.HandleFunc("GET /download", hahttp.DownloadHandler)
 
 	mux.HandleFunc("POST /databases/{id}/snapshot", hahttp.TakeSnapshotHandler)
 	mux.HandleFunc("POST /snapshot", hahttp.TakeSnapshotHandler)
