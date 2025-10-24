@@ -300,7 +300,7 @@ http://localhost:8080
 ### 5.3 Backup database<a id='5.3'></a>
 
 ```sh
-curl -O -J http://localhost:8080
+curl -O -J http://localhost:8080/download
 ```
 
 ### 5.4 Take a snapshot and save on NATS Object Store<a id='5.4'></a>
