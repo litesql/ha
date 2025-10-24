@@ -249,9 +249,11 @@ func run() error {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /databases", hahttp.DatabasesHandler)
+
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
-	mux.HandleFunc("GET /databases/{id}", hahttp.DownloadHandler)
 	mux.HandleFunc("POST /", hahttp.QueryHandler)
+
+	mux.HandleFunc("GET /databases/{id}", hahttp.DownloadHandler)
 	mux.HandleFunc("GET /", hahttp.DownloadHandler)
 
 	mux.HandleFunc("POST /databases/{id}/snapshot", hahttp.TakeSnapshotHandler)
