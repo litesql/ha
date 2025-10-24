@@ -309,7 +309,6 @@ func run() error {
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("HTTP server shutdown failed", "error", err)
 		}
-
 	}()
 
 	slog.Info("starting HA HTTP server", "port", *port, "version", version, "commit", commit, "date", date)

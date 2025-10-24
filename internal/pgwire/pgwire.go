@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"regexp"
+	"slices"
 	"strings"
 
 	wire "github.com/jeroenrinzema/psql-wire"
@@ -21,6 +23,7 @@ import (
 
 const (
 	transactionAttribute = "tx"
+	databaseIDAttribute  = "dbID"
 )
 
 type Config struct {
@@ -94,65 +97,108 @@ func (s *Server) terminateConn(ctx context.Context) error {
 	return nil
 }
 
+var reSetDatabase = regexp.MustCompile(`(?i)^SET\s+DATABASE\s*(=|TO)\s*([^;\s]+)`)
+
 func parseFn() wire.ParseFn {
-	return func(ctx context.Context, sql string) (statements wire.PreparedStatements, err error) {
+	return func(ctx context.Context, sql string) (wire.PreparedStatements, error) {
 		slog.InfoContext(ctx, "pg-wire: query received", "remote", wire.RemoteAddress(ctx), "sql", sql)
-		db, err := sqlite.DB("")
-		if err != nil {
-			return nil, err
-		}
 		upper := strings.ToUpper(strings.TrimSpace(sql))
 		if strings.HasPrefix(upper, "-- PING") {
-			statements = wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete("pong")
-			}))
-			return
+			})), nil
 		}
+
+		var dbID string
+		if id, ok := wire.GetAttribute(ctx, databaseIDAttribute); ok {
+			dbID = id.(string)
+		}
+
+		if strings.TrimSpace(strings.ReplaceAll(upper, ";", "")) == "SHOW DATABASES" {
+			handle := func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+				var count int
+				for _, id := range sqlite.Databases() {
+					count++
+					status := "0"
+					if id == dbID {
+						status = "1"
+					}
+					writer.Row([]any{id, status})
+				}
+				return writer.Complete(fmt.Sprintf("SELECT %d", count))
+			}
+
+			return wire.Prepared(wire.NewStatement(handle,
+				wire.WithColumns(wire.Columns{
+					wire.Column{
+						Table: 0,
+						Name:  "database",
+						Oid:   oid.T_text,
+						Width: columnWidth,
+					},
+					wire.Column{
+						Table: 0,
+						Name:  "active",
+						Oid:   oid.T_text,
+						Width: columnWidth,
+					},
+				}))), nil
+		}
+
 		if strings.HasPrefix(upper, "SET ") {
-			statements = wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
-				return writer.Complete("OK")
-			}))
+			if match := reSetDatabase.FindStringSubmatch(sql); len(match) == 3 {
+				dbID := match[2]
+				if slices.Contains((sqlite.Databases()), dbID) {
+					rollback(ctx)
+					wire.SetAttribute(ctx, databaseIDAttribute, dbID)
+					return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+						return writer.Complete("OK, " + dbID)
+					})), nil
+				}
+				return nil, fmt.Errorf("database %q not found", dbID)
+			}
+			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+				return writer.Complete("ignored")
+			})), nil
+		}
+
+		db, err := sqlite.DB(dbID)
+		if err != nil {
+			return nil, err
 		}
 
 		stmt, err := ha.ParseStatement(ctx, sql)
 		if err != nil {
-			err = psqlerr.WithCode(err, codes.SyntaxErrorOrAccessRuleViolation)
-			return
+			return nil, psqlerr.WithCode(err, codes.SyntaxErrorOrAccessRuleViolation)
 		}
 
 		switch {
 		case stmt.Begin():
 			err = begin(ctx, db)
 			if err != nil {
-				return
+				return nil, err
 			}
-			statements = wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Empty()
-			}))
-			return
+			})), nil
 		case stmt.Commit():
 			err = commit(ctx)
 			if err != nil {
-				return
+				return nil, err
 			}
-			statements = wire.Prepared(wire.NewStatement(func(ctxHandler context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+			return wire.Prepared(wire.NewStatement(func(ctxHandler context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Empty()
-			}))
-
-			return
+			})), nil
 		case stmt.Rollback():
 			err = rollback(ctx)
 			if err != nil {
-				return
+				return nil, err
 			}
-			statements = wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Empty()
-			}))
-			return
+			})), nil
 		}
-		statements, err = handler(ctx, stmt, db)
-		return
-
+		return handler(ctx, stmt, db)
 	}
 }
 
