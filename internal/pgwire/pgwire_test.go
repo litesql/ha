@@ -2,18 +2,27 @@ package pgwire_test
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net"
+	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/litesql/go-ha"
-	sqlite3ha "github.com/litesql/go-sqlite3-ha"
 	"github.com/litesql/ha/internal/pgwire"
+	"github.com/litesql/ha/internal/sqlite"
 )
+
+func TestMain(m *testing.M) {
+	err := sqlite.Load([]string{"file:/test.db?vfs=memdb"}, true, false, "", 10)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load sqlite databases: %v\n", err)
+		os.Exit(1)
+	}
+	defer sqlite.Close()
+	os.Exit(m.Run())
+}
 
 func TestServe(t *testing.T) {
 	type command struct {
@@ -80,16 +89,16 @@ func TestServe(t *testing.T) {
 		"crud bind parameter": {
 			commands: []command{
 				{
-					sql:      "CREATE TABLE user(ID INT, Name TEXT)",
+					sql:      "CREATE TABLE user_bind(ID INT, Name TEXT)",
 					complete: "CREATE TABLE",
 				},
 				{
-					sql:      "INSERT INTO user VALUES($1, $2)",
+					sql:      "INSERT INTO user_bind VALUES($1, $2)",
 					args:     []any{1, "User 1"},
 					complete: "INSERT 0 1",
 				},
 				{
-					sql:      "SELECT name FROM user WHERE id = :id",
+					sql:      "SELECT name FROM user_bind WHERE id = :id",
 					args:     []any{1},
 					wantRows: [][]any{{"User 1"}},
 					complete: "SELECT 1",
@@ -99,13 +108,6 @@ func TestServe(t *testing.T) {
 		},
 	}
 
-	pub := new(fakePublisher)
-	connector, err := sqlite3ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer connector.Close()
-
 	for name, tc := range tt {
 		t.Run(name, func(t *testing.T) {
 			listener, err := net.Listen("tcp", ":0")
@@ -113,12 +115,10 @@ func TestServe(t *testing.T) {
 				t.Fatalf("failed to create listener: %v", err)
 			}
 			defer listener.Close()
-			db := sql.OpenDB(connector)
-			defer db.Close()
 
 			server, err := pgwire.NewServer(pgwire.Config{
 				User: "test", Pass: "test",
-			}, db)
+			})
 			if err != nil {
 				t.Fatalf("failed to create server: %v", err)
 			}
@@ -192,18 +192,10 @@ func TestTransaction(t *testing.T) {
 		t.Fatalf("failed to create listener: %v", err)
 	}
 	defer listener.Close()
-	pub := new(fakePublisher)
-	connector, err := sqlite3ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer connector.Close()
-	db := sql.OpenDB(connector)
-	defer db.Close()
 
 	server, err := pgwire.NewServer(pgwire.Config{
 		User: "test", Pass: "test",
-	}, db)
+	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
 	}
@@ -224,7 +216,7 @@ func TestTransaction(t *testing.T) {
 	}
 	defer pgPool.Close()
 
-	_, err = pgPool.Exec(context.TODO(), "CREATE TABLE user(ID INT, Name TEXT)")
+	_, err = pgPool.Exec(context.TODO(), "CREATE TABLE user_transaction(ID INT, Name TEXT)")
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -235,12 +227,12 @@ func TestTransaction(t *testing.T) {
 	}
 	defer tx.Rollback(context.TODO())
 
-	_, err = tx.Exec(context.TODO(), "INSERT INTO user VALUES(1, 'User 1')")
+	_, err = tx.Exec(context.TODO(), "INSERT INTO user_transaction VALUES(1, 'User 1')")
 	if err != nil {
 		t.Fatalf("failed to insert row: %v", err)
 	}
 	var name string
-	err = tx.QueryRow(context.TODO(), "SELECT name FROM user WHERE id = 1").Scan(&name)
+	err = tx.QueryRow(context.TODO(), "SELECT name FROM user_transaction WHERE id = 1").Scan(&name)
 	if err != nil {
 		t.Fatalf("failed to select row: %v", err)
 	}
@@ -253,7 +245,7 @@ func TestTransaction(t *testing.T) {
 		t.Fatalf("failed to commit transaction: %v", err)
 	}
 
-	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM user WHERE id = 1").Scan(&name)
+	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM user_transaction WHERE id = 1").Scan(&name)
 	if err != nil {
 		t.Fatalf("failed to select row after commit: %v", err)
 	}
@@ -268,14 +260,14 @@ func TestTransaction(t *testing.T) {
 	defer tx2.Rollback(context.TODO())
 
 	newUserName := "changed User"
-	_, err = tx2.Exec(context.TODO(), "UPDATE user SET name = $1 WHERE id = $2", newUserName, 1)
+	_, err = tx2.Exec(context.TODO(), "UPDATE user_transaction SET name = $1 WHERE id = $2", newUserName, 1)
 	if err != nil {
 		t.Fatalf("failed to update row: %v", err)
 	}
 
 	var name2 string
 	// change query to ignore cached value
-	err = tx2.QueryRow(context.TODO(), "SELECT name FROM user WHERE id = 1 LIMIT 1").Scan(&name2)
+	err = tx2.QueryRow(context.TODO(), "SELECT name FROM user_transaction WHERE id = 1 LIMIT 1").Scan(&name2)
 	if err != nil {
 		t.Fatalf("failed to select row: %v", err)
 	}
@@ -289,7 +281,7 @@ func TestTransaction(t *testing.T) {
 	}
 
 	name2 = ""
-	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM user WHERE id = 1").Scan(&name2)
+	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM user_transaction WHERE id = 1").Scan(&name2)
 	if err != nil {
 		t.Fatalf("failed to select row: %v", err)
 	}
@@ -304,18 +296,10 @@ func TestTransactionPrepared(t *testing.T) {
 		t.Fatalf("failed to create listener: %v", err)
 	}
 	defer listener.Close()
-	pub := new(fakePublisher)
-	connector, err := sqlite3ha.NewConnector("file:/test.db?vfs=memdb", ha.WithCDCPublisher(pub))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer connector.Close()
-	db := sql.OpenDB(connector)
-	defer db.Close()
 
 	server, err := pgwire.NewServer(pgwire.Config{
 		User: "test", Pass: "test",
-	}, db)
+	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
 	}
@@ -336,7 +320,7 @@ func TestTransactionPrepared(t *testing.T) {
 	}
 	defer pgPool.Close()
 
-	_, err = pgPool.Exec(context.TODO(), "CREATE TABLE user(ID INT, Name TEXT)")
+	_, err = pgPool.Exec(context.TODO(), "CREATE TABLE users(ID INT, Name TEXT)")
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
 	}
@@ -347,12 +331,12 @@ func TestTransactionPrepared(t *testing.T) {
 	}
 	defer tx.Rollback(context.TODO())
 
-	_, err = tx.Exec(context.TODO(), "INSERT INTO user VALUES(1, 'User 1')")
+	_, err = tx.Exec(context.TODO(), "INSERT INTO users VALUES(1, 'User 1')")
 	if err != nil {
 		t.Fatalf("failed to insert row: %v", err)
 	}
 	var name string
-	err = tx.QueryRow(context.TODO(), "SELECT name FROM user WHERE id = $1", 1).Scan(&name)
+	err = tx.QueryRow(context.TODO(), "SELECT name FROM users WHERE id = $1", 1).Scan(&name)
 	if err != nil {
 		t.Fatalf("failed to select row: %v", err)
 	}
@@ -365,7 +349,7 @@ func TestTransactionPrepared(t *testing.T) {
 		t.Fatalf("failed to commit transaction: %v", err)
 	}
 
-	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM user WHERE id = $1 LIMIT 1", 1).Scan(&name)
+	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM users WHERE id = $1 LIMIT 1", 1).Scan(&name)
 	if err != nil {
 		t.Fatalf("failed to select row after commit: %v", err)
 	}
@@ -380,14 +364,14 @@ func TestTransactionPrepared(t *testing.T) {
 	defer tx2.Rollback(context.TODO())
 
 	newUserName := "changed User"
-	_, err = tx2.Exec(context.TODO(), "UPDATE user SET name = $1 WHERE id = $2", newUserName, 1)
+	_, err = tx2.Exec(context.TODO(), "UPDATE users SET name = $1 WHERE id = $2", newUserName, 1)
 	if err != nil {
 		t.Fatalf("failed to update row: %v", err)
 	}
 
 	var name2 string
 	// change query to ignore cached value
-	err = tx2.QueryRow(context.TODO(), "SELECT name FROM user WHERE id = $1 LIMIT $2", 1, 2).Scan(&name2)
+	err = tx2.QueryRow(context.TODO(), "SELECT name FROM users WHERE id = $1 LIMIT $2", 1, 2).Scan(&name2)
 	if err != nil {
 		t.Fatalf("failed to select row: %v", err)
 	}
@@ -401,21 +385,11 @@ func TestTransactionPrepared(t *testing.T) {
 	}
 
 	name2 = ""
-	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM user WHERE id = 1").Scan(&name2)
+	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM users WHERE id = 1").Scan(&name2)
 	if err != nil {
 		t.Fatalf("failed to select row: %v", err)
 	}
 	if name2 != name {
 		t.Fatalf("unexpected name: want %q got %q", name, name2)
 	}
-}
-
-type fakePublisher struct {
-	err     error
-	changes []ha.Change
-}
-
-func (f *fakePublisher) Publish(cs *ha.ChangeSet) error {
-	f.changes = cs.Changes
-	return f.err
 }

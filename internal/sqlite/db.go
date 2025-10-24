@@ -3,19 +3,156 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/litesql/go-ha"
 	sqlite3ha "github.com/litesql/go-sqlite3-ha"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
-var (
-	db *sql.DB
-)
+type connectorDB struct {
+	db        *sql.DB
+	connector *ha.Connector
+}
+
+var dbs = make(map[string]*connectorDB)
+
+var reDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
+
+func Load(dsnList []string, memDB bool, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) error {
+	for i, dsn := range dsnList {
+		defaultDB := i == 0
+		id := idFromDSN(dsn)
+		if _, exists := dbs[id]; exists {
+			return fmt.Errorf("database with id %q already added", id)
+		}
+		options := slices.Clone(opts)
+		waitFor := make(chan struct{})
+		options = append(options, ha.WithWaitFor(waitFor))
+		var connector *ha.Connector
+		if fromLatestSnapshot {
+			slog.Info("loading latest snapshot from NATS JetStream Object Store", "dsn", dsn)
+			sequence, reader, err := ha.LatestSnapshot(context.Background(), dsn, opts...)
+			if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
+				return fmt.Errorf("failed to load latest snapshot: %w", err)
+			}
+
+			if sequence > 0 && deliverPolicy == "" {
+				policy := fmt.Sprintf("by_start_sequence=%d", sequence)
+				options = append(options, ha.WithDeliverPolicy(policy))
+			}
+			if reader != nil {
+				if memDB {
+					connector, err = sqlite3ha.NewConnector(dsn, options...)
+					if err != nil {
+						return err
+					}
+					err = deserializeFromReader(context.Background(), connector, reader)
+					if err != nil {
+						return fmt.Errorf("failed to load latest snapshot: %w", err)
+					}
+				} else {
+					filename := filenameFromDSN(dsn)
+					f, err := os.Create(filename)
+					if err != nil {
+						return fmt.Errorf("failed to create snapshot file %q: %w", filename, err)
+					}
+					_, err = io.Copy(f, reader)
+					if err != nil {
+						f.Close()
+						return fmt.Errorf("failed to write snapshot file %q: %w", filename, err)
+					}
+					f.Close()
+					slog.Info("loading snapshot", "filename", filename)
+					connector, err = sqlite3ha.NewConnector(dsn, options...)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			if memDB {
+				slog.Info("using in-memory database")
+				filename := filenameFromDSN(dsn)
+				options := slices.Clone(opts)
+				if filename != "" && deliverPolicy == "" {
+					matched := reDateTime.MatchString(filepath.Base(filename))
+					if matched {
+						dateTime := filepath.Base(filename)[0:len(time.DateTime)]
+						_, err := time.Parse(time.DateTime, dateTime)
+						if err == nil {
+							policy := fmt.Sprintf("by_start_time=%s", dateTime)
+							options = append(options, ha.WithDeliverPolicy(policy))
+						}
+					}
+				}
+				var err error
+				connector, err = sqlite3ha.NewConnector(dsn, options...)
+				if err != nil {
+					return err
+				}
+
+				if filename != "" {
+					fi, err := os.Stat(filename)
+					if err == nil && !fi.IsDir() {
+						slog.Info("loading database", "file", filename)
+						err := deserialize(context.Background(), connector, filename)
+						if err != nil {
+							return fmt.Errorf("failed to load database %q: %w", filename, err)
+						}
+					}
+				}
+			} else {
+				slog.Info("using data source name", "dsn", dsn)
+				var err error
+				connector, err = sqlite3ha.NewConnector(dsn, opts...)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		db := sql.OpenDB(connector)
+		db.SetConnMaxIdleTime(0)
+		db.SetConnMaxLifetime(0)
+		db.SetMaxOpenConns(maxConns)
+		db.SetMaxIdleConns(maxConns)
+		if connector.Subscriber() != nil {
+			connector.Subscriber().SetDB(db)
+		}
+		if connector.Snapshotter() != nil {
+			connector.Snapshotter().SetDB(db)
+		}
+		close(waitFor)
+		connDB := &connectorDB{
+			db:        db,
+			connector: connector,
+		}
+		dbs[id] = connDB
+		if defaultDB {
+			dbs[""] = connDB
+		}
+	}
+	return nil
+}
+
+func Close() {
+	for _, connDB := range dbs {
+		connDB.db.Close()
+		connDB.connector.Close()
+	}
+}
 
 type Request struct {
 	Sql    string         `json:"sql"`
@@ -34,10 +171,6 @@ type execerQuerier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
-func SetGlobalDB(database *sql.DB) {
-	db = database
-}
-
 func Exec(ctx context.Context, eq execerQuerier, stmt *ha.Statement, params map[string]any) (*Response, error) {
 	slog.Info("Executing statement", "type", stmt.Type(), "sql", stmt.Source(), "params", params)
 	if stmt.IsSelect() || stmt.IsExplain() || stmt.HasReturning() {
@@ -47,7 +180,34 @@ func Exec(ctx context.Context, eq execerQuerier, stmt *ha.Statement, params map[
 	return doExec(ctx, eq, stmt.Source(), params)
 }
 
-func Transaction(ctx context.Context, queries []Request) ([]*Response, error) {
+func Databases() []string {
+	var list []string
+	for id := range dbs {
+		if id == "" {
+			continue
+		}
+		list = append(list, id)
+	}
+	return list
+}
+
+func DB(id string) (*sql.DB, error) {
+	dbConnector, ok := dbs[id]
+	if !ok {
+		return nil, fmt.Errorf("database with id %q not found", id)
+	}
+	return dbConnector.db, nil
+}
+
+func Connector(id string) (*ha.Connector, error) {
+	dbConnector, ok := dbs[id]
+	if !ok {
+		return nil, fmt.Errorf("database with id %q not found", id)
+	}
+	return dbConnector.connector, nil
+}
+
+func Transaction(ctx context.Context, db *sql.DB, queries []Request) ([]*Response, error) {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{
 		Isolation: sql.LevelReadCommitted,
 		ReadOnly:  false,
@@ -75,7 +235,7 @@ func Transaction(ctx context.Context, queries []Request) ([]*Response, error) {
 	return list, nil
 }
 
-func DeserializeFromReader(ctx context.Context, r io.Reader) error {
+func deserializeFromReader(ctx context.Context, connector driver.Connector, r io.Reader) error {
 	dest, err := os.CreateTemp("", "ha-*.db")
 	if err != nil {
 		return err
@@ -88,15 +248,16 @@ func DeserializeFromReader(ctx context.Context, r io.Reader) error {
 	}
 	dest.Close()
 
-	return Deserialize(ctx, dest.Name())
+	return deserialize(ctx, connector, dest.Name())
 }
 
-func Deserialize(ctx context.Context, file string) error {
+func deserialize(ctx context.Context, connector driver.Connector, file string) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
-	conn, err := db.Conn(ctx)
+
+	conn, err := connector.Connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -211,19 +372,47 @@ type deserializer interface {
 	Deserialize(b []byte, schema string) error
 }
 
-func deserializerConn(conn *sql.Conn) (deserializer, error) {
-	var deserializerConn deserializer
-	err := conn.Raw(func(driverConn any) error {
-		switch c := driverConn.(type) {
-		case *sqlite3ha.Conn:
-			deserializerConn = c.SQLiteConn
-			return nil
-		case deserializer:
-			deserializerConn = c
-			return nil
-		default:
-			return fmt.Errorf("not a sqlite3 connection")
+func deserializerConn(conn driver.Conn) (deserializer, error) {
+	switch c := conn.(type) {
+	case *sqlite3ha.Conn:
+		return c.SQLiteConn, nil
+	case deserializer:
+		return c, nil
+	default:
+		return nil, fmt.Errorf("not a sqlite3 connection")
+	}
+
+}
+
+func filenameFromDSN(dsn string) string {
+	var filename string
+	u, err := url.Parse(dsn)
+	if err == nil {
+		filename = u.Path
+	}
+	if filename == "" {
+		filename = strings.TrimPrefix(dsn, "file:")
+		if i := strings.Index(filename, "?"); i > 0 {
+			filename = filename[0:i]
 		}
-	})
-	return deserializerConn, err
+	}
+	return filename
+}
+
+func idFromDSN(dsn string) string {
+	var filename string
+	u, err := url.Parse(dsn)
+	if err == nil {
+		filename = u.Path
+	}
+	if filename == "" {
+		filename = strings.TrimPrefix(dsn, "file:")
+		if i := strings.Index(filename, "?"); i > 0 {
+			filename = filename[0:i]
+		}
+	}
+	if filename != "" {
+		return filepath.Base(filename)
+	}
+	return ""
 }

@@ -2,30 +2,24 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"syscall"
 	"time"
 
 	ha "github.com/litesql/go-ha"
-	sqlite3ha "github.com/litesql/go-sqlite3-ha"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
+	hahttp "github.com/litesql/ha/internal/http"
 	"github.com/litesql/ha/internal/interceptor"
 	"github.com/litesql/ha/internal/pgwire"
 	"github.com/litesql/ha/internal/sqlite"
@@ -39,6 +33,7 @@ var (
 
 var (
 	fs       *ff.FlagSet
+	dbParams *string
 	name     *string
 	port     *uint
 	logLevel *string
@@ -76,6 +71,7 @@ var (
 
 func main() {
 	fs = ff.NewFlagSet("ha")
+	dbParams = fs.StringLong("db-params", "_journal=WAL&_timeout=5000", "SQLite DSN parameters (added to each database file DSN if not defined)")
 	name = fs.String('n', "name", "", "Node name")
 	port = fs.Uint('p', "port", 8080, "Server port")
 	interceptorPath = fs.String('i', "interceptor", "", "Path to a golang script to customize replication behaviour")
@@ -163,22 +159,33 @@ func run() error {
 		}
 	}
 
-	var (
-		db  *sql.DB
-		dsn string
-		err error
-	)
-	args := fs.GetArgs()
+	dsnList := make([]string, 0)
+	dsnParams := *dbParams
+	dsnPrefix := "file:"
 	if *memDB {
-		dsn = "file:/ha.db?vfs=memdb"
-		if len(args) > 0 {
-			dsn = fmt.Sprintf("file:/%s?vfs=memdb", strings.TrimPrefix(args[0], "/"))
+		dsnParams = "vfs=memdb"
+		dsnPrefix = "file:/"
+	}
+	for _, pattern := range fs.GetArgs() {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			log.Fatal(err)
 		}
-	} else {
-		dsn = "file:ha.db?_journal=WAL&_timeout=5000"
-		if len(args) > 0 {
-			dsn = args[0]
+
+		for _, file := range matches {
+			dsn := fmt.Sprintf("%s%s?%s", dsnPrefix, file, dsnParams)
+			dsnList = append(dsnList, dsn)
 		}
+		if len(matches) == 0 && !strings.Contains(pattern, "*") {
+			dsn := fmt.Sprintf("%s%s", dsnPrefix, strings.TrimPrefix(pattern, "file:"))
+			if !strings.Contains(dsn, "?") {
+				dsn = fmt.Sprintf("%s?%s", dsn, dsnParams)
+			}
+			dsnList = append(dsnList, dsn)
+		}
+	}
+	if len(dsnList) == 0 {
+		dsnList = append(dsnList, fmt.Sprintf("%s%s?%s", dsnPrefix, "ha.db", dsnParams))
 	}
 
 	opts := []ha.Option{
@@ -232,239 +239,41 @@ func run() error {
 		opts = append(opts, ha.WithChangeSetInterceptor(changeSetInterceptor))
 	}
 
-	var connector *ha.Connector
-
-	if *fromLatestSnapshot {
-		slog.Info("loading latest snapshot from NATS JetStream Object Store")
-		sequence, reader, err := ha.LatestSnapshot(context.Background(), dsn, opts...)
-		if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
-			return fmt.Errorf("failed to load latest snapshot: %w", err)
-		}
-		if sequence > 0 && *replicationPolicy == "" {
-			policy := fmt.Sprintf("by_start_sequence=%d", sequence)
-			opts = append(opts, ha.WithDeliverPolicy(policy))
-		}
-		if reader != nil {
-			if *memDB {
-				connector, err = sqlite3ha.NewConnector(dsn, opts...)
-				if err != nil {
-					return err
-				}
-				defer connector.Close()
-				err = sqlite.DeserializeFromReader(context.Background(), reader)
-				if err != nil {
-					return fmt.Errorf("failed to load latest snapshot: %w", err)
-				}
-			} else {
-				filename := filenameFromDSN(dsn)
-				f, err := os.Create(filename)
-				if err != nil {
-					return fmt.Errorf("failed to create snapshot file %q: %w", filename, err)
-				}
-				_, err = io.Copy(f, reader)
-				if err != nil {
-					f.Close()
-					return fmt.Errorf("failed to write snapshot file %q: %w", filename, err)
-				}
-				f.Close()
-				slog.Info("loading snapshot", "filename", filename)
-				db.Close()
-				connector, err = sqlite3ha.NewConnector(dsn, opts...)
-				if err != nil {
-					return err
-				}
-				defer connector.Close()
-				db = sql.OpenDB(connector)
-				defer db.Close()
-				configDB(db)
-			}
-		}
-	} else {
-		if *memDB {
-			slog.Info("using in-memory database")
-			var filename string
-			if len(args) > 0 {
-				filename = args[0]
-			}
-			if filename != "" && *replicationPolicy == "" {
-				matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`, filepath.Base(filename))
-				if matched {
-					dateTime := filepath.Base(filename)[0:len(time.DateTime)]
-					_, err := time.Parse(time.DateTime, dateTime)
-					if err == nil {
-						policy := fmt.Sprintf("by_start_time=%s", dateTime)
-						opts = append(opts, ha.WithDeliverPolicy(policy))
-					}
-				}
-			}
-
-			connector, err = sqlite3ha.NewConnector(dsn, opts...)
-			if err != nil {
-				return err
-			}
-			defer connector.Close()
-			db = sql.OpenDB(connector)
-			defer db.Close()
-			configDB(db)
-
-			if filename != "" {
-				slog.Info("loading database", "file", filename)
-				err := sqlite.Deserialize(context.Background(), filename)
-				if err != nil {
-					return fmt.Errorf("failed to load database %q: %w", filename, err)
-				}
-			}
-		} else {
-			slog.Info("using data source name", "dsn", dsn)
-			connector, err = sqlite3ha.NewConnector(dsn, opts...)
-			if err != nil {
-				return err
-			}
-			defer connector.Close()
-			db = sql.OpenDB(connector)
-			defer db.Close()
-			configDB(db)
-		}
+	err := sqlite.Load(dsnList, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to load database: %w", err)
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	mux.HandleFunc("POST /", func(w http.ResponseWriter, r *http.Request) {
-		var req QueriesRequest
-		err := json.NewDecoder(r.Body).Decode(&req)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
+	mux.HandleFunc("GET /databases", hahttp.DatabasesHandler)
+	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
+	mux.HandleFunc("GET /databases/{id}", hahttp.DownloadHandler)
+	mux.HandleFunc("POST /", hahttp.QueryHandler)
+	mux.HandleFunc("GET /", hahttp.DownloadHandler)
 
-		if len(req.Queries) == 0 {
-			http.Error(w, "no queries found", http.StatusBadRequest)
-			return
-		}
+	mux.HandleFunc("POST /databases/{id}/snapshot", hahttp.TakeSnapshotHandler)
+	mux.HandleFunc("POST /snapshot", hahttp.TakeSnapshotHandler)
 
-		if len(req.Queries) == 1 {
-			stmt, err := ha.ParseStatement(r.Context(), req.Queries[0].Sql)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			res, err := sqlite.Exec(r.Context(), db, stmt, req.Queries[0].Params)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			if !req.slice {
-				json.NewEncoder(w).Encode(res)
-				return
-			}
-			json.NewEncoder(w).Encode(map[string][]*sqlite.Response{
-				"results": {res},
-			})
-			return
-		}
+	mux.HandleFunc("GET /databases/{id}/snapshot", hahttp.DownloadSnapshotHandler)
+	mux.HandleFunc("GET /snapshot", hahttp.DownloadSnapshotHandler)
 
-		res, err := sqlite.Transaction(r.Context(), req.Queries)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string][]*sqlite.Response{
-			"results": res,
-		})
-	})
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		filename := fmt.Sprintf("%s_ha.db", time.Now().UTC().Format(time.DateTime))
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-		w.Header().Set("Content-Type", "application/octet-stream")
-		err := sqlite3ha.Backup(r.Context(), db, w)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-	})
+	mux.HandleFunc("GET /databases/{id}/replications", hahttp.ReplicationsHandler)
+	mux.HandleFunc("GET /replications", hahttp.ReplicationsHandler)
+	mux.HandleFunc("GET /databases/{id}/replications/{name}", hahttp.ReplicationsHandler)
+	mux.HandleFunc("GET /replications/{name}", hahttp.ReplicationsHandler)
 
-	mux.HandleFunc("POST /snapshot", func(w http.ResponseWriter, r *http.Request) {
-		sequence, err := connector.TakeSnapshot(r.Context(), db)
-		if err != nil {
-			slog.Error("take snapshot", "error", err)
-			http.Error(w, fmt.Sprintf("failed to take snapshot: %v", err), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("X-Sequence", fmt.Sprint(sequence))
-		w.WriteHeader(http.StatusOK)
-	})
-
-	mux.HandleFunc("GET /snapshot", func(w http.ResponseWriter, r *http.Request) {
-		sequence, reader, err := connector.LatestSnapshot(r.Context())
-		if err != nil {
-			slog.ErrorContext(r.Context(), "failed o get latest snapshot", "error", err)
-			http.Error(w, fmt.Sprintf("failed to get latest snapshot: %v", err), http.StatusInternalServerError)
-			return
-		}
-		defer reader.Close()
-		filename := fmt.Sprintf("%s_ha_snapshot_%d.db", time.Now().UTC().Format(time.DateTime), sequence)
-		w.Header().Set("X-Sequence", fmt.Sprint(sequence))
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-		w.Header().Set("Content-Type", "application/octet-stream")
-		_, err = io.Copy(w, reader)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to send latest snapshot: %v", err), http.StatusInternalServerError)
-			return
-		}
-	})
-
-	mux.HandleFunc("GET /replications", func(w http.ResponseWriter, r *http.Request) {
-		info, err := connector.DeliveredInfo(r.Context(), "")
-		if err != nil {
-			slog.Error("failed to get replication info", "error", err)
-			http.Error(w, fmt.Sprintf("failed to get replication info: %v", err), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"replications": info,
-		})
-	})
-
-	mux.HandleFunc("GET /replications/{name}", func(w http.ResponseWriter, r *http.Request) {
-		name := r.PathValue("name")
-		info, err := connector.DeliveredInfo(r.Context(), name)
-		if err != nil {
-			slog.Error("failed to get replication info", "error", err, "name", name)
-			http.Error(w, fmt.Sprintf("failed to get replication info: %v", err), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"replications": info,
-		})
-	})
-
-	mux.HandleFunc("DELETE /replications/{name}", func(w http.ResponseWriter, r *http.Request) {
-		name := r.PathValue("name")
-		if name == "" {
-			http.Error(w, "name is required", http.StatusInternalServerError)
-			return
-		}
-		err := connector.RemoveConsumer(r.Context(), name)
-		if err != nil {
-			slog.Error("failed remove consumer", "error", err, "name", name)
-			http.Error(w, fmt.Sprintf("failed to remove consumer: %v", err), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
-	})
+	mux.HandleFunc("DELETE /databases/{id}/replications/{name}", hahttp.DeleteReplicationHandler)
+	mux.HandleFunc("DELETE /replications/{name}", hahttp.DeleteReplicationHandler)
 
 	pgServer, err := pgwire.NewServer(pgwire.Config{
 		User:    *pgUser,
 		Pass:    *pgPass,
 		TLSCert: *pgCert,
 		TLSKey:  *pgKey,
-	}, db)
+	})
 	if err != nil {
 		return fmt.Errorf("failed to create PostgreSQL server: %w", err)
 	}
@@ -492,9 +301,7 @@ func run() error {
 		if err := pgServer.Close(); err != nil {
 			slog.Error("PostgreSQL server shutdown failed", "error", err)
 		}
-		if connector != nil {
-			connector.Close()
-		}
+		sqlite.Close()
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
@@ -505,57 +312,4 @@ func run() error {
 
 	slog.Info("starting HA HTTP server", "port", *port, "version", version, "commit", commit, "date", date)
 	return server.ListenAndServe()
-}
-
-type QueriesRequest struct {
-	Queries []sqlite.Request
-	slice   bool
-}
-
-func (r *QueriesRequest) UnmarshalJSON(b []byte) error {
-	if len(b) == 0 {
-		return fmt.Errorf("empty")
-	}
-	switch b[0] {
-	case '{':
-		var query sqlite.Request
-		err := json.Unmarshal(b, &query)
-		if err != nil {
-			return err
-		}
-		r.Queries = []sqlite.Request{
-			query,
-		}
-	case '[':
-		r.slice = true
-		return json.Unmarshal(b, &r.Queries)
-	}
-	return nil
-}
-
-func configDB(db *sql.DB) {
-	db.SetConnMaxIdleTime(0)
-	db.SetConnMaxLifetime(0)
-	db.SetMaxOpenConns(*concurrentQueries)
-	db.SetMaxIdleConns(*concurrentQueries)
-
-	sqlite.SetGlobalDB(db)
-}
-
-func filenameFromDSN(dsn string) string {
-	var filename string
-	u, err := url.Parse(dsn)
-	if err == nil {
-		filename = u.Path
-	}
-	if filename == "" {
-		filename = strings.TrimPrefix(dsn, "file:")
-		if i := strings.Index(filename, "?"); i > 0 {
-			filename = filename[0:i]
-		}
-	}
-	if filename != "" {
-		return filepath.Base(filename)
-	}
-	return ""
 }

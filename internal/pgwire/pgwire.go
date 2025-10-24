@@ -36,7 +36,7 @@ type Server struct {
 	*wire.Server
 }
 
-func NewServer(cfg Config, db *sql.DB) (*Server, error) {
+func NewServer(cfg Config) (*Server, error) {
 	var server Server
 	opts := []wire.OptionFn{
 		wire.Version("17.0"),
@@ -62,7 +62,7 @@ func NewServer(cfg Config, db *sql.DB) (*Server, error) {
 		opts = append(opts, wire.TLSConfig(config))
 	}
 
-	wireServer, err := wire.NewServer(parseFn(db), opts...)
+	wireServer, err := wire.NewServer(parseFn(), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,10 +94,13 @@ func (s *Server) terminateConn(ctx context.Context) error {
 	return nil
 }
 
-func parseFn(db *sql.DB) wire.ParseFn {
+func parseFn() wire.ParseFn {
 	return func(ctx context.Context, sql string) (statements wire.PreparedStatements, err error) {
 		slog.InfoContext(ctx, "pg-wire: query received", "remote", wire.RemoteAddress(ctx), "sql", sql)
-
+		db, err := sqlite.DB("")
+		if err != nil {
+			return nil, err
+		}
 		upper := strings.ToUpper(strings.TrimSpace(sql))
 		if strings.HasPrefix(upper, "-- PING") {
 			statements = wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
