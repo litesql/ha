@@ -2,7 +2,7 @@ openapi: 3.0.4
 info:
   title: HA SQLite Cluster API
   description: API for executing queries, managing databases, snapshots, and replications in HA. Access [litesql.github.io/ha/](https://litesql.github.io/ha/) to read the full documentation.
-  version: 1.0.0
+  version: 0.1.0
 tags:
   - name: Main Database
     description: Operations on the main database.
