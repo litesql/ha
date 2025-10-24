@@ -7,7 +7,6 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.15.0
 	github.com/lib/pq v1.10.9
 	github.com/litesql/go-ha v0.0.14
-	github.com/litesql/go-sqlite3 v1.14.34
 	github.com/litesql/go-sqlite3-ha v0.0.3
 	github.com/nats-io/nats.go v1.47.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
@@ -23,6 +22,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
+	github.com/litesql/go-sqlite3 v1.14.34 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect
 	github.com/nats-io/jwt/v2 v2.8.0 // indirect
 	github.com/nats-io/nats-server/v2 v2.12.1 // indirect
