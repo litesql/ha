@@ -17,6 +17,8 @@ RUN CGO_ENABLED=1 go build -o ha -ldflags="-X main.commit=$COMMIT -X main.date=$
 # Production image
 FROM debian:trixie-slim AS production
 
+LABEL org.opencontainers.image.source https://github.com/litesql/ha
+
 RUN groupadd --system --gid 1000 ha && \
     useradd --system --uid 1000 --gid 1000 --home /data ha
 
