@@ -1,13 +1,13 @@
 module github.com/litesql/ha
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/jackc/pgx/v5 v5.7.6
-	github.com/jeroenrinzema/psql-wire v0.15.0
+	github.com/jeroenrinzema/psql-wire v0.16.0
 	github.com/lib/pq v1.10.9
-	github.com/litesql/go-ha v0.0.14
-	github.com/litesql/go-sqlite3-ha v0.0.3
+	github.com/litesql/go-ha v0.0.16
+	github.com/litesql/go-sqlite3-ha v0.0.4
 	github.com/nats-io/nats.go v1.47.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/traefik/yaegi v0.16.1

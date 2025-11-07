@@ -147,13 +147,6 @@ func Load(dsnList []string, memDB bool, fromLatestSnapshot bool, deliverPolicy s
 	return nil
 }
 
-func Close() {
-	for _, connDB := range dbs {
-		connDB.db.Close()
-		connDB.connector.Close()
-	}
-}
-
 type Request struct {
 	Sql    string         `json:"sql"`
 	Params map[string]any `json:"params"`

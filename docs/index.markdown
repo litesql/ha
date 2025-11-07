@@ -425,6 +425,8 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --pg-key  | HA_PG_KEY  |      | Path to PostgreSQL TLS key file |
 | --concurrent-queries | HA_CONCURRENT_QUERIES | 50 | Number of concurrent queries (DB pool max) |
 | --extensions | HA_EXTENSIONS |  | Comma-separated list of SQLite extensions path to load |
+| --async-replication | HA_ASYNC_REPLICATION | false | Enables asynchronous replication message publishing |
+| --async-replication-store-dir | HA_ASYNC_REPLICATION_STORE_DIR | | Directory path for storing outbox messages used in asynchronous replication |
 | --replicas | HA_REPLICAS | 1 | Number of replicas to keep for the stream and object store in clustered jetstream |
 | --replication-timeout | HA_REPLICATION_TIMEOUT | 15s | Replication publisher timeout |
 | --replication-stream | HA_REPLICATION_STREAM | ha_replication | Replication stream name |

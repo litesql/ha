@@ -61,12 +61,14 @@ var (
 	natsStoreDir *string
 	natsConfig   *string
 
-	replicationStream  *string
-	replicationTimeout *time.Duration
-	replicationMaxAge  *time.Duration
-	replicationURL     *string
-	replicationPolicy  *string
-	replicas           *int
+	asyncReplication          *bool
+	asyncReplicationOutboxDir *string
+	replicationStream         *string
+	replicationTimeout        *time.Duration
+	replicationMaxAge         *time.Duration
+	replicationURL            *string
+	replicationPolicy         *string
+	replicas                  *int
 
 	interceptorPath *string
 )
@@ -103,6 +105,8 @@ func main() {
 	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Number of concurrent queries")
 	extensions = flagSet.StringLong("extensions", "", "Comma-separated list of SQLite extensions to load")
 
+	asyncReplication = flagSet.BoolLong("async-replication", "Enables asynchronous replication message publishing")
+	asyncReplicationOutboxDir = flagSet.StringLong("async-replication-store-dir", "", "Directory path for storing outbox messages used in asynchronous replication")
 	replicas = flagSet.IntLong("replicas", 1, "Number of replicas to keep for the stream and object store in clustered jetstream. Defaults to 1, maximum is 5")
 	replicationTimeout = flagSet.DurationLong("replication-timeout", 15*time.Second, "Replication publisher timeout")
 	replicationStream = flagSet.StringLong("replication-stream", "ha_replication", "Replication stream name")
@@ -244,6 +248,10 @@ func run() error {
 		opts = append(opts, ha.WithChangeSetInterceptor(changeSetInterceptor))
 	}
 
+	if *asyncReplication {
+		opts = append(opts, ha.WithAsyncPublisher())
+		opts = append(opts, ha.WithAsyncPublisherOutboxDir(*asyncReplicationOutboxDir))
+	}
 	err := sqlite.Load(dsnList, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to load database: %w", err)
@@ -316,7 +324,7 @@ func run() error {
 		if err := pgServer.Close(); err != nil {
 			slog.Error("PostgreSQL server shutdown failed", "error", err)
 		}
-		sqlite.Close()
+		ha.Shutdown()
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
