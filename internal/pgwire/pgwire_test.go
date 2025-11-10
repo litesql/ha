@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/litesql/go-ha"
 	"github.com/litesql/ha/internal/pgwire"
 	"github.com/litesql/ha/internal/sqlite"
 )
@@ -20,7 +21,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "failed to load sqlite databases: %v\n", err)
 		os.Exit(1)
 	}
-	defer sqlite.Close()
+	defer ha.Shutdown()
 	os.Exit(m.Run())
 }
 
