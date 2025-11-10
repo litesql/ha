@@ -49,6 +49,20 @@ builds:
       - CGO_ENABLED=1
       - CC=zig cc -target x86_64-windows
 
+  - id: ha_windows_arm64
+    binary: ha
+    flags:
+      - -tags=zig
+    ldflags:
+    - -s -w -X github.com/litesql/ha/main.version={{.Version}} -X github.com/litesql/ha/main.commit={{.Commit}} -X github.com/litesql/ha/main.date={{.Date}}
+    goos:
+      - windows
+    goarch:
+      - arm64
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-windows
+
   - id: ha_darwin
     binary: ha
     ldflags:
@@ -65,7 +79,7 @@ builds:
 archives:
   - id: ha
     formats: [tar.gz]
-    ids: [ha, ha_linux_arm64, ha_windows, ha_darwin]
+    ids: [ha, ha_linux_arm64, ha_windows, ha_windows_arm64, ha_darwin]
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       ha_
