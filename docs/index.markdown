@@ -433,5 +433,6 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --replication-max-age | HA_REPLICATION_MAX_AGE | 24h | Replication stream max age |
 | --replication-url | HA_REPLICATION_URL |  | Replication NATS url (defaults to embedded NATS server) |
 | --replication-policy | HA_REPLICATION_POLICY | all | Replication subscriber delivery policy (all, last, new, by_start_sequence=X, by_start_time=x) |
+| --row-identify | HA_ROW_IDENTIFY | rowid | Strategy used to identify rows during replication. Options: rowid or full |
 | --version | HA_VERSION | false | Print version information and exit |
 | -c, --config | | | config file (optional) |

@@ -17,7 +17,6 @@ import (
 	"time"
 
 	ha "github.com/litesql/go-ha"
-	"github.com/nats-io/nats.go"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
@@ -69,6 +68,7 @@ var (
 	replicationURL            *string
 	replicationPolicy         *string
 	replicas                  *int
+	rowIdentify               *string
 
 	interceptorPath *string
 )
@@ -113,6 +113,7 @@ func main() {
 	replicationMaxAge = flagSet.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
 	replicationURL = flagSet.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
 	replicationPolicy = flagSet.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
+	rowIdentify = flagSet.StringLong("row-identify", "rowid", "Strategy used to identify rows during replication. Options: rowid or full")
 
 	printVersion := flagSet.BoolLong("version", "Print version information and exit")
 	_ = flagSet.String('c', "config", "", "config file (optional)")
@@ -206,21 +207,6 @@ func run() error {
 		ha.WithPublisherTimeout(*replicationTimeout),
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
-		ha.WithNatsOptions(
-			nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
-				if err != nil {
-					slog.Error("Got disconnected!", "reason", err)
-				}
-			}),
-			nats.ReconnectHandler(func(nc *nats.Conn) {
-				slog.Info("Got reconnected!", "url", nc.ConnectedUrl())
-			}),
-			nats.ClosedHandler(func(nc *nats.Conn) {
-				if err := nc.LastError(); err != nil {
-					slog.Error("Connection closed.", "reason", err)
-				}
-			}),
-		),
 	}
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())
@@ -252,6 +238,18 @@ func run() error {
 		opts = append(opts, ha.WithAsyncPublisher())
 		opts = append(opts, ha.WithAsyncPublisherOutboxDir(*asyncReplicationOutboxDir))
 	}
+
+	if *rowIdentify != "" {
+		switch *rowIdentify {
+		case string(ha.Rowid):
+			opts = append(opts, ha.WithRowIdentify(ha.Rowid))
+		case string(ha.Full):
+			opts = append(opts, ha.WithRowIdentify(ha.Full))
+		default:
+			return fmt.Errorf("invalid --row-identify. Use rowid or full")
+		}
+	}
+
 	err := sqlite.Load(dsnList, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to load database: %w", err)
