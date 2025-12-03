@@ -113,7 +113,7 @@ func main() {
 	replicationMaxAge = flagSet.DurationLong("replication-max-age", 24*time.Hour, "Replication stream max age")
 	replicationURL = flagSet.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
 	replicationPolicy = flagSet.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
-	rowIdentify = flagSet.StringLong("row-identify", "rowid", "Strategy used to identify rows during replication. Options: rowid or full")
+	rowIdentify = flagSet.StringLong("row-identify", "pk", "Strategy used to identify rows during replication. Options: pk, rowid or full")
 
 	printVersion := flagSet.BoolLong("version", "Print version information and exit")
 	_ = flagSet.String('c', "config", "", "config file (optional)")
@@ -241,12 +241,14 @@ func run() error {
 
 	if *rowIdentify != "" {
 		switch *rowIdentify {
+		case string(ha.PK):
+			opts = append(opts, ha.WithRowIdentify(ha.PK))
 		case string(ha.Rowid):
 			opts = append(opts, ha.WithRowIdentify(ha.Rowid))
 		case string(ha.Full):
 			opts = append(opts, ha.WithRowIdentify(ha.Full))
 		default:
-			return fmt.Errorf("invalid --row-identify. Use rowid or full")
+			return fmt.Errorf("invalid --row-identify. Use pk, rowid or full")
 		}
 	}
 

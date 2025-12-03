@@ -16,65 +16,81 @@ import (
 func init() {
 	Symbols["github.com/litesql/go-ha/ha"] = map[string]reflect.Value{
 		// function, constant and variable definitions
-		"DefaultStream":               reflect.ValueOf(constant.MakeFromLiteral("\"ha_replication\"", token.STRING, 0)),
-		"ErrInvalidSQL":               reflect.ValueOf(&ha.ErrInvalidSQL).Elem(),
-		"ErrSnapshotterNotConfigured": reflect.ValueOf(&ha.ErrSnapshotterNotConfigured).Elem(),
-		"ErrSubscriberNotConfigured":  reflect.ValueOf(&ha.ErrSubscriberNotConfigured).Elem(),
-		"GetConnector":                reflect.ValueOf(ha.GetConnector),
-		"LatestSnapshot":              reflect.ValueOf(ha.LatestSnapshot),
-		"NameToOptions":               reflect.ValueOf(ha.NameToOptions),
-		"NewChangeSet":                reflect.ValueOf(ha.NewChangeSet),
-		"NewConnector":                reflect.ValueOf(ha.NewConnector),
-		"NewJSONPublisher":            reflect.ValueOf(ha.NewJSONPublisher),
-		"NewNATSPublisher":            reflect.ValueOf(ha.NewNATSPublisher),
-		"NewNATSSnapshotter":          reflect.ValueOf(ha.NewNATSSnapshotter),
-		"NewNATSSubscriber":           reflect.ValueOf(ha.NewNATSSubscriber),
-		"NewNoopPublisher":            reflect.ValueOf(ha.NewNoopPublisher),
-		"NewNoopSnapshotter":          reflect.ValueOf(ha.NewNoopSnapshotter),
-		"NewNoopSubscriber":           reflect.ValueOf(ha.NewNoopSubscriber),
-		"NewWriterPublisher":          reflect.ValueOf(ha.NewWriterPublisher),
-		"Parse":                       reflect.ValueOf(ha.Parse),
-		"ParseStatement":              reflect.ValueOf(ha.ParseStatement),
-		"TypeAlterTable":              reflect.ValueOf(constant.MakeFromLiteral("\"ALTER TABLE\"", token.STRING, 0)),
-		"TypeAnalyze":                 reflect.ValueOf(constant.MakeFromLiteral("\"ANALYZE\"", token.STRING, 0)),
-		"TypeBegin":                   reflect.ValueOf(constant.MakeFromLiteral("\"BEGIN\"", token.STRING, 0)),
-		"TypeCommit":                  reflect.ValueOf(constant.MakeFromLiteral("\"COMMIT\"", token.STRING, 0)),
-		"TypeCreateIndex":             reflect.ValueOf(constant.MakeFromLiteral("\"CREATE INDEX\"", token.STRING, 0)),
-		"TypeCreateTable":             reflect.ValueOf(constant.MakeFromLiteral("\"CREATE TABLE\"", token.STRING, 0)),
-		"TypeCreateTrigger":           reflect.ValueOf(constant.MakeFromLiteral("\"CREATE TRIGGER\"", token.STRING, 0)),
-		"TypeCreateView":              reflect.ValueOf(constant.MakeFromLiteral("\"CREATE VIEW\"", token.STRING, 0)),
-		"TypeCreateVirtualTable":      reflect.ValueOf(constant.MakeFromLiteral("\"CREATE VIRTUAL TABLE\"", token.STRING, 0)),
-		"TypeDelete":                  reflect.ValueOf(constant.MakeFromLiteral("\"DELETE\"", token.STRING, 0)),
-		"TypeDrop":                    reflect.ValueOf(constant.MakeFromLiteral("\"DROP\"", token.STRING, 0)),
-		"TypeExplain":                 reflect.ValueOf(constant.MakeFromLiteral("\"EXPLAIN\"", token.STRING, 0)),
-		"TypeInsert":                  reflect.ValueOf(constant.MakeFromLiteral("\"INSERT\"", token.STRING, 0)),
-		"TypeOther":                   reflect.ValueOf(constant.MakeFromLiteral("\"OTHER\"", token.STRING, 0)),
-		"TypeRelease":                 reflect.ValueOf(constant.MakeFromLiteral("\"RELEASE\"", token.STRING, 0)),
-		"TypeRollback":                reflect.ValueOf(constant.MakeFromLiteral("\"ROLLBACK\"", token.STRING, 0)),
-		"TypeSavepoint":               reflect.ValueOf(constant.MakeFromLiteral("\"SAVEPOINT\"", token.STRING, 0)),
-		"TypeSelect":                  reflect.ValueOf(constant.MakeFromLiteral("\"SELECT\"", token.STRING, 0)),
-		"TypeUpdate":                  reflect.ValueOf(constant.MakeFromLiteral("\"UPDATE\"", token.STRING, 0)),
-		"TypeVacuum":                  reflect.ValueOf(constant.MakeFromLiteral("\"VACUUM\"", token.STRING, 0)),
-		"UnverifiedStatement":         reflect.ValueOf(ha.UnverifiedStatement),
-		"WithCDCPublisher":            reflect.ValueOf(ha.WithCDCPublisher),
-		"WithCDCSubscriber":           reflect.ValueOf(ha.WithCDCSubscriber),
-		"WithChangeSetInterceptor":    reflect.ValueOf(ha.WithChangeSetInterceptor),
-		"WithDBSnapshotter":           reflect.ValueOf(ha.WithDBSnapshotter),
-		"WithDeliverPolicy":           reflect.ValueOf(ha.WithDeliverPolicy),
-		"WithDisableDDLSync":          reflect.ValueOf(ha.WithDisableDDLSync),
-		"WithEmbeddedNatsConfig":      reflect.ValueOf(ha.WithEmbeddedNatsConfig),
-		"WithExtensions":              reflect.ValueOf(ha.WithExtensions),
-		"WithName":                    reflect.ValueOf(ha.WithName),
-		"WithNatsOptions":             reflect.ValueOf(ha.WithNatsOptions),
-		"WithPublisherTimeout":        reflect.ValueOf(ha.WithPublisherTimeout),
-		"WithReplicas":                reflect.ValueOf(ha.WithReplicas),
-		"WithReplicationStream":       reflect.ValueOf(ha.WithReplicationStream),
-		"WithReplicationURL":          reflect.ValueOf(ha.WithReplicationURL),
-		"WithSnapshotInterval":        reflect.ValueOf(ha.WithSnapshotInterval),
-		"WithStreamMaxAge":            reflect.ValueOf(ha.WithStreamMaxAge),
-		"WithWaitFor":                 reflect.ValueOf(ha.WithWaitFor),
+		"DefaultStream":                 reflect.ValueOf(constant.MakeFromLiteral("\"ha_replication\"", token.STRING, 0)),
+		"ErrInvalidSQL":                 reflect.ValueOf(&ha.ErrInvalidSQL).Elem(),
+		"ErrSnapshotterNotConfigured":   reflect.ValueOf(&ha.ErrSnapshotterNotConfigured).Elem(),
+		"ErrSubscriberNotConfigured":    reflect.ValueOf(&ha.ErrSubscriberNotConfigured).Elem(),
+		"Full":                          reflect.ValueOf(ha.Full),
+		"LatestSnapshot":                reflect.ValueOf(ha.LatestSnapshot),
+		"ListDSN":                       reflect.ValueOf(ha.ListDSN),
+		"LookupConnector":               reflect.ValueOf(ha.LookupConnector),
+		"NameToOptions":                 reflect.ValueOf(ha.NameToOptions),
+		"NewAsyncNATSPublisher":         reflect.ValueOf(ha.NewAsyncNATSPublisher),
+		"NewChangeSet":                  reflect.ValueOf(ha.NewChangeSet),
+		"NewConnector":                  reflect.ValueOf(ha.NewConnector),
+		"NewJSONPublisher":              reflect.ValueOf(ha.NewJSONPublisher),
+		"NewNATSPublisher":              reflect.ValueOf(ha.NewNATSPublisher),
+		"NewNATSSnapshotter":            reflect.ValueOf(ha.NewNATSSnapshotter),
+		"NewNATSSubscriber":             reflect.ValueOf(ha.NewNATSSubscriber),
+		"NewNoopPublisher":              reflect.ValueOf(ha.NewNoopPublisher),
+		"NewNoopSnapshotter":            reflect.ValueOf(ha.NewNoopSnapshotter),
+		"NewNoopSubscriber":             reflect.ValueOf(ha.NewNoopSubscriber),
+		"NewWriterPublisher":            reflect.ValueOf(ha.NewWriterPublisher),
+		"PK":                            reflect.ValueOf(ha.PK),
+		"Parse":                         reflect.ValueOf(ha.Parse),
+		"ParseStatement":                reflect.ValueOf(ha.ParseStatement),
+		"Rowid":                         reflect.ValueOf(ha.Rowid),
+		"Shutdown":                      reflect.ValueOf(ha.Shutdown),
+		"TXCookieName":                  reflect.ValueOf(constant.MakeFromLiteral("\"_txseq\"", token.STRING, 0)),
+		"TypeAlterTable":                reflect.ValueOf(constant.MakeFromLiteral("\"ALTER TABLE\"", token.STRING, 0)),
+		"TypeAnalyze":                   reflect.ValueOf(constant.MakeFromLiteral("\"ANALYZE\"", token.STRING, 0)),
+		"TypeBegin":                     reflect.ValueOf(constant.MakeFromLiteral("\"BEGIN\"", token.STRING, 0)),
+		"TypeCommit":                    reflect.ValueOf(constant.MakeFromLiteral("\"COMMIT\"", token.STRING, 0)),
+		"TypeCreateIndex":               reflect.ValueOf(constant.MakeFromLiteral("\"CREATE INDEX\"", token.STRING, 0)),
+		"TypeCreateTable":               reflect.ValueOf(constant.MakeFromLiteral("\"CREATE TABLE\"", token.STRING, 0)),
+		"TypeCreateTrigger":             reflect.ValueOf(constant.MakeFromLiteral("\"CREATE TRIGGER\"", token.STRING, 0)),
+		"TypeCreateView":                reflect.ValueOf(constant.MakeFromLiteral("\"CREATE VIEW\"", token.STRING, 0)),
+		"TypeCreateVirtualTable":        reflect.ValueOf(constant.MakeFromLiteral("\"CREATE VIRTUAL TABLE\"", token.STRING, 0)),
+		"TypeDelete":                    reflect.ValueOf(constant.MakeFromLiteral("\"DELETE\"", token.STRING, 0)),
+		"TypeDrop":                      reflect.ValueOf(constant.MakeFromLiteral("\"DROP\"", token.STRING, 0)),
+		"TypeExplain":                   reflect.ValueOf(constant.MakeFromLiteral("\"EXPLAIN\"", token.STRING, 0)),
+		"TypeInsert":                    reflect.ValueOf(constant.MakeFromLiteral("\"INSERT\"", token.STRING, 0)),
+		"TypeOther":                     reflect.ValueOf(constant.MakeFromLiteral("\"OTHER\"", token.STRING, 0)),
+		"TypeRelease":                   reflect.ValueOf(constant.MakeFromLiteral("\"RELEASE\"", token.STRING, 0)),
+		"TypeRollback":                  reflect.ValueOf(constant.MakeFromLiteral("\"ROLLBACK\"", token.STRING, 0)),
+		"TypeSavepoint":                 reflect.ValueOf(constant.MakeFromLiteral("\"SAVEPOINT\"", token.STRING, 0)),
+		"TypeSelect":                    reflect.ValueOf(constant.MakeFromLiteral("\"SELECT\"", token.STRING, 0)),
+		"TypeUpdate":                    reflect.ValueOf(constant.MakeFromLiteral("\"UPDATE\"", token.STRING, 0)),
+		"TypeVacuum":                    reflect.ValueOf(constant.MakeFromLiteral("\"VACUUM\"", token.STRING, 0)),
+		"UnverifiedStatement":           reflect.ValueOf(ha.UnverifiedStatement),
+		"WithAsyncPublisher":            reflect.ValueOf(ha.WithAsyncPublisher),
+		"WithAsyncPublisherOutboxDir":   reflect.ValueOf(ha.WithAsyncPublisherOutboxDir),
+		"WithAutoStart":                 reflect.ValueOf(ha.WithAutoStart),
+		"WithCDCID":                     reflect.ValueOf(ha.WithCDCID),
+		"WithCDCPublisher":              reflect.ValueOf(ha.WithCDCPublisher),
+		"WithCDCSubscriber":             reflect.ValueOf(ha.WithCDCSubscriber),
+		"WithChangeSetInterceptor":      reflect.ValueOf(ha.WithChangeSetInterceptor),
+		"WithClusterSize":               reflect.ValueOf(ha.WithClusterSize),
+		"WithDBSnapshotter":             reflect.ValueOf(ha.WithDBSnapshotter),
+		"WithDeliverPolicy":             reflect.ValueOf(ha.WithDeliverPolicy),
+		"WithDisableDDLSync":            reflect.ValueOf(ha.WithDisableDDLSync),
+		"WithEmbeddedNatsConfig":        reflect.ValueOf(ha.WithEmbeddedNatsConfig),
+		"WithExtensions":                reflect.ValueOf(ha.WithExtensions),
+		"WithLeaderElectionLocalTarget": reflect.ValueOf(ha.WithLeaderElectionLocalTarget),
+		"WithLeaderProvider":            reflect.ValueOf(ha.WithLeaderProvider),
+		"WithName":                      reflect.ValueOf(ha.WithName),
+		"WithNatsOptions":               reflect.ValueOf(ha.WithNatsOptions),
+		"WithPublisherTimeout":          reflect.ValueOf(ha.WithPublisherTimeout),
+		"WithReplicas":                  reflect.ValueOf(ha.WithReplicas),
+		"WithReplicationStream":         reflect.ValueOf(ha.WithReplicationStream),
+		"WithReplicationURL":            reflect.ValueOf(ha.WithReplicationURL),
+		"WithRowIdentify":               reflect.ValueOf(ha.WithRowIdentify),
+		"WithSnapshotInterval":          reflect.ValueOf(ha.WithSnapshotInterval),
+		"WithStreamMaxAge":              reflect.ValueOf(ha.WithStreamMaxAge),
+		"WithWaitFor":                   reflect.ValueOf(ha.WithWaitFor),
 
 		// type definitions
+		"AsyncNATSPublisher":   reflect.ValueOf((*ha.AsyncNATSPublisher)(nil)),
 		"BackupFn":             reflect.ValueOf((*ha.BackupFn)(nil)),
 		"CDCPublisher":         reflect.ValueOf((*ha.CDCPublisher)(nil)),
 		"CDCSubscriber":        reflect.ValueOf((*ha.CDCSubscriber)(nil)),
@@ -86,18 +102,22 @@ func init() {
 		"ConnHooksProvider":    reflect.ValueOf((*ha.ConnHooksProvider)(nil)),
 		"Connector":            reflect.ValueOf((*ha.Connector)(nil)),
 		"DBSnapshotter":        reflect.ValueOf((*ha.DBSnapshotter)(nil)),
-		"DriverProvider":       reflect.ValueOf((*ha.DriverProvider)(nil)),
+		"DynamicLeader":        reflect.ValueOf((*ha.DynamicLeader)(nil)),
 		"EmbeddedNatsConfig":   reflect.ValueOf((*ha.EmbeddedNatsConfig)(nil)),
 		"JSONPublisher":        reflect.ValueOf((*ha.JSONPublisher)(nil)),
+		"LeaderProvider":       reflect.ValueOf((*ha.LeaderProvider)(nil)),
 		"NATSPublisher":        reflect.ValueOf((*ha.NATSPublisher)(nil)),
 		"NATSSnapshotter":      reflect.ValueOf((*ha.NATSSnapshotter)(nil)),
 		"NATSSubscriber":       reflect.ValueOf((*ha.NATSSubscriber)(nil)),
+		"NATSSubscriberConfig": reflect.ValueOf((*ha.NATSSubscriberConfig)(nil)),
 		"NoopPublisher":        reflect.ValueOf((*ha.NoopPublisher)(nil)),
 		"NoopSnapshotter":      reflect.ValueOf((*ha.NoopSnapshotter)(nil)),
 		"NoopSubscriber":       reflect.ValueOf((*ha.NoopSubscriber)(nil)),
 		"Option":               reflect.ValueOf((*ha.Option)(nil)),
+		"RowIdentify":          reflect.ValueOf((*ha.RowIdentify)(nil)),
 		"SequenceProvider":     reflect.ValueOf((*ha.SequenceProvider)(nil)),
 		"Statement":            reflect.ValueOf((*ha.Statement)(nil)),
+		"StaticLeader":         reflect.ValueOf((*ha.StaticLeader)(nil)),
 		"WriterPublisher":      reflect.ValueOf((*ha.WriterPublisher)(nil)),
 
 		// interface wrapper definitions
@@ -106,19 +126,23 @@ func init() {
 		"_ChangeSetInterceptor": reflect.ValueOf((*_github_com_litesql_go_ha_ChangeSetInterceptor)(nil)),
 		"_ConnHooksProvider":    reflect.ValueOf((*_github_com_litesql_go_ha_ConnHooksProvider)(nil)),
 		"_DBSnapshotter":        reflect.ValueOf((*_github_com_litesql_go_ha_DBSnapshotter)(nil)),
-		"_DriverProvider":       reflect.ValueOf((*_github_com_litesql_go_ha_DriverProvider)(nil)),
+		"_LeaderProvider":       reflect.ValueOf((*_github_com_litesql_go_ha_LeaderProvider)(nil)),
 		"_SequenceProvider":     reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
 	}
 }
 
 // _github_com_litesql_go_ha_CDCPublisher is an interface wrapper for CDCPublisher type
 type _github_com_litesql_go_ha_CDCPublisher struct {
-	IValue   interface{}
-	WPublish func(cs *ha.ChangeSet) error
+	IValue    interface{}
+	WPublish  func(cs *ha.ChangeSet) error
+	WSequence func() uint64
 }
 
 func (W _github_com_litesql_go_ha_CDCPublisher) Publish(cs *ha.ChangeSet) error {
 	return W.WPublish(cs)
+}
+func (W _github_com_litesql_go_ha_CDCPublisher) Sequence() uint64 {
+	return W.WSequence()
 }
 
 // _github_com_litesql_go_ha_CDCSubscriber is an interface wrapper for CDCSubscriber type
@@ -127,6 +151,7 @@ type _github_com_litesql_go_ha_CDCSubscriber struct {
 	WDeliveredInfo  func(ctx context.Context, name string) (any, error)
 	WLatestSeq      func() uint64
 	WRemoveConsumer func(ctx context.Context, name string) error
+	WSetDB          func(a0 *sql.DB)
 	WStart          func() error
 }
 
@@ -138,6 +163,9 @@ func (W _github_com_litesql_go_ha_CDCSubscriber) LatestSeq() uint64 {
 }
 func (W _github_com_litesql_go_ha_CDCSubscriber) RemoveConsumer(ctx context.Context, name string) error {
 	return W.WRemoveConsumer(ctx, name)
+}
+func (W _github_com_litesql_go_ha_CDCSubscriber) SetDB(a0 *sql.DB) {
+	W.WSetDB(a0)
 }
 func (W _github_com_litesql_go_ha_CDCSubscriber) Start() error {
 	return W.WStart()
@@ -179,36 +207,40 @@ func (W _github_com_litesql_go_ha_ConnHooksProvider) RegisterHooks(a0 driver.Con
 type _github_com_litesql_go_ha_DBSnapshotter struct {
 	IValue          interface{}
 	WLatestSnapshot func(ctx context.Context) (sequence uint64, reader io.ReadCloser, err error)
-	WTakeSnapshot   func(ctx context.Context, db *sql.DB) (sequence uint64, err error)
+	WSetDB          func(a0 *sql.DB)
+	WStart          func()
+	WTakeSnapshot   func(ctx context.Context) (sequence uint64, err error)
 }
 
 func (W _github_com_litesql_go_ha_DBSnapshotter) LatestSnapshot(ctx context.Context) (sequence uint64, reader io.ReadCloser, err error) {
 	return W.WLatestSnapshot(ctx)
 }
-func (W _github_com_litesql_go_ha_DBSnapshotter) TakeSnapshot(ctx context.Context, db *sql.DB) (sequence uint64, err error) {
-	return W.WTakeSnapshot(ctx, db)
+func (W _github_com_litesql_go_ha_DBSnapshotter) SetDB(a0 *sql.DB) {
+	W.WSetDB(a0)
+}
+func (W _github_com_litesql_go_ha_DBSnapshotter) Start() {
+	W.WStart()
+}
+func (W _github_com_litesql_go_ha_DBSnapshotter) TakeSnapshot(ctx context.Context) (sequence uint64, err error) {
+	return W.WTakeSnapshot(ctx)
 }
 
-// _github_com_litesql_go_ha_DriverProvider is an interface wrapper for DriverProvider type
-type _github_com_litesql_go_ha_DriverProvider struct {
-	IValue            interface{}
-	WConnWithoutHooks func() (*sql.Conn, error)
-	WEnableHooks      func(conn *sql.Conn)
-	WOnConnect        func(c driver.Conn) (driver.Conn, error)
-	WOpen             func(name string) (driver.Conn, error)
+// _github_com_litesql_go_ha_LeaderProvider is an interface wrapper for LeaderProvider type
+type _github_com_litesql_go_ha_LeaderProvider struct {
+	IValue          interface{}
+	WIsLeader       func() bool
+	WReady          func() chan struct{}
+	WRedirectTarget func() string
 }
 
-func (W _github_com_litesql_go_ha_DriverProvider) ConnWithoutHooks() (*sql.Conn, error) {
-	return W.WConnWithoutHooks()
+func (W _github_com_litesql_go_ha_LeaderProvider) IsLeader() bool {
+	return W.WIsLeader()
 }
-func (W _github_com_litesql_go_ha_DriverProvider) EnableHooks(conn *sql.Conn) {
-	W.WEnableHooks(conn)
+func (W _github_com_litesql_go_ha_LeaderProvider) Ready() chan struct{} {
+	return W.WReady()
 }
-func (W _github_com_litesql_go_ha_DriverProvider) OnConnect(c driver.Conn) (driver.Conn, error) {
-	return W.WOnConnect(c)
-}
-func (W _github_com_litesql_go_ha_DriverProvider) Open(name string) (driver.Conn, error) {
-	return W.WOpen(name)
+func (W _github_com_litesql_go_ha_LeaderProvider) RedirectTarget() string {
+	return W.WRedirectTarget()
 }
 
 // _github_com_litesql_go_ha_SequenceProvider is an interface wrapper for SequenceProvider type
