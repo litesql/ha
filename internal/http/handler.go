@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/litesql/go-ha"
-	sqlite3ha "github.com/litesql/go-sqlite3-ha"
 	"github.com/litesql/ha/internal/sqlite"
 )
 
@@ -109,7 +108,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	filename := fmt.Sprintf("%s_ha.db", time.Now().UTC().Format(time.DateTime))
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
 	w.Header().Set("Content-Type", "application/octet-stream")
-	err = sqlite3ha.Backup(r.Context(), db, w)
+	err = sqlite.Backup(r.Context(), db, w)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

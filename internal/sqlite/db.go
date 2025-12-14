@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/litesql/go-ha"
-	sqlite3ha "github.com/litesql/go-sqlite3-ha"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
@@ -54,7 +53,7 @@ func Load(dsnList []string, memDB bool, fromLatestSnapshot bool, deliverPolicy s
 			}
 			if reader != nil {
 				if memDB {
-					connector, err = sqlite3ha.NewConnector(dsn, options...)
+					connector, err = newConnector(dsn, options...)
 					if err != nil {
 						return err
 					}
@@ -75,7 +74,7 @@ func Load(dsnList []string, memDB bool, fromLatestSnapshot bool, deliverPolicy s
 					}
 					f.Close()
 					slog.Info("loading snapshot", "filename", filename)
-					connector, err = sqlite3ha.NewConnector(dsn, options...)
+					connector, err = newConnector(dsn, options...)
 					if err != nil {
 						return err
 					}
@@ -98,7 +97,7 @@ func Load(dsnList []string, memDB bool, fromLatestSnapshot bool, deliverPolicy s
 					}
 				}
 				var err error
-				connector, err = sqlite3ha.NewConnector(dsn, options...)
+				connector, err = newConnector(dsn, options...)
 				if err != nil {
 					return err
 				}
@@ -116,7 +115,7 @@ func Load(dsnList []string, memDB bool, fromLatestSnapshot bool, deliverPolicy s
 			} else {
 				slog.Info("using data source name", "dsn", dsn)
 				var err error
-				connector, err = sqlite3ha.NewConnector(dsn, opts...)
+				connector, err = newConnector(dsn, opts...)
 				if err != nil {
 					return err
 				}
@@ -363,18 +362,6 @@ func getPositionalArgs(params map[string]any) []any {
 
 type deserializer interface {
 	Deserialize(b []byte, schema string) error
-}
-
-func deserializerConn(conn driver.Conn) (deserializer, error) {
-	switch c := conn.(type) {
-	case *sqlite3ha.Conn:
-		return c.SQLiteConn, nil
-	case deserializer:
-		return c, nil
-	default:
-		return nil, fmt.Errorf("not a sqlite3 connection")
-	}
-
 }
 
 func filenameFromDSN(dsn string) string {

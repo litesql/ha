@@ -5,81 +5,24 @@ version: 2
 before:
   hooks:
     - go mod tidy
+    - go generate ./...
 
 builds:
   - id: ha
-    binary: ha    
-    flags:
-      - -tags=zig
+    binary: ha
+    env:
+      - CGO_ENABLED=0
     ldflags:
     - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
     goos:
       - linux
-    goarch:
-      - amd64
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-linux-gnu
-
-  - id: ha_linux_arm64
-    binary: ha
-    flags:
-      - -tags=zig
-    ldflags:
-    - -s -w -X github.com/litesql/ha/main.version={{.Version}} -X github.com/litesql/ha/main.commit={{.Commit}} -X github.com/litesql/ha/main.date={{.Date}}
-    goos:
-      - linux
-    goarch:
-      - arm64
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-linux-gnu
-
-  - id: ha_windows
-    binary: ha
-    flags:
-      - -tags=zig
-    ldflags:
-    - -s -w -X github.com/litesql/ha/main.version={{.Version}} -X github.com/litesql/ha/main.commit={{.Commit}} -X github.com/litesql/ha/main.date={{.Date}}
-    goos:
       - windows
-    goarch:
-      - amd64
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-windows
-
-  - id: ha_windows_arm64
-    binary: ha
-    flags:
-      - -tags=zig
-    ldflags:
-    - -s -w -X github.com/litesql/ha/main.version={{.Version}} -X github.com/litesql/ha/main.commit={{.Commit}} -X github.com/litesql/ha/main.date={{.Date}}
-    goos:
-      - windows
-    goarch:
-      - arm64
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-windows
-
-  - id: ha_darwin
-    binary: ha
-    ldflags:
-    - -s -w -X github.com/litesql/ha/main.version={{.Version}} -X github.com/litesql/ha/main.commit={{.Commit}} -X github.com/litesql/ha/main.date={{.Date}}
-    goos:
       - darwin
-    goarch:
-      - amd64
-      - arm64
-    env:
-      - CGO_ENABLED=1
-      - CC=o64-clang
 
 archives:
   - id: ha
     formats: [tar.gz]
-    ids: [ha, ha_linux_arm64, ha_windows, ha_windows_arm64, ha_darwin]
+    ids: [ha]
     # this name template makes the OS and Arch compatible with the results of `uname`.
     name_template: >-
       ha_
