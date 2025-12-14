@@ -1,6 +1,6 @@
 .PHONY: release
 release:
-	goreleaser release --clean --rm-dist
+	goreleaser release --clean
 
 commit = $(shell git rev-parse --short HEAD)
 date = $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
