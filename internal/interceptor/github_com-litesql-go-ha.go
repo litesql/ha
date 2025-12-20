@@ -66,9 +66,7 @@ func init() {
 		"WithAsyncPublisher":            reflect.ValueOf(ha.WithAsyncPublisher),
 		"WithAsyncPublisherOutboxDir":   reflect.ValueOf(ha.WithAsyncPublisherOutboxDir),
 		"WithAutoStart":                 reflect.ValueOf(ha.WithAutoStart),
-		"WithCDCID":                     reflect.ValueOf(ha.WithCDCID),
 		"WithCDCPublisher":              reflect.ValueOf(ha.WithCDCPublisher),
-		"WithCDCSubscriber":             reflect.ValueOf(ha.WithCDCSubscriber),
 		"WithChangeSetInterceptor":      reflect.ValueOf(ha.WithChangeSetInterceptor),
 		"WithClusterSize":               reflect.ValueOf(ha.WithClusterSize),
 		"WithDBSnapshotter":             reflect.ValueOf(ha.WithDBSnapshotter),
@@ -82,7 +80,10 @@ func init() {
 		"WithNatsOptions":               reflect.ValueOf(ha.WithNatsOptions),
 		"WithPublisherTimeout":          reflect.ValueOf(ha.WithPublisherTimeout),
 		"WithReplicas":                  reflect.ValueOf(ha.WithReplicas),
+		"WithReplicationID":             reflect.ValueOf(ha.WithReplicationID),
+		"WithReplicationPublisher":      reflect.ValueOf(ha.WithReplicationPublisher),
 		"WithReplicationStream":         reflect.ValueOf(ha.WithReplicationStream),
+		"WithReplicationSubscriber":     reflect.ValueOf(ha.WithReplicationSubscriber),
 		"WithReplicationURL":            reflect.ValueOf(ha.WithReplicationURL),
 		"WithRowIdentify":               reflect.ValueOf(ha.WithRowIdentify),
 		"WithSnapshotInterval":          reflect.ValueOf(ha.WithSnapshotInterval),
@@ -93,7 +94,6 @@ func init() {
 		"AsyncNATSPublisher":   reflect.ValueOf((*ha.AsyncNATSPublisher)(nil)),
 		"BackupFn":             reflect.ValueOf((*ha.BackupFn)(nil)),
 		"CDCPublisher":         reflect.ValueOf((*ha.CDCPublisher)(nil)),
-		"CDCSubscriber":        reflect.ValueOf((*ha.CDCSubscriber)(nil)),
 		"Change":               reflect.ValueOf((*ha.Change)(nil)),
 		"ChangeSet":            reflect.ValueOf((*ha.ChangeSet)(nil)),
 		"ChangeSetInterceptor": reflect.ValueOf((*ha.ChangeSetInterceptor)(nil)),
@@ -102,6 +102,10 @@ func init() {
 		"ConnHooksProvider":    reflect.ValueOf((*ha.ConnHooksProvider)(nil)),
 		"Connector":            reflect.ValueOf((*ha.Connector)(nil)),
 		"DBSnapshotter":        reflect.ValueOf((*ha.DBSnapshotter)(nil)),
+		"DebeziumData":         reflect.ValueOf((*ha.DebeziumData)(nil)),
+		"DebeziumPayload":      reflect.ValueOf((*ha.DebeziumPayload)(nil)),
+		"DebeziumSource":       reflect.ValueOf((*ha.DebeziumSource)(nil)),
+		"DebeziumTransaction":  reflect.ValueOf((*ha.DebeziumTransaction)(nil)),
 		"DynamicLeader":        reflect.ValueOf((*ha.DynamicLeader)(nil)),
 		"EmbeddedNatsConfig":   reflect.ValueOf((*ha.EmbeddedNatsConfig)(nil)),
 		"JSONPublisher":        reflect.ValueOf((*ha.JSONPublisher)(nil)),
@@ -114,61 +118,34 @@ func init() {
 		"NoopSnapshotter":      reflect.ValueOf((*ha.NoopSnapshotter)(nil)),
 		"NoopSubscriber":       reflect.ValueOf((*ha.NoopSubscriber)(nil)),
 		"Option":               reflect.ValueOf((*ha.Option)(nil)),
+		"Publisher":            reflect.ValueOf((*ha.Publisher)(nil)),
 		"RowIdentify":          reflect.ValueOf((*ha.RowIdentify)(nil)),
 		"SequenceProvider":     reflect.ValueOf((*ha.SequenceProvider)(nil)),
 		"Statement":            reflect.ValueOf((*ha.Statement)(nil)),
 		"StaticLeader":         reflect.ValueOf((*ha.StaticLeader)(nil)),
+		"Subscriber":           reflect.ValueOf((*ha.Subscriber)(nil)),
 		"WriterPublisher":      reflect.ValueOf((*ha.WriterPublisher)(nil)),
 
 		// interface wrapper definitions
 		"_CDCPublisher":         reflect.ValueOf((*_github_com_litesql_go_ha_CDCPublisher)(nil)),
-		"_CDCSubscriber":        reflect.ValueOf((*_github_com_litesql_go_ha_CDCSubscriber)(nil)),
 		"_ChangeSetInterceptor": reflect.ValueOf((*_github_com_litesql_go_ha_ChangeSetInterceptor)(nil)),
 		"_ConnHooksProvider":    reflect.ValueOf((*_github_com_litesql_go_ha_ConnHooksProvider)(nil)),
 		"_DBSnapshotter":        reflect.ValueOf((*_github_com_litesql_go_ha_DBSnapshotter)(nil)),
 		"_LeaderProvider":       reflect.ValueOf((*_github_com_litesql_go_ha_LeaderProvider)(nil)),
+		"_Publisher":            reflect.ValueOf((*_github_com_litesql_go_ha_Publisher)(nil)),
 		"_SequenceProvider":     reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
+		"_Subscriber":           reflect.ValueOf((*_github_com_litesql_go_ha_Subscriber)(nil)),
 	}
 }
 
 // _github_com_litesql_go_ha_CDCPublisher is an interface wrapper for CDCPublisher type
 type _github_com_litesql_go_ha_CDCPublisher struct {
-	IValue    interface{}
-	WPublish  func(cs *ha.ChangeSet) error
-	WSequence func() uint64
+	IValue   interface{}
+	WPublish func(data []ha.DebeziumData) error
 }
 
-func (W _github_com_litesql_go_ha_CDCPublisher) Publish(cs *ha.ChangeSet) error {
-	return W.WPublish(cs)
-}
-func (W _github_com_litesql_go_ha_CDCPublisher) Sequence() uint64 {
-	return W.WSequence()
-}
-
-// _github_com_litesql_go_ha_CDCSubscriber is an interface wrapper for CDCSubscriber type
-type _github_com_litesql_go_ha_CDCSubscriber struct {
-	IValue          interface{}
-	WDeliveredInfo  func(ctx context.Context, name string) (any, error)
-	WLatestSeq      func() uint64
-	WRemoveConsumer func(ctx context.Context, name string) error
-	WSetDB          func(a0 *sql.DB)
-	WStart          func() error
-}
-
-func (W _github_com_litesql_go_ha_CDCSubscriber) DeliveredInfo(ctx context.Context, name string) (any, error) {
-	return W.WDeliveredInfo(ctx, name)
-}
-func (W _github_com_litesql_go_ha_CDCSubscriber) LatestSeq() uint64 {
-	return W.WLatestSeq()
-}
-func (W _github_com_litesql_go_ha_CDCSubscriber) RemoveConsumer(ctx context.Context, name string) error {
-	return W.WRemoveConsumer(ctx, name)
-}
-func (W _github_com_litesql_go_ha_CDCSubscriber) SetDB(a0 *sql.DB) {
-	W.WSetDB(a0)
-}
-func (W _github_com_litesql_go_ha_CDCSubscriber) Start() error {
-	return W.WStart()
+func (W _github_com_litesql_go_ha_CDCPublisher) Publish(data []ha.DebeziumData) error {
+	return W.WPublish(data)
 }
 
 // _github_com_litesql_go_ha_ChangeSetInterceptor is an interface wrapper for ChangeSetInterceptor type
@@ -243,6 +220,20 @@ func (W _github_com_litesql_go_ha_LeaderProvider) RedirectTarget() string {
 	return W.WRedirectTarget()
 }
 
+// _github_com_litesql_go_ha_Publisher is an interface wrapper for Publisher type
+type _github_com_litesql_go_ha_Publisher struct {
+	IValue    interface{}
+	WPublish  func(cs *ha.ChangeSet) error
+	WSequence func() uint64
+}
+
+func (W _github_com_litesql_go_ha_Publisher) Publish(cs *ha.ChangeSet) error {
+	return W.WPublish(cs)
+}
+func (W _github_com_litesql_go_ha_Publisher) Sequence() uint64 {
+	return W.WSequence()
+}
+
 // _github_com_litesql_go_ha_SequenceProvider is an interface wrapper for SequenceProvider type
 type _github_com_litesql_go_ha_SequenceProvider struct {
 	IValue     interface{}
@@ -251,4 +242,30 @@ type _github_com_litesql_go_ha_SequenceProvider struct {
 
 func (W _github_com_litesql_go_ha_SequenceProvider) LatestSeq() uint64 {
 	return W.WLatestSeq()
+}
+
+// _github_com_litesql_go_ha_Subscriber is an interface wrapper for Subscriber type
+type _github_com_litesql_go_ha_Subscriber struct {
+	IValue          interface{}
+	WDeliveredInfo  func(ctx context.Context, name string) (any, error)
+	WLatestSeq      func() uint64
+	WRemoveConsumer func(ctx context.Context, name string) error
+	WSetDB          func(a0 *sql.DB)
+	WStart          func() error
+}
+
+func (W _github_com_litesql_go_ha_Subscriber) DeliveredInfo(ctx context.Context, name string) (any, error) {
+	return W.WDeliveredInfo(ctx, name)
+}
+func (W _github_com_litesql_go_ha_Subscriber) LatestSeq() uint64 {
+	return W.WLatestSeq()
+}
+func (W _github_com_litesql_go_ha_Subscriber) RemoveConsumer(ctx context.Context, name string) error {
+	return W.WRemoveConsumer(ctx, name)
+}
+func (W _github_com_litesql_go_ha_Subscriber) SetDB(a0 *sql.DB) {
+	W.WSetDB(a0)
+}
+func (W _github_com_litesql_go_ha_Subscriber) Start() error {
+	return W.WStart()
 }
