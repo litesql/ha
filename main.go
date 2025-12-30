@@ -50,6 +50,10 @@ var (
 	pgCert *string
 	pgKey  *string
 
+	mysqlPort *int
+	mysqlUser *string
+	mysqlPass *string
+
 	concurrentQueries *int
 	extensions        *string
 
@@ -95,6 +99,10 @@ func main() {
 	natsUser = flagSet.StringLong("nats-user", "", "Embedded NATS server user")
 	natsPass = flagSet.StringLong("nats-pass", "", "Embedded NATS server password")
 	natsConfig = flagSet.StringLong("nats-config", "", "Embedded NATS server config file")
+
+	mysqlPort = flagSet.IntLong("mysql-port", 0, "MySQL Server port")
+	mysqlUser = flagSet.StringLong("mysql-user", "root", "MySQL Auth user")
+	mysqlPass = flagSet.StringLong("mysql-pass", "", "MySQL Auth password")
 
 	pgPort = flagSet.IntLong("pg-port", 5432, "PostgreSQL Server port")
 	pgUser = flagSet.StringLong("pg-user", "ha", "PostgreSQL Auth user")
@@ -207,6 +215,9 @@ func run() error {
 		ha.WithPublisherTimeout(*replicationTimeout),
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
+		ha.WithMySQLPort(*mysqlPort),
+		ha.WithMySQLUser(*mysqlUser),
+		ha.WithMySQLPass(*mysqlPass),
 	}
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())

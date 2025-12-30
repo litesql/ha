@@ -14,7 +14,7 @@ Powered by an embedded NATS JetStream server.
 
 ## Features
 
-- 🔌 Connect via HTTP API or PostgreSQL Wire Protocol  
+- 🔌 Connect via HTTP API, MySQL or PostgreSQL Wire Protocol  
 - 🔁 Replicate data using embedded or external NATS server
 - 📝 Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
 - 📚 Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)
@@ -43,12 +43,13 @@ This command launches:
 
 ```sh
 mkdir db2
-ha -n node2 -p 8081 --nats-port 0 --pg-port 5433 --replication-url nats://localhost:4222 "file:db2/mydatabase.db?_journal=WAL&_busy_timeout=5000"
+ha -n node2 -p 8081 --nats-port 0 --pg-port 5433 --mysql-port 3306 --replication-url nats://localhost:4222 "file:db2/mydatabase.db?_journal=WAL&_busy_timeout=5000"
 ```
 
 This command starts:
 
 - A PostgreSQL Wire Protocol server on port 5433
+- A MySQL Wire Protocol server on port 3306
 - An HTTP API server on port 8081.
 
 It connects to the previously launched embedded NATS server for replication.
@@ -78,6 +79,30 @@ SELECT * FROM users;
 ----+---------
  1  | HA user
 
+```
+
+Using a mysql client:
+
+```sh
+mysql -h localhost --port 3306 -u root
+
+MySQL [(none)]> show databases;
++-----------------------+
+| Database              |
++-----------------------+
+| file:/ha.db?vfs=memdb |
++-----------------------+
+1 row in set (0,000 sec)
+
+MySQL [(none)]> use file:/ha.db?vfs=memdb
+
+MySQL [file:/ha.db?vfs=memdb]> select * from users;
++----+---------+
+| ID | name    |
++----+---------+
+|  1 | HA user |
++----+---------+
+1 row in set (0,000 sec)
 ```
 
 ### 5. Please refer to the complete documentation for the HTTP API

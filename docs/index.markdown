@@ -9,7 +9,7 @@ layout: home
 
 Highly available leaderless SQLite cluster powered by embedded NATS JetStream server.
 
-- Connect using HTTP API or PostgreSQL Wire Protocol
+- Connect using HTTP API, MySQL or PostgreSQL Wire Protocol
 - Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
 - Use [ha-sync SQLite extension](https://github.com/litesql/ha-sync) to create live local read replicas
 - Change Data Capture (CDC)
@@ -29,7 +29,7 @@ Highly available leaderless SQLite cluster powered by embedded NATS JetStream se
 - [3. Local Replicas](#3)
   - [3.1 Local Read/Write Replicas](#3.1)
   - [3.2 Local Read Replicas](#3.2)
-- [4. PostgreSQL Wire Protocol](#4)
+- [4. PostgreSQL and MySQL Wire Protocol](#4)
 - [5. HTTP API](#5)
   - [5.1 Using bind parameters](#5.1)
   - [5.2 Multiple commands (one transaction)](#5.2)
@@ -202,11 +202,12 @@ ha *.db
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
 - Use with any programming language
 
-## 4. PostgreSQL Wire Protocol<a id='4'></a>
+## 4. PostgreSQL and MySQL Wire Protocol<a id='4'></a>
 
-- You can use any PostgreSQL driver to connect to ha.
+- You can use any PostgreSQL or MySQL driver to connect to ha.
 - The SQLite parser engine will proccess the commands.
-- PostgreSQL functions (and visual editors like pgadmim, dbeaver, etc) are not supported.
+- Visual editors like pgAdmin is not supported while DBeaver (using mysql driver) is partially supported.
+- MySQL and PostgreSQL functions are not supported. 
 
 ## 5. HTTP API<a id='5'></a>
 
