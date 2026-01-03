@@ -8,7 +8,7 @@
 ![](ha.png)
 
 
-## Highly available leaderless SQLite cluster 
+## Highly available SQLite cluster 
 
 Powered by an embedded NATS JetStream server.
 

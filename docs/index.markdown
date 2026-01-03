@@ -7,7 +7,7 @@ layout: home
 
 ![](https://github.com/litesql/ha/blob/main/ha.png?raw=true)
 
-Highly available leaderless SQLite cluster powered by embedded NATS JetStream server.
+Highly available SQLite cluster powered by embedded NATS JetStream server.
 
 - Connect using HTTP API, MySQL or PostgreSQL Wire Protocol
 - Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
@@ -336,11 +336,11 @@ curl -X DELETE http://localhost:8080/replications/{name}
 
 ## 6. Replication<a id='6'></a>
 
-- You can write to any server
+- You can write to any server (in the leaderless mode)
 - Uses embedded or external NATS JetStream cluster
 - NATS JetStream guarantees "at-least-once" message delivery
 - All DML (INSERT, UPDATE, DELETE) operations are idempotent
-- Last writer wins
+- Last writer wins.
 - DDL commands are replicated (since v0.0.7)
 
 ### 6.1 CDC message format<a id='6.1'></a>
@@ -387,7 +387,7 @@ curl -X DELETE http://localhost:8080/replications/{name}
 - Tables WITHOUT ROWID are not replicated
 - The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
 - Uses "automatic idempotency" for DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS). But it's dificult to do with ALTER TABLE commands. 
-- Writing to any node in the cluster improves availability, but it can lead to consistency issues in certain edge cases. If your application values Consistency more than Availability, it's better to route all write operations through a single cluster node.
+- Writing to any node in the cluster (the default ha behaviour) improves availability, but it can lead to consistency issues in certain edge cases. If your application values Consistency more than Availability, it's better to route all write operations through a single cluster node or using the leader options **--leader-static** or **leader-addr**.
 
 ### 6.3 Conflict Resolution<a id='6.3'></a>
 
@@ -413,6 +413,12 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
 | --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
+| --grpc-port | HA_GRPC_PORT |       | Embedded a gRPC server to exec queries as cluster leader |
+| --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
+| --leader-static | HA_LEADER_STATIC | Address of a static leader. This will disable the leader election |
+| --mysql-port| HA_MYSQL_PORT|       | Port to MySQL Wire Protocol Server  |
+| --mysql-user| HA_MYSQL_USER|       | MySQL Auth user  |
+| --mysql-pass| HA_MYSQL_PASS|       | MySQL Auth password  | 
 | --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS Server logging |
 | --nats-port | HA_NATS_PORT | 4222 | Embedded NATS server port (0 to disable) |
 | --nats-store-dir | HA_NATS_STORE_DIR | /tmp/nats | Embedded NATS server store directory |

@@ -23,7 +23,7 @@ domain: litesql.github.io
 title: HA SQLite Cluster
 email: walterwanderley@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
-  HA is a free and open source Highly available leaderless SQLite cluster powered by embedded NATS JetStream server.
+  HA is a free and open source Highly available SQLite cluster powered by embedded NATS JetStream server.
 baseurl: "/ha"
 url: https://litesql.github.io
 github_username:  litesql

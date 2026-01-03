@@ -44,6 +44,11 @@ var (
 	fromLatestSnapshot *bool
 	disableDDLSync     *bool
 
+	staticRemoteLeaderAddr *string
+	dynamicLocalLeaderAddr *string
+
+	grpcPort *int
+
 	pgPort *int
 	pgUser *string
 	pgPass *string
@@ -99,6 +104,11 @@ func main() {
 	natsUser = flagSet.StringLong("nats-user", "", "Embedded NATS server user")
 	natsPass = flagSet.StringLong("nats-pass", "", "Embedded NATS server password")
 	natsConfig = flagSet.StringLong("nats-config", "", "Embedded NATS server config file")
+
+	dynamicLocalLeaderAddr = flagSet.StringLong("leader-addr", "", "Address when this node become the leader (uses the gRPC server). This will enable the leader election")
+	staticRemoteLeaderAddr = flagSet.StringLong("leader-static", "", "Address of a static leader. This will disable the leader election")
+
+	grpcPort = flagSet.IntLong("grpc-port", 0, "gRPC Server port")
 
 	mysqlPort = flagSet.IntLong("mysql-port", 0, "MySQL Server port")
 	mysqlUser = flagSet.StringLong("mysql-user", "root", "MySQL Auth user")
@@ -215,6 +225,7 @@ func run() error {
 		ha.WithPublisherTimeout(*replicationTimeout),
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
+		ha.WithGrpcPort(*grpcPort),
 		ha.WithMySQLPort(*mysqlPort),
 		ha.WithMySQLUser(*mysqlUser),
 		ha.WithMySQLPass(*mysqlPass),
@@ -235,6 +246,14 @@ func run() error {
 			File:       *natsConfig,
 			EnableLogs: *natsLogs,
 		}))
+	}
+
+	if *staticRemoteLeaderAddr != "" {
+		opts = append(opts, ha.WithLeaderProvider(&ha.StaticLeader{
+			Target: *staticRemoteLeaderAddr,
+		}))
+	} else if *dynamicLocalLeaderAddr != "" {
+		opts = append(opts, ha.WithLeaderElectionLocalTarget(*dynamicLocalLeaderAddr))
 	}
 
 	if *interceptorPath != "" {
