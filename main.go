@@ -47,7 +47,8 @@ var (
 	staticRemoteLeaderAddr *string
 	dynamicLocalLeaderAddr *string
 
-	grpcPort *int
+	grpcPort    *int
+	grpcTimeout *time.Duration
 
 	pgPort *int
 	pgUser *string
@@ -109,6 +110,7 @@ func main() {
 	staticRemoteLeaderAddr = flagSet.StringLong("leader-static", "", "Address of a static leader. This will disable the leader election")
 
 	grpcPort = flagSet.IntLong("grpc-port", 0, "gRPC Server port")
+	grpcTimeout = flagSet.DurationLong("grpc-timeout", 5*time.Second, "gRPC operations timeout")
 
 	mysqlPort = flagSet.IntLong("mysql-port", 0, "MySQL Server port")
 	mysqlUser = flagSet.StringLong("mysql-user", "root", "MySQL Auth user")
@@ -226,6 +228,7 @@ func run() error {
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
 		ha.WithGrpcPort(*grpcPort),
+		ha.WithGrpcTimeout(*grpcTimeout),
 		ha.WithMySQLPort(*mysqlPort),
 		ha.WithMySQLUser(*mysqlUser),
 		ha.WithMySQLPass(*mysqlPass),

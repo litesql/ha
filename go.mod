@@ -6,9 +6,9 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jeroenrinzema/psql-wire v0.16.1
 	github.com/lib/pq v1.10.9
-	github.com/litesql/go-ha v0.4.5
-	github.com/litesql/go-sqlite-ha v0.4.5
-	github.com/litesql/go-sqlite3-ha v0.4.5
+	github.com/litesql/go-ha v0.4.8
+	github.com/litesql/go-sqlite-ha v0.4.8
+	github.com/litesql/go-sqlite3-ha v0.4.8
 	github.com/nats-io/nats.go v1.48.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/traefik/yaegi v0.16.1
@@ -57,7 +57,7 @@ require (
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	modernc.org/libc v1.67.3 // indirect
+	modernc.org/libc v1.67.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.42.2 // indirect

@@ -19,7 +19,6 @@ func init() {
 		"DefaultStream":                  reflect.ValueOf(constant.MakeFromLiteral("\"ha_replication\"", token.STRING, 0)),
 		"ErrInvalidSQL":                  reflect.ValueOf(&ha.ErrInvalidSQL).Elem(),
 		"ErrSnapshotterNotConfigured":    reflect.ValueOf(&ha.ErrSnapshotterNotConfigured).Elem(),
-		"ErrSubscriberNotConfigured":     reflect.ValueOf(&ha.ErrSubscriberNotConfigured).Elem(),
 		"Full":                           reflect.ValueOf(ha.Full),
 		"LatestSnapshot":                 reflect.ValueOf(ha.LatestSnapshot),
 		"ListDSN":                        reflect.ValueOf(ha.ListDSN),
@@ -77,6 +76,7 @@ func init() {
 		"WithEmbeddedNatsConfig":         reflect.ValueOf(ha.WithEmbeddedNatsConfig),
 		"WithExtensions":                 reflect.ValueOf(ha.WithExtensions),
 		"WithGrpcPort":                   reflect.ValueOf(ha.WithGrpcPort),
+		"WithGrpcTimeout":                reflect.ValueOf(ha.WithGrpcTimeout),
 		"WithLeaderElectionLocalTarget":  reflect.ValueOf(ha.WithLeaderElectionLocalTarget),
 		"WithLeaderProvider":             reflect.ValueOf(ha.WithLeaderProvider),
 		"WithMySQLPass":                  reflect.ValueOf(ha.WithMySQLPass),
@@ -131,6 +131,8 @@ func init() {
 		"Statement":            reflect.ValueOf((*ha.Statement)(nil)),
 		"StaticLeader":         reflect.ValueOf((*ha.StaticLeader)(nil)),
 		"Subscriber":           reflect.ValueOf((*ha.Subscriber)(nil)),
+		"TxSeqTracker":         reflect.ValueOf((*ha.TxSeqTracker)(nil)),
+		"TxSeqTrackerProvider": reflect.ValueOf((*ha.TxSeqTrackerProvider)(nil)),
 		"WriterPublisher":      reflect.ValueOf((*ha.WriterPublisher)(nil)),
 
 		// interface wrapper definitions
@@ -142,6 +144,7 @@ func init() {
 		"_Publisher":            reflect.ValueOf((*_github_com_litesql_go_ha_Publisher)(nil)),
 		"_SequenceProvider":     reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
 		"_Subscriber":           reflect.ValueOf((*_github_com_litesql_go_ha_Subscriber)(nil)),
+		"_TxSeqTracker":         reflect.ValueOf((*_github_com_litesql_go_ha_TxSeqTracker)(nil)),
 	}
 }
 
@@ -275,4 +278,14 @@ func (W _github_com_litesql_go_ha_Subscriber) SetDB(a0 *sql.DB) {
 }
 func (W _github_com_litesql_go_ha_Subscriber) Start() error {
 	return W.WStart()
+}
+
+// _github_com_litesql_go_ha_TxSeqTracker is an interface wrapper for TxSeqTracker type
+type _github_com_litesql_go_ha_TxSeqTracker struct {
+	IValue     interface{}
+	WLatestSeq func() uint64
+}
+
+func (W _github_com_litesql_go_ha_TxSeqTracker) LatestSeq() uint64 {
+	return W.WLatestSeq()
 }

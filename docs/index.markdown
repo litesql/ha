@@ -414,6 +414,7 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
 | --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
 | --grpc-port | HA_GRPC_PORT |       | Embedded a gRPC server to exec queries as cluster leader |
+| --grpc-timeout | HA_GRPC_TIMEOUT | 5s      | gRPC operations timeout |
 | --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
 | --leader-static | HA_LEADER_STATIC | Address of a static leader. This will disable the leader election |
 | --mysql-port| HA_MYSQL_PORT|       | Port to MySQL Wire Protocol Server  |
