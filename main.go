@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"errors"
 	"fmt"
@@ -20,10 +21,11 @@ import (
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
-	hahttp "github.com/litesql/ha/internal/http"
 	"github.com/litesql/ha/internal/interceptor"
-	"github.com/litesql/ha/internal/pgwire"
 	"github.com/litesql/ha/internal/sqlite"
+	hahttp "github.com/litesql/ha/internal/wire/http"
+	"github.com/litesql/ha/internal/wire/mysql"
+	"github.com/litesql/ha/internal/wire/postgresql"
 )
 
 var (
@@ -112,8 +114,8 @@ func main() {
 	grpcPort = flagSet.IntLong("grpc-port", 0, "gRPC Server port")
 	grpcTimeout = flagSet.DurationLong("grpc-timeout", 5*time.Second, "gRPC operations timeout")
 
-	mysqlPort = flagSet.IntLong("mysql-port", 0, "MySQL Server port")
-	mysqlUser = flagSet.StringLong("mysql-user", "root", "MySQL Auth user")
+	mysqlPort = flagSet.IntLong("mysql-port", 3306, "MySQL Server port")
+	mysqlUser = flagSet.StringLong("mysql-user", "ha", "MySQL Auth user")
 	mysqlPass = flagSet.StringLong("mysql-pass", "", "MySQL Auth password")
 
 	pgPort = flagSet.IntLong("pg-port", 5432, "PostgreSQL Server port")
@@ -229,9 +231,6 @@ func run() error {
 		ha.WithSnapshotInterval(*snapshotInterval),
 		ha.WithGrpcPort(*grpcPort),
 		ha.WithGrpcTimeout(*grpcTimeout),
-		ha.WithMySQLPort(*mysqlPort),
-		ha.WithMySQLUser(*mysqlUser),
-		ha.WithMySQLPass(*mysqlPass),
 	}
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())
@@ -324,7 +323,29 @@ func run() error {
 	mux.HandleFunc("DELETE /databases/{id}/replications/{name}", hahttp.DeleteReplicationHandler)
 	mux.HandleFunc("DELETE /replications/{name}", hahttp.DeleteReplicationHandler)
 
-	pgServer, err := pgwire.NewServer(pgwire.Config{
+	mysqlServer, err := mysql.NewServer(mysql.Config{
+		Port: *mysqlPort,
+		User: *mysqlUser,
+		Pass: *mysqlPass,
+		DBProvider: func(dbName string) (*sql.DB, bool) {
+			db, err := sqlite.DB(dbName)
+			if err != nil {
+				return nil, false
+			}
+			return db, true
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create MySQL server: %w", err)
+	}
+
+	if *mysqlPort > 0 {
+		if err := mysqlServer.ListenAndServe(); err != nil {
+			return fmt.Errorf("failed to start MySQL server: %w", err)
+		}
+	}
+
+	pgServer, err := postgresql.NewServer(postgresql.Config{
 		User:    *pgUser,
 		Pass:    *pgPass,
 		TLSCert: *pgCert,
@@ -335,7 +356,7 @@ func run() error {
 	}
 
 	if *pgPort > 0 {
-		slog.Info("starting HA postgreSQL wire Protocol server", "port", *pgPort)
+		slog.Info("starting HA PostgreSQL wire Protocol server", "port", *pgPort)
 		go func() {
 			err = pgServer.ListenAndServe(*pgPort)
 			if err != nil {
@@ -354,6 +375,9 @@ func run() error {
 	go func() {
 		sig := <-done
 		slog.Warn("signal detected...", "signal", sig)
+		if err := mysqlServer.Close(); err != nil {
+			slog.Error("MySQL server shutdown failed", "error", err)
+		}
 		if err := pgServer.Close(); err != nil {
 			slog.Error("PostgreSQL server shutdown failed", "error", err)
 		}

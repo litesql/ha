@@ -79,11 +79,11 @@ docker compose up
 
 - Services:
 
-| Instance | HTTP | Pg Wire | NATS |
-|----------|------|---------|------|
-|node1     | 8080 | 5432    | 4222 |
-|node2     | 8081 | 5433    | 4223 |
-|node3     | 8082 | 5434    | 4224 |
+| Instance | HTTP | Pg Wire | NATS | MySQL Wire |
+|----------|------|---------|------|------------|
+|node1     | 8080 | 5432    | 4222 | 3306       |
+|node2     | 8081 | 5433    | 4223 | 3307       |
+|node3     | 8082 | 5434    | 4224 | 3308       |
 
 
 ### 1.3 Install using Helm<a id='1.2'></a>
@@ -417,8 +417,8 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --grpc-timeout | HA_GRPC_TIMEOUT | 5s      | gRPC operations timeout |
 | --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
 | --leader-static | HA_LEADER_STATIC | Address of a static leader. This will disable the leader election |
-| --mysql-port| HA_MYSQL_PORT|       | Port to MySQL Wire Protocol Server  |
-| --mysql-user| HA_MYSQL_USER|       | MySQL Auth user  |
+| --mysql-port| HA_MYSQL_PORT| 3306  | Port to MySQL Wire Protocol Server  |
+| --mysql-user| HA_MYSQL_USER| ha    | MySQL Auth user  |
 | --mysql-pass| HA_MYSQL_PASS|       | MySQL Auth password  | 
 | --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS Server logging |
 | --nats-port | HA_NATS_PORT | 4222 | Embedded NATS server port (0 to disable) |

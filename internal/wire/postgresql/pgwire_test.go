@@ -1,4 +1,4 @@
-package pgwire_test
+package postgresql_test
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/litesql/go-ha"
-	"github.com/litesql/ha/internal/pgwire"
 	"github.com/litesql/ha/internal/sqlite"
+	"github.com/litesql/ha/internal/wire/postgresql"
 )
 
 func TestMain(m *testing.M) {
@@ -117,7 +117,7 @@ func TestServe(t *testing.T) {
 			}
 			defer listener.Close()
 
-			server, err := pgwire.NewServer(pgwire.Config{
+			server, err := postgresql.NewServer(postgresql.Config{
 				User: "test", Pass: "test",
 			})
 			if err != nil {
@@ -194,7 +194,7 @@ func TestTransaction(t *testing.T) {
 	}
 	defer listener.Close()
 
-	server, err := pgwire.NewServer(pgwire.Config{
+	server, err := postgresql.NewServer(postgresql.Config{
 		User: "test", Pass: "test",
 	})
 	if err != nil {
@@ -298,7 +298,7 @@ func TestTransactionPrepared(t *testing.T) {
 	}
 	defer listener.Close()
 
-	server, err := pgwire.NewServer(pgwire.Config{
+	server, err := postgresql.NewServer(postgresql.Config{
 		User: "test", Pass: "test",
 	})
 	if err != nil {

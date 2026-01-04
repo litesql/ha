@@ -36,20 +36,21 @@ ha -n node1 "file:db1/mydatabase.db?_journal=WAL&_busy_timeout=5000"
 This command launches:
 
 - An embedded NATS server on port 4222
-- A PostgreSQL Wire Protocol server on port 5432
+- A MySQL Wire Protocol compatible server on port 3306
+- A PostgreSQL Wire Protocol compatible server on port 5432
 - An HTTP API server on port 8080
 
 ### 2. Start a second **ha** instance
 
 ```sh
 mkdir db2
-ha -n node2 -p 8081 --nats-port 0 --pg-port 5433 --mysql-port 3306 --replication-url nats://localhost:4222 "file:db2/mydatabase.db?_journal=WAL&_busy_timeout=5000"
+ha -n node2 -p 8081 --nats-port 0 --pg-port 5433 --mysql-port 3307 --replication-url nats://localhost:4222 "file:db2/mydatabase.db?_journal=WAL&_busy_timeout=5000"
 ```
 
 This command starts:
 
 - A PostgreSQL Wire Protocol server on port 5433
-- A MySQL Wire Protocol server on port 3306
+- A MySQL Wire Protocol server on port 3307
 - An HTTP API server on port 8081.
 
 It connects to the previously launched embedded NATS server for replication.
@@ -84,19 +85,19 @@ SELECT * FROM users;
 Using a mysql client:
 
 ```sh
-mysql -h localhost --port 3306 -u root
+mysql -h localhost --port 3307 -u ha
 
 MySQL [(none)]> show databases;
 +-----------------------+
 | Database              |
 +-----------------------+
-| file:/ha.db?vfs=memdb |
+|ha.db                  |
 +-----------------------+
 1 row in set (0,000 sec)
 
-MySQL [(none)]> use file:/ha.db?vfs=memdb
+MySQL [(none)]> use ha.db
 
-MySQL [file:/ha.db?vfs=memdb]> select * from users;
+MySQL [ha.db]> select * from users;
 +----+---------+
 | ID | name    |
 +----+---------+

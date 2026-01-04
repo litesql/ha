@@ -5,6 +5,7 @@ services:
       - ./testdata:/etc/nats
       - node1_data:/data
     ports:
+      - "3306:3306"
       - "4222:4222"
       - "5432:5432"
       - "8080:8080"
@@ -22,6 +23,7 @@ services:
       - ./testdata:/etc/nats
       - node2_data:/data
     ports:
+      - "3307:3306"
       - "4223:4222"
       - "5433:5432"
       - "8081:8080"
@@ -38,6 +40,7 @@ services:
       - ./testdata:/etc/nats
       - node3_data:/data
     ports:
+      - "3308:3306"
       - "4224:4222"
       - "5434:5432"
       - "8082:8080"

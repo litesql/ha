@@ -34,7 +34,7 @@ COPY --from=builder /build/ha .
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE 4222 5432 6222 8080
+EXPOSE 3306 4222 5000 5432 6222 8080
 
 USER ha
 
