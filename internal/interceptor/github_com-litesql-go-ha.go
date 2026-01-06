@@ -82,6 +82,7 @@ func init() {
 		"WithName":                       reflect.ValueOf(ha.WithName),
 		"WithNatsOptions":                reflect.ValueOf(ha.WithNatsOptions),
 		"WithPublisherTimeout":           reflect.ValueOf(ha.WithPublisherTimeout),
+		"WithQueryRouter":                reflect.ValueOf(ha.WithQueryRouter),
 		"WithReplicas":                   reflect.ValueOf(ha.WithReplicas),
 		"WithReplicationID":              reflect.ValueOf(ha.WithReplicationID),
 		"WithReplicationPublisher":       reflect.ValueOf(ha.WithReplicationPublisher),
