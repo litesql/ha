@@ -19,7 +19,8 @@ Powered by an embedded NATS JetStream server.
 - 📝 Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
 - 📚 Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)
 - 🔄 Supports Change Data Capture (CDC)
-- ⚙️ Configure custom strategies for resolving replication data conflicts
+- ⚙️ Configure a leader-based or leaderless cluster (with custom strategies for resolving replication data conflicts)
+- 📚 Execute cross-shard queries sing SQL hint /*+ db=DSN */ using regexp
 - 📖 Full documentation: [https://litesql.github.io/ha/](https://litesql.github.io/ha/)
 
 ## 🚀 Getting Started

@@ -12,10 +12,10 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	wire "github.com/jeroenrinzema/psql-wire"
 	"github.com/jeroenrinzema/psql-wire/codes"
 	psqlerr "github.com/jeroenrinzema/psql-wire/errors"
-	"github.com/lib/pq/oid"
 	"github.com/litesql/go-ha"
 
 	"github.com/litesql/ha/internal/sqlite"
@@ -133,13 +133,13 @@ func parseFn() wire.ParseFn {
 					wire.Column{
 						Table: 0,
 						Name:  "database",
-						Oid:   oid.T_text,
+						Oid:   pgtype.TextOID,
 						Width: columnWidth,
 					},
 					wire.Column{
 						Table: 0,
 						Name:  "active",
-						Oid:   oid.T_text,
+						Oid:   pgtype.TextOID,
 						Width: columnWidth,
 					},
 				}))), nil
@@ -256,7 +256,7 @@ func handler(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.Prepared
 		columns[i] = wire.Column{
 			Table: 0,
 			Name:  col,
-			Oid:   oid.T_text,
+			Oid:   pgtype.TextOID,
 			Width: columnWidth,
 		}
 	}
@@ -281,7 +281,7 @@ func handler(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.Prepared
 
 func handlerPrepared(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.PreparedStatements, error) {
 	bindParameters := stmt.Parameters()
-	parameters := make([]oid.Oid, len(bindParameters))
+	parameters := make([]uint32, len(bindParameters))
 	for i := range parameters {
 		parameters[i] = 0
 	}
@@ -297,7 +297,7 @@ func handlerPrepared(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.
 			columns[i] = wire.Column{
 				Table: 0,
 				Name:  col,
-				Oid:   oid.T_text,
+				Oid:   pgtype.TextOID,
 				Width: columnWidth,
 			}
 		}

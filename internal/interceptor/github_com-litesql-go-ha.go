@@ -16,6 +16,7 @@ import (
 func init() {
 	Symbols["github.com/litesql/go-ha/ha"] = map[string]reflect.Value{
 		// function, constant and variable definitions
+		"CrossShardQuery":                reflect.ValueOf(ha.CrossShardQuery),
 		"DefaultStream":                  reflect.ValueOf(constant.MakeFromLiteral("\"ha_replication\"", token.STRING, 0)),
 		"ErrInvalidSQL":                  reflect.ValueOf(&ha.ErrInvalidSQL).Elem(),
 		"ErrSnapshotterNotConfigured":    reflect.ValueOf(&ha.ErrSnapshotterNotConfigured).Elem(),
