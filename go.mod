@@ -6,7 +6,7 @@ require (
 	github.com/go-mysql-org/go-mysql v1.13.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jeroenrinzema/psql-wire v0.17.0
-	github.com/litesql/go-ha v0.5.10
+	github.com/litesql/go-ha v0.5.12
 	github.com/litesql/go-sqlite-ha v0.5.10
 	github.com/litesql/go-sqlite3-ha v0.5.10
 	github.com/nats-io/nats.go v1.48.0
