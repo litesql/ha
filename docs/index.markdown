@@ -9,7 +9,7 @@ layout: home
 
 Highly available SQLite cluster powered by embedded NATS JetStream server.
 
-- Connect using HTTP API, MySQL or PostgreSQL Wire Protocol
+- Connect using HTTP API, [gRPC API](https://buf.build/litesql/sqlite-ha/sdks/main:grpc), [database/sql go driver](https://github.com/litesql/go-ha), [JDBC driver](https://github.com/litesql/jdbc-ha), MySQL or PostgreSQL Wire Protocol
 - Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
 - Use [ha-sync SQLite extension](https://github.com/litesql/ha-sync) to create live local read replicas
 - Change Data Capture (CDC)
@@ -206,8 +206,8 @@ ha *.db
 
 - You can use any PostgreSQL or MySQL driver to connect to ha.
 - The SQLite parser engine will proccess the commands.
-- Visual editors like pgAdmin is not supported while DBeaver (using mysql driver) is partially supported.
-- MySQL and PostgreSQL functions are not supported. 
+- MySQL and PostgreSQL functions are not supported.
+- DBeaver support: use the [JDBC HA](https://github.com/litesql/jdbc-ha) driver to manage the database.
 
 ## 5. HTTP API<a id='5'></a>
 

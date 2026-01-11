@@ -14,7 +14,7 @@ Powered by an embedded NATS JetStream server.
 
 ## Features
 
-- 🔌 Connect via HTTP API, MySQL or PostgreSQL Wire Protocol  
+- 🔌 Connect using HTTP API, [gRPC API](https://buf.build/litesql/sqlite-ha/sdks/main:grpc), [database/sql go driver](https://github.com/litesql/go-ha), [JDBC driver](https://github.com/litesql/jdbc-ha), MySQL or PostgreSQL Wire Protocol
 - 🔁 Replicate data using embedded or external NATS server
 - 📝 Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
 - 📚 Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)
@@ -39,13 +39,14 @@ This command launches:
 - An embedded NATS server on port 4222
 - A MySQL Wire Protocol compatible server on port 3306
 - A PostgreSQL Wire Protocol compatible server on port 5432
+- A gRPC server on port 5001
 - An HTTP API server on port 8080
 
 ### 2. Start a second **ha** instance
 
 ```sh
 mkdir db2
-ha -n node2 -p 8081 --nats-port 0 --pg-port 5433 --mysql-port 3307 --replication-url nats://localhost:4222 "file:db2/mydatabase.db?_journal=WAL&_busy_timeout=5000"
+ha -n node2 -p 8081 --nats-port 0 --grpc-port 0 --pg-port 5433 --mysql-port 3307 --replication-url nats://localhost:4222 "file:db2/mydatabase.db?_journal=WAL&_busy_timeout=5000"
 ```
 
 This command starts:

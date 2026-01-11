@@ -30,9 +30,7 @@ func (h *Handler) UseDB(dbName string) error {
 }
 
 var (
-	commentsRE    = regexp.MustCompile(`(?s)//.*?\\n|/\\*.*?\\*/`)
-	tableSchemaRE = regexp.MustCompile(`(?i)\bTABLE_SCHEMA\s*=\s*'[^']*'`)
-	tableNameRE   = regexp.MustCompile(`(?i)\bTABLE_NAME\s*=\s*'[^']*'`)
+	commentsRE = regexp.MustCompile(`(?s)//.*?\\n|/\\*.*?\\*/`)
 )
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
@@ -58,16 +56,6 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return nil, h.UseDB(dbName)
 	}
 
-	//dbeaver
-	if strings.HasPrefix(query, "/* mysql-connector-j") {
-		resultSet, _ := mysql.BuildSimpleResultset(
-			[]string{"auto_increment_increment", "character_set_client", "character_set_connection", "character_set_results", "character_set_server", "collation_server  ", "collation_connection", "init_connect", "interactive_timeout", "license", "lower_case_table_names", "max_allowed_packet", "net_write_timeout", "performance_schema", "sql_mode", "system_time_zone", "time_zone", "transaction_isolation", "wait_timeout"},
-			[][]any{
-				{1, "latin1", "latin1", "latin1", "utf8mb4", "utf8mb4_0900_ai_ci", "latin1_swedish_ci", "", 28800, "GPL", 0, 67108864, 60, 1, "ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION", "UTC", "SYSTEM", "REPEATABLE-READ", 28800},
-			}, false)
-		return mysql.NewResult(resultSet), nil
-	}
-
 	if cleanQuery == "SHOW DATABASES" {
 		dbs := sqlite.Databases()
 		vals := make([][]any, 0, len(dbs))
@@ -77,44 +65,6 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		resultSet, err := mysql.BuildSimpleResultset([]string{"Database"}, vals, false)
 		if err != nil {
 			slog.Debug("BuildSimpleResultset error", "error", err)
-			return nil, err
-		}
-		return mysql.NewResult(resultSet), nil
-	}
-
-	if strings.HasPrefix(cleanQuery, "SHOW FULL TABLES FROM ") {
-		dbName := strings.ReplaceAll(strings.TrimSpace(query[strings.Index(strings.ToUpper(query), "SHOW FULL TABLES FROM ")+22:]), "`", "")
-		db, ok := h.provider(dbName)
-		if !ok {
-			return nil, fmt.Errorf("database %q not found", dbName)
-		}
-		rows, err := db.Query("SELECT name as tables, 'BASE TABLE' as Table_type FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
-		if err != nil {
-			slog.Debug("Query error", "error", err)
-			return nil, err
-		}
-		resultSet, err := rowsToResultset(rows, false)
-		if err != nil {
-			slog.Debug("rowsToResultset error", "error", err)
-			return nil, err
-		}
-		return mysql.NewResult(resultSet), nil
-	}
-
-	if strings.HasPrefix(cleanQuery, "SHOW TABLE STATUS FROM ") {
-		dbName := strings.ReplaceAll(strings.TrimSpace(query[strings.Index(strings.ToUpper(query), "SHOW TABLE STATUS FROM ")+23:]), "`", "")
-		db, ok := h.provider(dbName)
-		if !ok {
-			return nil, fmt.Errorf("database %q not found", dbName)
-		}
-		rows, err := db.Query("SELECT name as Name, 'BASE TABLE' as Type, 'SQLite' as Engine, 10 as Version, '' as Row_format, 0 as Rows, 0 as Avg_row_length, 0 as Data_length, 0 as Max_data_length, 0 as Index_length, 0 as Data_free, 0 as Auto_increment, '' as Create_time, '' as Update_time, '' as Check_time, '' as Collation, '' as Comment FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
-		if err != nil {
-			slog.Debug("Query error", "error", err)
-			return nil, err
-		}
-		resultSet, err := rowsToResultset(rows, false)
-		if err != nil {
-			slog.Debug("rowsToResultset error", "error", err)
 			return nil, err
 		}
 		return mysql.NewResult(resultSet), nil
@@ -134,49 +84,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return mysql.NewResult(resultSet), nil
 	}
 
-	if cleanQuery == "SELECT @@SESSION.TRANSACTION_READ_ONLY" {
-		resultSet, err := mysql.BuildSimpleResultset([]string{"@@session.transaction_read_only"}, [][]any{
-			{0},
-		}, false)
-		if err != nil {
-			slog.Debug("BuildSimpleResultset error", "error", err)
-			return nil, err
-		}
-		return mysql.NewResult(resultSet), nil
-	}
-
 	if isSelect(cleanQuery) {
-		if strings.Contains(cleanQuery, "INFORMATION_SCHEMA.") {
-			dbName := strings.TrimSpace(strings.TrimPrefix(tableSchemaRE.FindString(query), "TABLE_SCHEMA"))
-			dbName = strings.TrimSpace(strings.TrimPrefix(dbName, "="))
-			dbName = strings.TrimPrefix(dbName, "'")
-			dbName = strings.TrimSuffix(dbName, "'")
-
-			tableName := strings.TrimSpace(strings.TrimPrefix(tableNameRE.FindString(query), "TABLE_NAME"))
-			tableName = strings.TrimSpace(strings.TrimPrefix(tableName, "="))
-			tableName = strings.TrimPrefix(tableName, "'")
-			tableName = strings.TrimSuffix(tableName, "'")
-
-			if dbName != "" {
-				db, ok := h.provider(dbName)
-				if ok {
-					if strings.HasPrefix(cleanQuery, "SELECT * FROM INFORMATION_SCHEMA.COLUMNS ") {
-						rows, err := db.Query("SELECT 'def' AS table_catalog, '"+dbName+"' AS table_schema, '"+tableName+"' AS table_name , name AS column_name, cid + 1 AS ordinal_position, dflt_value AS column_default, CASE WHEN [notnull] = 1 THEN 'NO' ELSE 'YES' END AS is_nullable, type AS data_type, null AS character_maximum_length, null AS character_octet_length, null AS numeric_precision, null AS numeric_scale, null AS datetime_precision, 'utf8mb4' AS character_set_name, 'utf8mb4_general_ci' AS collation_name, type AS column_type, CASE WHEN pk = 1 THEN 'PRI' ELSE '' END AS column_key, '' AS extra, 'select,insert,update,references' AS privileges, '' AS column_comment, '' AS generation_expression, null AS srs_id FROM PRAGMA_table_info(?) ORDER BY cid", tableName)
-						if err != nil {
-							slog.Debug("Query error", "error", err)
-							return nil, err
-						}
-						resultSet, err := rowsToResultset(rows, false)
-						if err != nil {
-							slog.Debug("rowsToResultset error", "error", err)
-							return nil, err
-						}
-						return mysql.NewResult(resultSet), nil
-					}
-				}
-			}
-		}
-
 		rows, err := h.query(query)
 		if err != nil {
 			slog.Debug("Query error", "error", err)

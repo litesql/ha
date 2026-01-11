@@ -90,7 +90,7 @@ var staticFiles embed.FS
 
 func main() {
 	flagSet = ff.NewFlagSet("ha")
-	dbParams = flagSet.StringLong("db-params", "_journal=WAL&_timeout=5000&_sync=NORMAL", "SQLite DSN parameters (added to each database file DSN if not defined)")
+	dbParams = flagSet.StringLong("db-params", defaultDBOptions, "SQLite DSN parameters (added to each database file DSN if not defined)")
 	name = flagSet.String('n', "name", "", "Node name")
 	port = flagSet.Uint('p', "port", 8080, "Server port")
 	interceptorPath = flagSet.String('i', "interceptor", "", "Path to a golang script to customize replication behaviour")
@@ -111,7 +111,7 @@ func main() {
 	dynamicLocalLeaderAddr = flagSet.StringLong("leader-addr", "", "Address when this node become the leader (uses the gRPC server). This will enable the leader election")
 	staticRemoteLeaderAddr = flagSet.StringLong("leader-static", "", "Address of a static leader. This will disable the leader election")
 
-	grpcPort = flagSet.IntLong("grpc-port", 0, "gRPC Server port")
+	grpcPort = flagSet.IntLong("grpc-port", 5001, "gRPC Server port")
 	grpcTimeout = flagSet.DurationLong("grpc-timeout", 5*time.Second, "gRPC operations timeout")
 
 	mysqlPort = flagSet.IntLong("mysql-port", 3306, "MySQL Server port")
@@ -125,7 +125,6 @@ func main() {
 	pgKey = flagSet.StringLong("pg-key", "", "PostgreSQL TLS key file")
 
 	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Number of concurrent queries")
-	extensions = flagSet.StringLong("extensions", "", "Comma-separated list of SQLite extensions to load")
 
 	asyncReplication = flagSet.BoolLong("async-replication", "Enables asynchronous replication message publishing")
 	asyncReplicationOutboxDir = flagSet.StringLong("async-replication-store-dir", "", "Directory path for storing outbox messages used in asynchronous replication")
@@ -136,6 +135,7 @@ func main() {
 	replicationURL = flagSet.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
 	replicationPolicy = flagSet.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
 	rowIdentify = flagSet.StringLong("row-identify", "pk", "Strategy used to identify rows during replication. Options: pk, rowid or full")
+	initDynamicFlags()
 
 	printVersion := flagSet.BoolLong("version", "Print version information and exit")
 	_ = flagSet.String('c', "config", "", "config file (optional)")
