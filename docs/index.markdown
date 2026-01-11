@@ -79,11 +79,11 @@ docker compose up
 
 - Services:
 
-| Instance | HTTP | Pg Wire | NATS | MySQL Wire |
-|----------|------|---------|------|------------|
-|node1     | 8080 | 5432    | 4222 | 3306       |
-|node2     | 8081 | 5433    | 4223 | 3307       |
-|node3     | 8082 | 5434    | 4224 | 3308       |
+| Instance | HTTP | Pg Wire | NATS | MySQL Wire | gRPC |
+|----------|------|---------|------|------------|------|
+|node1     | 8080 | 5432    | 4222 | 3306       | 5001 |
+|node2     | 8081 | 5433    | 4223 | 3307       | 5002 |
+|node3     | 8082 | 5434    | 4224 | 3308       | 5003 |
 
 
 ### 1.3 Install using Helm<a id='1.2'></a>
@@ -119,7 +119,7 @@ ha -n node1 -m
 - Start an another ha node
 
 ```sh
-ha -n node2 -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222
+ha -n node2 -m --port 8081 --pg-port 5433 --grpc-port 0 --nats-port 0 --replication-url nats://localhost:4222
 ```
 
 - Create a table
@@ -413,7 +413,7 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
 | --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
-| --grpc-port | HA_GRPC_PORT |       | Embedded a gRPC server to exec queries as cluster leader |
+| --grpc-port | HA_GRPC_PORT | 5000  | Embedded a gRPC server to exec queries as cluster leader or connect using the JDBC driver |
 | --grpc-timeout | HA_GRPC_TIMEOUT | 5s      | gRPC operations timeout |
 | --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
 | --leader-static | HA_LEADER_STATIC | Address of a static leader. This will disable the leader election |
