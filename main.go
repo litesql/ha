@@ -111,7 +111,7 @@ func main() {
 	dynamicLocalLeaderAddr = flagSet.StringLong("leader-addr", "", "Address when this node become the leader (uses the gRPC server). This will enable the leader election")
 	staticRemoteLeaderAddr = flagSet.StringLong("leader-static", "", "Address of a static leader. This will disable the leader election")
 
-	grpcPort = flagSet.IntLong("grpc-port", 5001, "gRPC Server port")
+	grpcPort = flagSet.IntLong("grpc-port", 5001, "gRPC Server port to exec queries as cluster leader and connect using the JDBC driver")
 	grpcTimeout = flagSet.DurationLong("grpc-timeout", 5*time.Second, "gRPC operations timeout")
 
 	mysqlPort = flagSet.IntLong("mysql-port", 3306, "MySQL Server port")
