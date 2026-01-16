@@ -31,7 +31,7 @@ Download and install the [latest release](https://github.com/litesql/ha/releases
 
 ```sh
 mkdir db1
-ha -n node1 "file:db1/mydatabase.db?_journal=WAL&_busy_timeout=5000"
+ha -n node1 "file:db1/mydatabase.db"
 ```
 
 This command launches:
@@ -46,7 +46,7 @@ This command launches:
 
 ```sh
 mkdir db2
-ha -n node2 -p 8081 --nats-port 0 --grpc-port 0 --pg-port 5433 --mysql-port 3307 --replication-url nats://localhost:4222 "file:db2/mydatabase.db?_journal=WAL&_busy_timeout=5000"
+ha -n node2 -p 8081 --nats-port 0 --grpc-port 0 --pg-port 5433 --mysql-port 3307 --replication-url nats://localhost:4222 "file:db2/mydatabase.db"
 ```
 
 This command starts:
