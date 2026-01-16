@@ -17,8 +17,7 @@ services:
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node1.cfg
       - HA_REPLICAS=1
-      - HA_GRPC_PORT=5000
-      - HA_LEADER_ADDR=node1:5000
+      - HA_LEADER_ADDR=node1:5001
 
   node2:
     image: ghcr.io/litesql/ha:latest
@@ -36,9 +35,8 @@ services:
       - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node2.cfg
-      - HA_REPLICAS=1
-      - HA_GRPC_PORT=5000
-      - HA_LEADER_ADDR=node2:5000
+      - HA_REPLICAS=1      
+      - HA_LEADER_ADDR=node2:5001
 
   node3:
     image: ghcr.io/litesql/ha:latest
@@ -56,9 +54,8 @@ services:
       - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node3.cfg
-      - HA_REPLICAS=1
-      - HA_GRPC_PORT=5000
-      - HA_LEADER_ADDR=node3:5000
+      - HA_REPLICAS=1      
+      - HA_LEADER_ADDR=node3:5001
 
 volumes:
   node1_data:
