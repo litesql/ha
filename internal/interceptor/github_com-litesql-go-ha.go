@@ -58,6 +58,7 @@ func init() {
 		"TypeExplain":                    reflect.ValueOf(constant.MakeFromLiteral("\"EXPLAIN\"", token.STRING, 0)),
 		"TypeInsert":                     reflect.ValueOf(constant.MakeFromLiteral("\"INSERT\"", token.STRING, 0)),
 		"TypeOther":                      reflect.ValueOf(constant.MakeFromLiteral("\"OTHER\"", token.STRING, 0)),
+		"TypePragma":                     reflect.ValueOf(constant.MakeFromLiteral("\"PRAGMA\"", token.STRING, 0)),
 		"TypeRelease":                    reflect.ValueOf(constant.MakeFromLiteral("\"RELEASE\"", token.STRING, 0)),
 		"TypeRollback":                   reflect.ValueOf(constant.MakeFromLiteral("\"ROLLBACK\"", token.STRING, 0)),
 		"TypeSavepoint":                  reflect.ValueOf(constant.MakeFromLiteral("\"SAVEPOINT\"", token.STRING, 0)),
