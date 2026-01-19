@@ -20,7 +20,7 @@ Powered by an embedded NATS JetStream server.
 - 📚 Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)
 - 🔄 Supports Change Data Capture (CDC)
 - ⚙️ Configure a leader-based or leaderless cluster (with custom strategies for resolving replication data conflicts)
-- 📚 Execute cross-shard queries sing SQL hint /*+ db=DSN */ using regexp
+- 📚 Execute cross-shard queries using SQL hint /*+ db=DSN */ (where DSN is a regexp to DataSource name)
 - 📖 Full documentation: [https://litesql.github.io/ha/](https://litesql.github.io/ha/)
 
 ## 🚀 Getting Started

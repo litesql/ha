@@ -6,9 +6,9 @@ require (
 	github.com/go-mysql-org/go-mysql v1.13.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jeroenrinzema/psql-wire v0.17.0
-	github.com/litesql/go-ha v0.6.4
-	github.com/litesql/go-sqlite-ha v0.6.5
-	github.com/litesql/go-sqlite3-ha v0.6.5
+	github.com/litesql/go-ha v0.6.5
+	github.com/litesql/go-sqlite-ha v0.6.6
+	github.com/litesql/go-sqlite3-ha v0.6.6
 	github.com/nats-io/nats.go v1.48.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/traefik/yaegi v0.16.1
@@ -27,7 +27,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/klauspost/compress v1.18.3 // indirect
-	github.com/litesql/go-sqlite3 v1.14.35 // indirect
+	github.com/litesql/go-sqlite3 v1.14.36 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/highwayhash v1.0.4-0.20251030100505-070ab1a87a76 // indirect
 	github.com/nats-io/graft v0.0.0-20250422222653-97395d62ec95 // indirect
@@ -38,7 +38,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20251231075859-d18e03b1da26 // indirect
 	github.com/pingcap/log v1.1.1-0.20251231064424-c412c24f73b2 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20260116163908-78403e58db72 // indirect
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20260119151035-b253d8d1690a // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rqlite/sql v0.0.0-20260116131802-a0234dd98904 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
@@ -59,5 +59,5 @@ require (
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.44.1 // indirect
+	modernc.org/sqlite v1.44.2 // indirect
 )
