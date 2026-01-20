@@ -38,6 +38,21 @@ paths:
       responses:
         '200':
           description: A list of databases.
+    post:
+      summary: Create a database
+      operationId: createDatabase
+      tags:
+        - All Databases
+      requestBody:
+        description: Payload for the create database.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDatabaseRequest"
+      responses:
+        '201':
+          description: Created
   /databases/{id}:
     get:
       summary: Download a specific database.
@@ -227,6 +242,11 @@ paths:
           description: Replication deleted.
 components:
   schemas:
+    CreateDatabaseRequest:
+      type: object
+      properties:
+        dsn:
+          type: string
     QueryRequest:
       type: array
       items:

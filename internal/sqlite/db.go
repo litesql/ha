@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/litesql/go-ha"
@@ -25,124 +26,131 @@ type connectorDB struct {
 	connector *ha.Connector
 }
 
-var dbs = make(map[string]*connectorDB)
+var (
+	dbs   = make(map[string]*connectorDB)
+	muDBs sync.Mutex
+)
 
 var reDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
 
-func Load(dsnList []string, memDB bool, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) error {
-	for i, dsn := range dsnList {
-		defaultDB := i == 0
-		id := idFromDSN(dsn)
-		if _, exists := dbs[id]; exists {
-			return fmt.Errorf("database with id %q already added", id)
+func Load(ctx context.Context, dsn string, memDB bool, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) error {
+	muDBs.Lock()
+	defer muDBs.Unlock()
+	defaultDB := false
+	if len(dbs) == 0 {
+		defaultDB = true
+	}
+	id := IdFromDSN(dsn)
+	if _, exists := dbs[id]; exists {
+		return fmt.Errorf("database with id %q already added", id)
+	}
+	options := slices.Clone(opts)
+	waitFor := make(chan struct{})
+	options = append(options, ha.WithWaitFor(waitFor))
+	var connector *ha.Connector
+	if fromLatestSnapshot {
+		slog.Info("loading latest snapshot from NATS JetStream Object Store", "dsn", dsn)
+		sequence, reader, err := ha.LatestSnapshot(ctx, dsn, opts...)
+		if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
+			return fmt.Errorf("failed to load latest snapshot: %w", err)
 		}
-		options := slices.Clone(opts)
-		waitFor := make(chan struct{})
-		options = append(options, ha.WithWaitFor(waitFor))
-		var connector *ha.Connector
-		if fromLatestSnapshot {
-			slog.Info("loading latest snapshot from NATS JetStream Object Store", "dsn", dsn)
-			sequence, reader, err := ha.LatestSnapshot(context.Background(), dsn, opts...)
-			if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
-				return fmt.Errorf("failed to load latest snapshot: %w", err)
-			}
 
-			if sequence > 0 && deliverPolicy == "" {
-				policy := fmt.Sprintf("by_start_sequence=%d", sequence)
-				options = append(options, ha.WithDeliverPolicy(policy))
-			}
-			if reader != nil {
-				if memDB {
-					connector, err = newConnector(dsn, options...)
-					if err != nil {
-						return err
-					}
-					err = deserializeFromReader(context.Background(), connector, reader)
-					if err != nil {
-						return fmt.Errorf("failed to load latest snapshot: %w", err)
-					}
-				} else {
-					filename := filenameFromDSN(dsn)
-					f, err := os.Create(filename)
-					if err != nil {
-						return fmt.Errorf("failed to create snapshot file %q: %w", filename, err)
-					}
-					_, err = io.Copy(f, reader)
-					if err != nil {
-						f.Close()
-						return fmt.Errorf("failed to write snapshot file %q: %w", filename, err)
-					}
-					f.Close()
-					slog.Info("loading snapshot", "filename", filename)
-					connector, err = newConnector(dsn, options...)
-					if err != nil {
-						return err
-					}
-				}
-			}
-		} else {
+		if sequence > 0 && deliverPolicy == "" {
+			policy := fmt.Sprintf("by_start_sequence=%d", sequence)
+			options = append(options, ha.WithDeliverPolicy(policy))
+		}
+		if reader != nil {
 			if memDB {
-				slog.Info("using in-memory database")
-				filename := filenameFromDSN(dsn)
-				options := slices.Clone(opts)
-				if filename != "" && deliverPolicy == "" {
-					matched := reDateTime.MatchString(filepath.Base(filename))
-					if matched {
-						dateTime := filepath.Base(filename)[0:len(time.DateTime)]
-						_, err := time.Parse(time.DateTime, dateTime)
-						if err == nil {
-							policy := fmt.Sprintf("by_start_time=%s", dateTime)
-							options = append(options, ha.WithDeliverPolicy(policy))
-						}
-					}
-				}
-				var err error
 				connector, err = newConnector(dsn, options...)
 				if err != nil {
 					return err
 				}
-
-				if filename != "" {
-					fi, err := os.Stat(filename)
-					if err == nil && !fi.IsDir() {
-						slog.Info("loading database", "file", filename)
-						err := deserialize(context.Background(), connector, filename)
-						if err != nil {
-							return fmt.Errorf("failed to load database %q: %w", filename, err)
-						}
-					}
+				err = deserializeFromReader(ctx, connector, reader)
+				if err != nil {
+					return fmt.Errorf("failed to load latest snapshot: %w", err)
 				}
 			} else {
-				slog.Info("using data source name", "dsn", dsn)
-				var err error
-				connector, err = newConnector(dsn, opts...)
+				filename := filenameFromDSN(dsn)
+				f, err := os.Create(filename)
+				if err != nil {
+					return fmt.Errorf("failed to create snapshot file %q: %w", filename, err)
+				}
+				_, err = io.Copy(f, reader)
+				if err != nil {
+					f.Close()
+					return fmt.Errorf("failed to write snapshot file %q: %w", filename, err)
+				}
+				f.Close()
+				slog.Info("loading snapshot", "filename", filename)
+				connector, err = newConnector(dsn, options...)
 				if err != nil {
 					return err
 				}
 			}
 		}
+	} else {
+		if memDB {
+			slog.Info("using in-memory database")
+			filename := filenameFromDSN(dsn)
+			options := slices.Clone(opts)
+			if filename != "" && deliverPolicy == "" {
+				matched := reDateTime.MatchString(filepath.Base(filename))
+				if matched {
+					dateTime := filepath.Base(filename)[0:len(time.DateTime)]
+					_, err := time.Parse(time.DateTime, dateTime)
+					if err == nil {
+						policy := fmt.Sprintf("by_start_time=%s", dateTime)
+						options = append(options, ha.WithDeliverPolicy(policy))
+					}
+				}
+			}
+			var err error
+			connector, err = newConnector(dsn, options...)
+			if err != nil {
+				return err
+			}
 
-		db := sql.OpenDB(connector)
-		db.SetConnMaxIdleTime(0)
-		db.SetConnMaxLifetime(0)
-		db.SetMaxOpenConns(maxConns)
-		db.SetMaxIdleConns(maxConns)
-		if connector.Subscriber() != nil {
-			connector.Subscriber().SetDB(db)
-		}
-		if connector.Snapshotter() != nil {
-			connector.Snapshotter().SetDB(db)
-		}
-		close(waitFor)
-		connDB := &connectorDB{
-			db:        db,
-			connector: connector,
-		}
-		dbs[id] = connDB
-		if defaultDB {
-			dbs[""] = connDB
+			if filename != "" {
+				fi, err := os.Stat(filename)
+				if err == nil && !fi.IsDir() {
+					slog.Info("loading database", "file", filename)
+					err := deserialize(ctx, connector, filename)
+					if err != nil {
+						return fmt.Errorf("failed to load database %q: %w", filename, err)
+					}
+				}
+			}
+		} else {
+			slog.Info("using data source name", "dsn", dsn)
+			var err error
+			connector, err = newConnector(dsn, opts...)
+			if err != nil {
+				return err
+			}
 		}
 	}
+
+	db := sql.OpenDB(connector)
+	db.SetConnMaxIdleTime(0)
+	db.SetConnMaxLifetime(0)
+	db.SetMaxOpenConns(maxConns)
+	db.SetMaxIdleConns(maxConns)
+	if connector.Subscriber() != nil {
+		connector.Subscriber().SetDB(db)
+	}
+	if connector.Snapshotter() != nil {
+		connector.Snapshotter().SetDB(db)
+	}
+	close(waitFor)
+	connDB := &connectorDB{
+		db:        db,
+		connector: connector,
+	}
+	dbs[id] = connDB
+	if defaultDB {
+		dbs[""] = connDB
+	}
+
 	return nil
 }
 
@@ -225,6 +233,23 @@ func Transaction(ctx context.Context, db *sql.DB, queries []Request) ([]*Respons
 		return nil, err
 	}
 	return list, nil
+}
+
+func Drop(ctx context.Context, id string) (string, error) {
+	muDBs.Lock()
+	defer muDBs.Unlock()
+	dbConnector, ok := dbs[id]
+	if !ok {
+		return "", fmt.Errorf("database with id %q not found", id)
+	}
+	var filename string
+	err := dbConnector.db.QueryRowContext(ctx, "SELECT file FROM pragma_database_list WHERE name = ?", "main").Scan(&filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to get db filename: %w", err)
+	}
+	dbConnector.connector.Close()
+	delete(dbs, id)
+	return filename, nil
 }
 
 func deserializeFromReader(ctx context.Context, connector driver.Connector, r io.Reader) error {
@@ -379,7 +404,7 @@ func filenameFromDSN(dsn string) string {
 	return filename
 }
 
-func idFromDSN(dsn string) string {
+func IdFromDSN(dsn string) string {
 	var filename string
 	u, err := url.Parse(dsn)
 	if err == nil {

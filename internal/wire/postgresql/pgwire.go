@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -27,10 +29,20 @@ const (
 )
 
 type Config struct {
-	User    string
-	Pass    string
-	TLSCert string
-	TLSKey  string
+	User       string
+	Pass       string
+	TLSCert    string
+	TLSKey     string
+	CreateOpts CreateDatabaseOptions
+}
+
+type CreateDatabaseOptions struct {
+	Dir                string
+	MemDB              bool
+	FromLatestSnapshot bool
+	DeliverPolicy      string
+	MaxConns           int
+	Opts               []ha.Option
 }
 
 const columnWidth = 256
@@ -65,7 +77,7 @@ func NewServer(cfg Config) (*Server, error) {
 		opts = append(opts, wire.TLSConfig(config))
 	}
 
-	wireServer, err := wire.NewServer(parseFn(), opts...)
+	wireServer, err := wire.NewServer(parseFn(cfg.CreateOpts), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +111,7 @@ func (s *Server) terminateConn(ctx context.Context) error {
 
 var reSetDatabase = regexp.MustCompile(`(?i)^SET\s+DATABASE\s*(=|TO)\s*([^;\s]+)`)
 
-func parseFn() wire.ParseFn {
+func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 	return func(ctx context.Context, sql string) (wire.PreparedStatements, error) {
 		slog.InfoContext(ctx, "pg-wire: query received", "remote", wire.RemoteAddress(ctx), "sql", sql)
 		upper := strings.ToUpper(strings.TrimSpace(sql))
@@ -159,6 +171,54 @@ func parseFn() wire.ParseFn {
 			}
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete("ignored")
+			})), nil
+		}
+
+		if strings.HasPrefix(upper, "CREATE DATABASE ") {
+			if !createDatabaseOptions.MemDB && createDatabaseOptions.Dir == "" {
+				return nil, fmt.Errorf("create database is disabled, inform flag --create-db-dir at startup")
+			}
+			dsn := strings.TrimSpace(sql[16:])
+			dsn = strings.TrimSuffix(dsn, ";")
+
+			destPath := sqlite.IdFromDSN(dsn)
+			if destPath == "" {
+				return nil, fmt.Errorf("invalid dsn")
+			}
+			var params string
+			if idx := strings.Index(dsn, "?"); idx != -1 {
+				params = dsn[idx:]
+			}
+
+			if !strings.HasSuffix(destPath, ".db") {
+				destPath += ".db"
+			}
+			destPath = filepath.Join(createDatabaseOptions.Dir, filepath.Base(destPath))
+			dsn = fmt.Sprintf("file:%s%s", destPath, params)
+
+			err := sqlite.Load(ctx, dsn, createDatabaseOptions.MemDB, createDatabaseOptions.FromLatestSnapshot,
+				createDatabaseOptions.DeliverPolicy, createDatabaseOptions.MaxConns, createDatabaseOptions.Opts...)
+			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+				if err != nil {
+					return writer.Complete(fmt.Sprintf("failed to create database: %v", err))
+				}
+				return writer.Complete("DATABASE CREATED")
+			})), nil
+		} else if strings.HasPrefix(upper, "DROP DATABASE ") {
+			id := strings.TrimSpace(sql[14:])
+			id = strings.TrimSuffix(id, ";")
+
+			dbfile, err := sqlite.Drop(ctx, id)
+			if dbfile != "" {
+				err = os.Remove(dbfile)
+				if err != nil && !errors.Is(err, os.ErrNotExist) {
+					return nil, fmt.Errorf("failed to remove database file: %v", err)
+				}
+				os.Remove(dbfile + "-shm")
+				os.Remove(dbfile + "-wal")
+			}
+			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+				return writer.Complete("OK")
 			})), nil
 		}
 

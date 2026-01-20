@@ -16,7 +16,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	err := sqlite.Load([]string{"file:/test.db?vfs=memdb"}, true, false, "", 10)
+	err := sqlite.Load(context.TODO(), "file:/test.db?vfs=memdb", true, false, "", 10)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to load sqlite databases: %v\n", err)
 		os.Exit(1)

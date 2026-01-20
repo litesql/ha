@@ -20,6 +20,35 @@ func DatabasesHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func CreateDatabasesHandler(createDatabaseDir string, memDB bool, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) http.HandlerFunc {
+	type request struct {
+		DSN string `json:"dsn"`
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req request
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.DSN == "" {
+			http.Error(w, "DSN is required", http.StatusBadRequest)
+			return
+		}
+		if !memDB && createDatabaseDir == "" {
+			http.Error(w, "create database is disabled, inform flag --create-db-dir at startup", http.StatusInternalServerError)
+			return
+		}
+
+		err = sqlite.Load(r.Context(), req.DSN, memDB, fromLatestSnapshot, deliverPolicy, maxConns, opts...)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	}
+}
+
 type QueriesRequest struct {
 	Queries []sqlite.Request
 	slice   bool

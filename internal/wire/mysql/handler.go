@@ -1,9 +1,13 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -12,9 +16,10 @@ import (
 )
 
 type Handler struct {
-	db       *sql.DB
-	tx       *sql.Tx
-	provider DBProvider
+	db                    *sql.DB
+	tx                    *sql.Tx
+	provider              DBProvider
+	createDatabaseOptions CreateDatabaseOptions
 }
 
 type DBProvider func(dbName string) (*sql.DB, bool)
@@ -36,7 +41,8 @@ var (
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	slog.Debug("Received: Query", "query", query)
 	cleanQuery := commentsRE.ReplaceAllString(query, "")
-	cleanQuery = strings.ToUpper(strings.TrimSpace(cleanQuery))
+	keepCaseQuery := strings.TrimSpace(cleanQuery)
+	cleanQuery = strings.ToUpper(keepCaseQuery)
 	// These queries are implemented for minimal support for MySQL Shell
 	if len(cleanQuery) > 4 && strings.HasPrefix(strings.ToUpper(cleanQuery[0:4]), "SET ") {
 		return mysql.NewResultReserveResultset(0), nil
@@ -82,6 +88,51 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 			return nil, err
 		}
 		return mysql.NewResult(resultSet), nil
+	}
+
+	if strings.HasPrefix(cleanQuery, "CREATE DATABASE ") {
+		if !h.createDatabaseOptions.MemDB && h.createDatabaseOptions.Dir == "" {
+			return nil, fmt.Errorf("create database is disabled, inform flag --create-db-dir at startup")
+		}
+		dsn := strings.TrimSpace(keepCaseQuery[16:])
+		dsn = strings.TrimSuffix(dsn, ";")
+
+		destPath := sqlite.IdFromDSN(dsn)
+		if destPath == "" {
+			return nil, fmt.Errorf("invalid dsn")
+		}
+		var params string
+		if idx := strings.Index(dsn, "?"); idx != -1 {
+			params = dsn[idx:]
+		}
+
+		if !strings.HasSuffix(destPath, ".db") {
+			destPath += ".db"
+		}
+		destPath = filepath.Join(h.createDatabaseOptions.Dir, filepath.Base(destPath))
+		dsn = fmt.Sprintf("file:%s%s", destPath, params)
+
+		err := sqlite.Load(context.Background(), dsn, h.createDatabaseOptions.MemDB, h.createDatabaseOptions.FromLatestSnapshot,
+			h.createDatabaseOptions.DeliverPolicy, h.createDatabaseOptions.MaxConns, h.createDatabaseOptions.Opts...)
+		if err != nil {
+			return nil, err
+		}
+		return mysql.NewResult(nil), nil
+	}
+	if strings.HasPrefix(cleanQuery, "DROP DATABASE ") {
+		id := strings.TrimSpace(keepCaseQuery[14:])
+		id = strings.TrimSuffix(id, ";")
+
+		dbfile, err := sqlite.Drop(context.Background(), id)
+		if dbfile != "" {
+			err = os.Remove(dbfile)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return nil, fmt.Errorf("failed to remove database file: %v", err)
+			}
+			os.Remove(dbfile + "-shm")
+			os.Remove(dbfile + "-wal")
+		}
+		return mysql.NewResult(nil), nil
 	}
 
 	if isSelect(cleanQuery) {

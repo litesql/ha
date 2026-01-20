@@ -6,13 +6,24 @@ import (
 	"net"
 
 	"github.com/go-mysql-org/go-mysql/server"
+	"github.com/litesql/go-ha"
 )
 
 type Config struct {
-	Port       int
-	User       string
-	Pass       string
-	DBProvider DBProvider
+	Port                  int
+	User                  string
+	Pass                  string
+	DBProvider            DBProvider
+	CreateDatabaseOptions CreateDatabaseOptions
+}
+
+type CreateDatabaseOptions struct {
+	Dir                string
+	MemDB              bool
+	FromLatestSnapshot bool
+	DeliverPolicy      string
+	MaxConns           int
+	Opts               []ha.Option
 }
 
 type Server struct {
@@ -21,16 +32,18 @@ type Server struct {
 	User       string
 	Pass       string
 
-	listener net.Listener
-	closed   bool
+	createDatabaseOptions CreateDatabaseOptions
+	listener              net.Listener
+	closed                bool
 }
 
 func NewServer(cfg Config) (*Server, error) {
 	return &Server{
-		DBProvider: cfg.DBProvider,
-		Port:       cfg.Port,
-		User:       cfg.User,
-		Pass:       cfg.Pass,
+		DBProvider:            cfg.DBProvider,
+		Port:                  cfg.Port,
+		User:                  cfg.User,
+		Pass:                  cfg.Pass,
+		createDatabaseOptions: cfg.CreateDatabaseOptions,
 	}, nil
 }
 
@@ -60,7 +73,8 @@ func (s *Server) ListenAndServe() error {
 				slog.Debug("New mysql connection", "remote", c.RemoteAddr().String())
 				slog.Info("MySQL user/pass", "user", s.User, "pass", s.Pass)
 				conn, err := mysqlServer.NewConn(c, s.User, s.Pass, &Handler{
-					provider: s.DBProvider,
+					provider:              s.DBProvider,
+					createDatabaseOptions: s.createDatabaseOptions,
 				})
 				if err != nil {
 					slog.Error("New conn", "error", err)

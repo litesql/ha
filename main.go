@@ -41,6 +41,8 @@ var (
 	port     *uint
 	logLevel *string
 
+	createDatabaseDir *string
+
 	memDB              *bool
 	snapshotInterval   *time.Duration
 	fromLatestSnapshot *bool
@@ -95,6 +97,8 @@ func main() {
 	port = flagSet.Uint('p', "port", 8080, "Server port")
 	interceptorPath = flagSet.String('i', "interceptor", "", "Path to a golang script to customize replication behaviour")
 	logLevel = flagSet.StringLong("log-level", "info", "Log level (info, warn, error, debug)")
+
+	createDatabaseDir = flagSet.StringLong("create-db-dir", "", "Path to a directory where new databases are created")
 
 	memDB = flagSet.Bool('m', "memory", "Store database in memory")
 	fromLatestSnapshot = flagSet.BoolLong("from-latest-snapshot", "Use the latest database snapshot from NATS JetStream Object Store (if available at startup)")
@@ -198,7 +202,11 @@ func run() error {
 		dsnParams = "vfs=memdb"
 		dsnPrefix = "file:/"
 	}
-	for _, pattern := range flagSet.GetArgs() {
+	patterns := flagSet.GetArgs()
+	if *createDatabaseDir != "" {
+		patterns = append(patterns, filepath.Join(*createDatabaseDir, "*.db"))
+	}
+	for _, pattern := range patterns {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
 			log.Fatal(err)
@@ -284,9 +292,11 @@ func run() error {
 		}
 	}
 
-	err := sqlite.Load(dsnList, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...)
-	if err != nil {
-		return fmt.Errorf("failed to load database: %w", err)
+	for _, dsn := range dsnList {
+		err := sqlite.Load(context.Background(), dsn, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to load database %q: %w", dsn, err)
+		}
 	}
 
 	staticFs, err := fs.Sub(staticFiles, "static")
@@ -302,6 +312,7 @@ func run() error {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /databases", hahttp.DatabasesHandler)
+	mux.HandleFunc("POST /databases", hahttp.CreateDatabasesHandler(*createDatabaseDir, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...))
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
 	mux.HandleFunc("POST /", hahttp.QueryHandler)
@@ -334,6 +345,14 @@ func run() error {
 			}
 			return db, true
 		},
+		CreateDatabaseOptions: mysql.CreateDatabaseOptions{
+			Dir:                *createDatabaseDir,
+			MemDB:              *memDB,
+			FromLatestSnapshot: *fromLatestSnapshot,
+			DeliverPolicy:      *replicationPolicy,
+			MaxConns:           *concurrentQueries,
+			Opts:               opts,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create MySQL server: %w", err)
@@ -350,6 +369,14 @@ func run() error {
 		Pass:    *pgPass,
 		TLSCert: *pgCert,
 		TLSKey:  *pgKey,
+		CreateOpts: postgresql.CreateDatabaseOptions{
+			Dir:                *createDatabaseDir,
+			MemDB:              *memDB,
+			FromLatestSnapshot: *fromLatestSnapshot,
+			DeliverPolicy:      *replicationPolicy,
+			MaxConns:           *concurrentQueries,
+			Opts:               opts,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create PostgreSQL server: %w", err)
