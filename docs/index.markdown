@@ -413,7 +413,7 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
 | --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
-| --grpc-port | HA_GRPC_PORT | 5000  | Embedded a gRPC server to exec queries as cluster leader or connect using the JDBC driver |
+| --grpc-port | HA_GRPC_PORT | 5001  | Embedded a gRPC server to exec queries as cluster leader or connect using the JDBC driver |
 | --grpc-timeout | HA_GRPC_TIMEOUT | 5s      | gRPC operations timeout |
 | --grpc-token   | HA_GRPC_TOKEN   |         | gRPC auth token         |
 | --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
