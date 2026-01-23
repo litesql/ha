@@ -53,6 +53,7 @@ var (
 
 	grpcPort    *int
 	grpcTimeout *time.Duration
+	grpcToken   *string
 
 	pgPort *int
 	pgUser *string
@@ -117,6 +118,7 @@ func main() {
 
 	grpcPort = flagSet.IntLong("grpc-port", 5001, "gRPC Server port to exec queries as cluster leader and connect using the JDBC driver")
 	grpcTimeout = flagSet.DurationLong("grpc-timeout", 5*time.Second, "gRPC operations timeout")
+	grpcToken = flagSet.StringLong("grpc-token", "", "gRPC Auth token")
 
 	mysqlPort = flagSet.IntLong("mysql-port", 3306, "MySQL Server port")
 	mysqlUser = flagSet.StringLong("mysql-user", "ha", "MySQL Auth user")
@@ -239,6 +241,7 @@ func run() error {
 		ha.WithSnapshotInterval(*snapshotInterval),
 		ha.WithGrpcPort(*grpcPort),
 		ha.WithGrpcTimeout(*grpcTimeout),
+		ha.WithGrpcToken(*grpcToken),
 	}
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())

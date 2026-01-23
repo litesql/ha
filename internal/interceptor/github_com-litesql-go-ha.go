@@ -79,6 +79,7 @@ func init() {
 		"WithExtensions":                 reflect.ValueOf(ha.WithExtensions),
 		"WithGrpcPort":                   reflect.ValueOf(ha.WithGrpcPort),
 		"WithGrpcTimeout":                reflect.ValueOf(ha.WithGrpcTimeout),
+		"WithGrpcToken":                  reflect.ValueOf(ha.WithGrpcToken),
 		"WithLeaderElectionLocalTarget":  reflect.ValueOf(ha.WithLeaderElectionLocalTarget),
 		"WithLeaderProvider":             reflect.ValueOf(ha.WithLeaderProvider),
 		"WithName":                       reflect.ValueOf(ha.WithName),

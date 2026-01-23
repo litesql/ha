@@ -415,6 +415,7 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
 | --grpc-port | HA_GRPC_PORT | 5000  | Embedded a gRPC server to exec queries as cluster leader or connect using the JDBC driver |
 | --grpc-timeout | HA_GRPC_TIMEOUT | 5s      | gRPC operations timeout |
+| --grpc-token   | HA_GRPC_TOKEN   |         | gRPC auth token         |
 | --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
 | --leader-static | HA_LEADER_STATIC | Address of a static leader. This will disable the leader election |
 | --mysql-port| HA_MYSQL_PORT| 3306  | Port to MySQL Wire Protocol Server  |
