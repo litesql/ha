@@ -246,7 +246,7 @@ func run() error {
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())
 	}
-	if *extensions != "" {
+	if extensions != nil && *extensions != "" {
 		opts = append(opts, ha.WithExtensions(strings.Split(*extensions, ",")...))
 	}
 	if *natsPort > 0 || *natsConfig != "" {
