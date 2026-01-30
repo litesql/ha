@@ -89,8 +89,6 @@ github.com/pingcap/errors v0.11.5-0.20251231075859-d18e03b1da26 h1:0YsD/8Tws3oVa
 github.com/pingcap/errors v0.11.5-0.20251231075859-d18e03b1da26/go.mod h1:ktAJCA9lxrHHjVyVl2pKJFvzBnq2eZbb+CUOjBRPlXo=
 github.com/pingcap/log v1.1.1-0.20251231064424-c412c24f73b2 h1:/UWmKgMiAJwpi/56C3bSBGLEXKi0wvQWHO+JFI3Uugo=
 github.com/pingcap/log v1.1.1-0.20251231064424-c412c24f73b2/go.mod h1:koK5zd0K8I+zRoJ7/8eOQuPaBugVVGMOS4Yl0A79dwE=
-github.com/pingcap/tidb/pkg/parser v0.0.0-20260127120332-5ee2924cb1a1 h1:d27lFK95nbQkR50N34Ow1VVIuybjSKJRcS1FRBjzPxY=
-github.com/pingcap/tidb/pkg/parser v0.0.0-20260127120332-5ee2924cb1a1/go.mod h1:oHE+ub2QaDERd+UNHe4z2BhFV2jZrm7VNOe6atR9AF4=
 github.com/pingcap/tidb/pkg/parser v0.0.0-20260130132044-258332aee603 h1:ZZCNDiJnHI2ZWeEgIObDBnRQR+VV2XFzHCLZw2XgD3E=
 github.com/pingcap/tidb/pkg/parser v0.0.0-20260130132044-258332aee603/go.mod h1:oHE+ub2QaDERd+UNHe4z2BhFV2jZrm7VNOe6atR9AF4=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
