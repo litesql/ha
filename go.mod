@@ -3,12 +3,13 @@ module github.com/litesql/ha
 go 1.25.0
 
 require (
+	connectrpc.com/connect v1.19.1
 	github.com/go-mysql-org/go-mysql v1.13.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jeroenrinzema/psql-wire v0.17.0
-	github.com/litesql/go-ha v0.7.1
-	github.com/litesql/go-sqlite-ha v0.7.1
-	github.com/litesql/go-sqlite3-ha v0.7.1
+	github.com/litesql/go-ha v0.8.0
+	github.com/litesql/go-sqlite-ha v0.8.0
+	github.com/litesql/go-sqlite3-ha v0.8.0
 	github.com/nats-io/nats.go v1.48.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/traefik/yaegi v0.16.1
@@ -33,14 +34,14 @@ require (
 	github.com/nats-io/graft v0.0.0-20250422222653-97395d62ec95 // indirect
 	github.com/nats-io/jwt/v2 v2.8.0 // indirect
 	github.com/nats-io/nats-server/v2 v2.12.4 // indirect
-	github.com/nats-io/nkeys v0.4.12 // indirect
+	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20251231075859-d18e03b1da26 // indirect
 	github.com/pingcap/log v1.1.1-0.20251231064424-c412c24f73b2 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20260127120332-5ee2924cb1a1 // indirect
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20260130132044-258332aee603 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/rqlite/sql v0.0.0-20260116131802-a0234dd98904 // indirect
+	github.com/rqlite/sql v0.0.0-20260129012909-a110ae1f061e // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

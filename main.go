@@ -3,10 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
-	"embed"
+	_ "embed"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log"
 	"log/slog"
 	"net/http"
@@ -17,7 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect"
 	ha "github.com/litesql/go-ha"
+	haconnect "github.com/litesql/go-ha/connect"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
@@ -39,6 +40,7 @@ var (
 	dbParams *string
 	name     *string
 	port     *uint
+	token    *string
 	logLevel *string
 
 	createDatabaseDir *string
@@ -50,10 +52,6 @@ var (
 
 	staticRemoteLeaderAddr *string
 	dynamicLocalLeaderAddr *string
-
-	grpcPort    *int
-	grpcTimeout *time.Duration
-	grpcToken   *string
 
 	pgPort *int
 	pgUser *string
@@ -88,14 +86,15 @@ var (
 	interceptorPath *string
 )
 
-//go:embed static
-var staticFiles embed.FS
+//go:embed openapi.yaml
+var openAPI []byte
 
 func main() {
 	flagSet = ff.NewFlagSet("ha")
 	dbParams = flagSet.StringLong("db-params", defaultDBOptions, "SQLite DSN parameters (added to each database file DSN if not defined)")
 	name = flagSet.String('n', "name", "", "Node name")
 	port = flagSet.Uint('p', "port", 8080, "Server port")
+	token = flagSet.StringLong("token", "", "API Auth token")
 	interceptorPath = flagSet.String('i', "interceptor", "", "Path to a golang script to customize replication behaviour")
 	logLevel = flagSet.StringLong("log-level", "info", "Log level (info, warn, error, debug)")
 
@@ -116,15 +115,11 @@ func main() {
 	dynamicLocalLeaderAddr = flagSet.StringLong("leader-addr", "", "Address when this node become the leader (uses the gRPC server). This will enable the leader election")
 	staticRemoteLeaderAddr = flagSet.StringLong("leader-static", "", "Address of a static leader. This will disable the leader election")
 
-	grpcPort = flagSet.IntLong("grpc-port", 5001, "gRPC Server port to exec queries as cluster leader and connect using the JDBC driver")
-	grpcTimeout = flagSet.DurationLong("grpc-timeout", 5*time.Second, "gRPC operations timeout")
-	grpcToken = flagSet.StringLong("grpc-token", "", "gRPC Auth token")
-
-	mysqlPort = flagSet.IntLong("mysql-port", 3306, "MySQL Server port")
+	mysqlPort = flagSet.IntLong("mysql-port", 0, "MySQL Server port")
 	mysqlUser = flagSet.StringLong("mysql-user", "ha", "MySQL Auth user")
 	mysqlPass = flagSet.StringLong("mysql-pass", "", "MySQL Auth password")
 
-	pgPort = flagSet.IntLong("pg-port", 5432, "PostgreSQL Server port")
+	pgPort = flagSet.IntLong("pg-port", 0, "PostgreSQL Server port")
 	pgUser = flagSet.StringLong("pg-user", "ha", "PostgreSQL Auth user")
 	pgPass = flagSet.StringLong("pg-pass", "ha", "PostgreSQL Auth password")
 	pgCert = flagSet.StringLong("pg-cert", "", "PostgreSQL TLS certificate file")
@@ -239,9 +234,6 @@ func run() error {
 		ha.WithPublisherTimeout(*replicationTimeout),
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
-		ha.WithGrpcPort(*grpcPort),
-		ha.WithGrpcTimeout(*grpcTimeout),
-		ha.WithGrpcToken(*grpcToken),
 	}
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())
@@ -302,14 +294,11 @@ func run() error {
 		}
 	}
 
-	staticFs, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		return err
-	}
-	fileServer := http.FileServer(http.FS(staticFs))
-
 	mux := http.NewServeMux()
-	mux.Handle("GET /", fileServer)
+	mux.Handle("GET /openapi.yaml", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/yaml")
+		w.Write(openAPI)
+	}))
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -318,7 +307,7 @@ func run() error {
 	mux.HandleFunc("POST /databases", hahttp.CreateDatabasesHandler(*createDatabaseDir, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...))
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
-	mux.HandleFunc("POST /", hahttp.QueryHandler)
+	mux.HandleFunc("POST /query", hahttp.QueryHandler)
 
 	mux.HandleFunc("GET /databases/{id}", hahttp.DownloadHandler)
 	mux.HandleFunc("GET /download", hahttp.DownloadHandler)
@@ -395,9 +384,30 @@ func run() error {
 		}()
 	}
 
+	connectOpts := make([]connect.HandlerOption, 0)
+	if *token != "" {
+		authInterceptor := haconnect.NewAuthInterceptor(*token)
+		connectOpts = append(connectOpts, connect.WithInterceptors(authInterceptor))
+	}
+	mux.Handle(ha.ConnectHandler(connectOpts...))
+	p := new(http.Protocols)
+	p.SetHTTP1(true)
+	p.SetUnencryptedHTTP2(true)
 	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", *port),
-		Handler: mux,
+		Addr:      fmt.Sprintf(":%d", *port),
+		Handler:   mux,
+		Protocols: p,
+	}
+
+	if *token != "" {
+		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			if r.URL.Path != "/openapi.yaml" && authHeader != *token {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			mux.ServeHTTP(w, r)
+		})
 	}
 
 	done := make(chan os.Signal, 1)

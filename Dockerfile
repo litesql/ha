@@ -34,11 +34,13 @@ COPY --from=builder /build/ha .
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE 3306 4222 5001 5432 6222 8080
+EXPOSE 3306 4222 5432 6222 8080
 
 USER ha
 
-ENV HA_NATS_STORE_DIR="/data" 
+ENV HA_NATS_STORE_DIR="/data"
+ENV HA_PG_PORT=5432
+ENV HA_MYSQL_PORT=3306
 ENV HA_ARGS=
 
 ENTRYPOINT ["/app/entrypoint.sh"]

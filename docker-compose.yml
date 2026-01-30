@@ -7,7 +7,6 @@ services:
     ports:
       - "3306:3306"
       - "4222:4222"
-      - "5001:5001"
       - "5432:5432"
       - "8080:8080"
     environment:
@@ -17,7 +16,9 @@ services:
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node1.cfg
       - HA_REPLICAS=1
-      - HA_LEADER_ADDR=node1:5001
+      - HA_PG_PORT=5432
+      - HA_MYSQL_PORT=3306
+      - HA_LEADER_ADDR=node1:8080
 
   node2:
     image: ghcr.io/litesql/ha:latest
@@ -27,7 +28,6 @@ services:
     ports:
       - "3307:3306"
       - "4223:4222"
-      - "5002:5001"
       - "5433:5432"
       - "8081:8080"
     environment:
@@ -35,8 +35,10 @@ services:
       - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node2.cfg
-      - HA_REPLICAS=1      
-      - HA_LEADER_ADDR=node2:5001
+      - HA_REPLICAS=1
+      - HA_PG_PORT=5432
+      - HA_MYSQL_PORT=3306
+      - HA_LEADER_ADDR=node2:8080
 
   node3:
     image: ghcr.io/litesql/ha:latest
@@ -46,7 +48,6 @@ services:
     ports:
       - "3308:3306"
       - "4224:4222"
-      - "5003:5001"
       - "5434:5432"
       - "8082:8080"
     environment:
@@ -54,8 +55,10 @@ services:
       - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
       - HA_CONCURRENT_QUERIES=50
       - HA_NATS_CONFIG=/etc/nats/node3.cfg
-      - HA_REPLICAS=1      
-      - HA_LEADER_ADDR=node3:5001
+      - HA_REPLICAS=1
+      - HA_PG_PORT=5432
+      - HA_MYSQL_PORT=3306 
+      - HA_LEADER_ADDR=node3:8080
 
 volumes:
   node1_data:

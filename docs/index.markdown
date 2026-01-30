@@ -79,11 +79,11 @@ docker compose up
 
 - Services:
 
-| Instance | HTTP | Pg Wire | NATS | MySQL Wire | gRPC |
-|----------|------|---------|------|------------|------|
-|node1     | 8080 | 5432    | 4222 | 3306       | 5001 |
-|node2     | 8081 | 5433    | 4223 | 3307       | 5002 |
-|node3     | 8082 | 5434    | 4224 | 3308       | 5003 |
+| Instance | HTTP | Pg Wire | NATS | MySQL Wire |
+|----------|------|---------|------|------------|
+|node1     | 8080 | 5432    | 4222 | 3306       |
+|node2     | 8081 | 5433    | 4223 | 3307       |
+|node3     | 8082 | 5434    | 4224 | 3308       |
 
 
 ### 1.3 Install using Helm<a id='1.2'></a>
@@ -113,13 +113,13 @@ helm install ha litesql/ha
 - Start the first ha node (-m flag if you want to use in-memory)
 
 ```sh
-ha -n node1 -m
+ha -n node1 -m -pg-port 5432
 ```
 
 - Start an another ha node
 
 ```sh
-ha -n node2 -m --port 8081 --pg-port 5433 --grpc-port 0 --nats-port 0 --replication-url nats://localhost:4222
+ha -n node2 -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222
 ```
 
 - Create a table
@@ -175,7 +175,7 @@ ha -m mydatabase.db
 ### 2.2 Use database in disk<a id='2.2'></a>
 
 ```sh
-ha "file:mydatabase.db?_journal=WAL&_busy_timeout=500"
+ha "file:mydatabase.db"
 ```
 
 ### 2.3 Load database from latest snapshot<a id='2.3'></a>
@@ -211,6 +211,8 @@ ha *.db
 
 ## 5. HTTP API<a id='5'></a>
 
+Access OpenAPI documentation: [http://localhost:8080/openapi.yaml](http://localhost:8080/openapi.yaml)
+
 ### 5.1 Using bind parameters<a id='5.1'></a>
 
 ```sh
@@ -218,7 +220,7 @@ curl -d '{
     "sql": "INSERT INTO users(name) VALUES(:name)", 
     "params": {"name": "HA user"}
 }' \
-http://localhost:8080
+http://localhost:8080/query
 ```
 
 ```json
@@ -252,7 +254,7 @@ curl -d '[
     "sql": "SELECT * FROM users"
 }
 ]' \
-http://localhost:8080
+http://localhost:8080/query
 ```
 
 ```json
@@ -407,18 +409,16 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 |------|----------------------|---------|-------------|
 | -n, --name | HA_NAME        | $HOSTNAME | Node name   |
 | -p, --port | HA_PORT        | 8080    | HTTP API tcp port |
+| --token    | HA_TOKEN       |         | API auth token    |
 | -m, --memory | HA_MEMORY    | false   | Store database in memory |
 | -i, --interceptor | HA_INTERCEPTOR | | Path to a Go script for customizing replication behavior |
 | --log-level | HA_LOG_LEVEL  | info    | Log level (info, warn, error or debug) |
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
 | --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
-| --grpc-port | HA_GRPC_PORT | 5001  | Embedded a gRPC server to exec queries as cluster leader or connect using the JDBC driver |
-| --grpc-timeout | HA_GRPC_TIMEOUT | 5s      | gRPC operations timeout |
-| --grpc-token   | HA_GRPC_TOKEN   |         | gRPC auth token         |
 | --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
 | --leader-static | HA_LEADER_STATIC | Address of a static leader. This will disable the leader election |
-| --mysql-port| HA_MYSQL_PORT| 3306  | Port to MySQL Wire Protocol Server  |
+| --mysql-port| HA_MYSQL_PORT|       | Port to MySQL Wire Protocol Server  |
 | --mysql-user| HA_MYSQL_USER| ha    | MySQL Auth user  |
 | --mysql-pass| HA_MYSQL_PASS|       | MySQL Auth password  | 
 | --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS Server logging |
@@ -427,7 +427,7 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --nats-user | HA_NATS_USER |  | Embedded NATS server user |
 | --nats-pass | HA_NATS_PASS |  | Embedded NATS server password |
 | --nats-config | HA_NATS_CONFIG | | Path to embedded NATS server config file (override other nats configurations) |
-| --pg-port | HA_PG_PORT | 5432 | Port to PostgreSQL Wire Protocol server |
+| --pg-port | HA_PG_PORT |      | Port to PostgreSQL Wire Protocol server |
 | --pg-user | HA_PG_USER | ha   | PostgreSQL Auth user |
 | --pg-pass | HA_PG_PASS | ha   | PostgreSQL Auth password |
 | --pg-cert | HA_PG_CERT |      | Path to PostgreSQL TLS certificate file |
@@ -442,6 +442,6 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --replication-max-age | HA_REPLICATION_MAX_AGE | 24h | Replication stream max age |
 | --replication-url | HA_REPLICATION_URL |  | Replication NATS url (defaults to embedded NATS server) |
 | --replication-policy | HA_REPLICATION_POLICY | all | Replication subscriber delivery policy (all, last, new, by_start_sequence=X, by_start_time=x) |
-| --row-identify | HA_ROW_IDENTIFY | rowid | Strategy used to identify rows during replication. Options: rowid or full |
+| --row-identify | HA_ROW_IDENTIFY | pk | Strategy used to identify rows during replication. Options: pk, rowid or full |
 | --version | HA_VERSION | false | Print version information and exit |
 | -c, --config | | | config file (optional) |

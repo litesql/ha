@@ -31,7 +31,7 @@ Download and install the [latest release](https://github.com/litesql/ha/releases
 
 ```sh
 mkdir db1
-ha -n node1 "file:db1/mydatabase.db"
+ha -n node1 --pg-port 5432 --mysql-port 3306 "file:db1/mydatabase.db"
 ```
 
 This command launches:
@@ -39,14 +39,13 @@ This command launches:
 - An embedded NATS server on port 4222
 - A MySQL Wire Protocol compatible server on port 3306
 - A PostgreSQL Wire Protocol compatible server on port 5432
-- A gRPC server on port 5001
 - An HTTP API server on port 8080
 
 ### 2. Start a second **ha** instance
 
 ```sh
 mkdir db2
-ha -n node2 -p 8081 --nats-port 0 --grpc-port 0 --pg-port 5433 --mysql-port 3307 --replication-url nats://localhost:4222 "file:db2/mydatabase.db"
+ha -n node2 --nats-port 0 -p 8081 --pg-port 5433 --mysql-port 3307 --replication-url nats://localhost:4222 "file:db2/mydatabase.db"
 ```
 
 This command starts:
@@ -90,16 +89,16 @@ Using a mysql client:
 mysql -h localhost --port 3307 -u ha
 
 MySQL [(none)]> show databases;
-+-----------------------+
-| Database              |
-+-----------------------+
-|ha.db                  |
-+-----------------------+
++---------------+
+| Database      |
++---------------+
+| mydatabase.db |
++---------------+
 1 row in set (0,000 sec)
 
-MySQL [(none)]> use ha.db
+MySQL [(none)]> use mydatabase.db
 
-MySQL [ha.db]> select * from users;
+MySQL [mydatabase.db]> select * from users;
 +----+---------+
 | ID | name    |
 +----+---------+
