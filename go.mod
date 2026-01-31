@@ -7,9 +7,9 @@ require (
 	github.com/go-mysql-org/go-mysql v1.13.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jeroenrinzema/psql-wire v0.17.0
-	github.com/litesql/go-ha v0.8.0
-	github.com/litesql/go-sqlite-ha v0.8.0
-	github.com/litesql/go-sqlite3-ha v0.8.0
+	github.com/litesql/go-ha v0.8.1
+	github.com/litesql/go-sqlite-ha v0.8.1
+	github.com/litesql/go-sqlite3-ha v0.8.1
 	github.com/nats-io/nats.go v1.48.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/traefik/yaegi v0.16.1
@@ -39,7 +39,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20251231075859-d18e03b1da26 // indirect
 	github.com/pingcap/log v1.1.1-0.20251231064424-c412c24f73b2 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20260130132044-258332aee603 // indirect
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20260130231008-85389ef3740f // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rqlite/sql v0.0.0-20260129012909-a110ae1f061e // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
