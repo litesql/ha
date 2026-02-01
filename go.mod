@@ -7,9 +7,9 @@ require (
 	github.com/go-mysql-org/go-mysql v1.13.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jeroenrinzema/psql-wire v0.17.0
-	github.com/litesql/go-ha v0.8.1
-	github.com/litesql/go-sqlite-ha v0.8.1
-	github.com/litesql/go-sqlite3-ha v0.8.1
+	github.com/litesql/go-ha v0.8.2
+	github.com/litesql/go-sqlite-ha v0.8.2
+	github.com/litesql/go-sqlite3-ha v0.8.2
 	github.com/modelcontextprotocol/go-sdk v1.2.0
 	github.com/nats-io/nats.go v1.48.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
@@ -23,7 +23,7 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
-	github.com/google/jsonschema-go v0.3.0 // indirect
+	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -52,7 +52,7 @@ require (
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.32.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
