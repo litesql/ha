@@ -23,6 +23,7 @@ import (
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
 	"github.com/litesql/ha/internal/interceptor"
+	"github.com/litesql/ha/internal/mcp"
 	"github.com/litesql/ha/internal/sqlite"
 	hahttp "github.com/litesql/ha/internal/wire/http"
 	"github.com/litesql/ha/internal/wire/mysql"
@@ -325,6 +326,8 @@ func run() error {
 
 	mux.HandleFunc("DELETE /databases/{id}/replications/{name}", hahttp.DeleteReplicationHandler)
 	mux.HandleFunc("DELETE /replications/{name}", hahttp.DeleteReplicationHandler)
+
+	mux.Handle("/mcp", mcp.NewHTTPHandler())
 
 	mysqlServer, err := mysql.NewServer(mysql.Config{
 		Port: *mysqlPort,
