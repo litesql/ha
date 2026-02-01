@@ -402,7 +402,7 @@ func run() error {
 	if *token != "" {
 		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
-			if r.URL.Path != "/openapi.yaml" && authHeader != *token {
+			if authHeader != *token && r.URL.Path != "/healthz" && r.URL.Path != "/openapi.yaml" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
