@@ -417,7 +417,7 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
 | --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
 | --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
-| --leader-static | HA_LEADER_STATIC | Address of a static leader. This will disable the leader election |
+| --leader-static | HA_LEADER_STATIC |    | Address of a static leader. This will disable the leader election |
 | --mysql-port| HA_MYSQL_PORT|       | Port to MySQL Wire Protocol Server  |
 | --mysql-user| HA_MYSQL_USER| ha    | MySQL Auth user  |
 | --mysql-pass| HA_MYSQL_PASS|       | MySQL Auth password  | 
