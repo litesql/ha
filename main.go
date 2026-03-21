@@ -22,6 +22,7 @@ import (
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
 
+	"github.com/litesql/ha/internal/cli"
 	"github.com/litesql/ha/internal/interceptor"
 	"github.com/litesql/ha/internal/mcp"
 	"github.com/litesql/ha/internal/sqlite"
@@ -85,6 +86,8 @@ var (
 	rowIdentify               *string
 
 	interceptorPath *string
+
+	remote *string
 )
 
 //go:embed openapi.yaml
@@ -137,6 +140,8 @@ func main() {
 	replicationURL = flagSet.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
 	replicationPolicy = flagSet.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
 	rowIdentify = flagSet.StringLong("row-identify", "pk", "Strategy used to identify rows during replication. Options: pk, rowid or full")
+
+	remote = flagSet.String('r', "remote", "", "Address of a remote HA server to connect to and interact with (e.g. to run queries) instead of starting a server")
 	initDynamicFlags()
 
 	printVersion := flagSet.BoolLong("version", "Print version information and exit")
@@ -178,6 +183,11 @@ func run() error {
 		slog.SetLogLoggerLevel(slog.LevelWarn)
 	default:
 		return fmt.Errorf("invalid log-level! Valid values: info, debug, error, warm")
+	}
+
+	if *remote != "" {
+		cli.Start(*remote)
+		return nil
 	}
 
 	if *concurrentQueries < 1 {

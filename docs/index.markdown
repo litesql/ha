@@ -412,6 +412,7 @@ See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/
 | --token    | HA_TOKEN       |         | API auth token    |
 | -m, --memory | HA_MEMORY    | false   | Store database in memory |
 | -i, --interceptor | HA_INTERCEPTOR | | Path to a Go script for customizing replication behavior |
+| -r, --remote | HA_REMOTE    |         | Address of a remote HA server to connect to and interact with (e.g. to run queries) instead of starting a server | 
 | --log-level | HA_LOG_LEVEL  | info    | Log level (info, warn, error or debug) |
 | --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
 | --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
