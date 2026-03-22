@@ -54,6 +54,7 @@ var (
 
 	staticRemoteLeaderAddr *string
 	dynamicLocalLeaderAddr *string
+	grpcInsecure           *bool
 
 	pgPort *int
 	pgUser *string
@@ -118,6 +119,7 @@ func main() {
 
 	dynamicLocalLeaderAddr = flagSet.StringLong("leader-addr", "", "Address when this node become the leader (uses the gRPC server). This will enable the leader election")
 	staticRemoteLeaderAddr = flagSet.StringLong("leader-static", "", "Address of a static leader. This will disable the leader election")
+	grpcInsecure = flagSet.BoolLong("grpc-insecure", "Use insecure gRPC connection (plaintext, no TLS) for leader messages. Only use this if you are sure your network is secure!")
 
 	mysqlPort = flagSet.IntLong("mysql-port", 0, "MySQL Server port")
 	mysqlUser = flagSet.StringLong("mysql-user", "ha", "MySQL Auth user")
@@ -245,6 +247,7 @@ func run() error {
 		ha.WithPublisherTimeout(*replicationTimeout),
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
+		ha.WithGrpcInsecure(*grpcInsecure),
 	}
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())
