@@ -112,11 +112,12 @@ func Start(remote string) {
 			continue
 		}
 
-		command += line + "\n"
+		command += line
 		if !strings.HasSuffix(strings.TrimSpace(command), ";") {
+			command += "\n"
 			continue
 		}
-		m.AddHistoryEntry(command)
+		m.AddHistoryEntry(strings.TrimSpace(command))
 		history.SaveHistory(m.GetHistory(), historyPath)
 		err = stream.Send(&sqlv1.QueryRequest{
 			Sql: command,
