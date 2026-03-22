@@ -93,7 +93,9 @@ func Start(remote string) {
 
 	var command string
 	for {
-		fmt.Print("> ")
+		if command == "" {
+			fmt.Print("> ")
+		}
 
 		line, err := m.GetLine()
 		if err != nil {
