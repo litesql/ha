@@ -9,11 +9,11 @@ require (
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/jeroenrinzema/psql-wire v0.18.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
-	github.com/litesql/go-ha v0.9.2
+	github.com/litesql/go-ha v0.9.4
 	github.com/litesql/go-sqlite-ha v0.9.2
 	github.com/litesql/go-sqlite3-ha v0.9.2
 	github.com/modelcontextprotocol/go-sdk v1.4.1
-	github.com/nats-io/nats.go v1.49.0
+	github.com/nats-io/nats.go v1.50.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/traefik/yaegi v0.16.1
 	google.golang.org/grpc v1.79.3
@@ -55,15 +55,15 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
-	github.com/nats-io/graft v0.0.0-20250422222653-97395d62ec95 // indirect
+	github.com/nats-io/graft v0.0.0-20260325174230-f9e6710ae36e // indirect
 	github.com/nats-io/jwt/v2 v2.8.1 // indirect
-	github.com/nats-io/nats-server/v2 v2.12.5 // indirect
+	github.com/nats-io/nats-server/v2 v2.12.6 // indirect
 	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2 // indirect
 	github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20260320225620-3b531d4e3d99 // indirect
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20260325233839-598c3b4ba331 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rqlite/sql v0.0.0-20260224021119-1b2524a41372 // indirect

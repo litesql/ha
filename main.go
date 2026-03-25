@@ -188,7 +188,7 @@ func run() error {
 	}
 
 	if *remote != "" {
-		cli.Start(*remote)
+		cli.Start(*remote, *token)
 		return nil
 	}
 
@@ -318,7 +318,8 @@ func run() error {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /databases", hahttp.DatabasesHandler)
-	mux.HandleFunc("POST /databases", hahttp.CreateDatabasesHandler(*createDatabaseDir, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...))
+	mux.HandleFunc("POST /databases", hahttp.CreateDatabaseHandler(*createDatabaseDir, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...))
+	mux.HandleFunc("DELETE /databases/{id}", hahttp.DropDatabaseHandler())
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
 	mux.HandleFunc("POST /query", hahttp.QueryHandler)

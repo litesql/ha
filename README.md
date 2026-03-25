@@ -56,10 +56,36 @@ This command starts:
 
 It connects to the previously launched embedded NATS server for replication.
 
-### 3. Connect using a PostgreSQL client
+### 3. Connect using a client
+
+Special HA Client commands:
+
+|Command|Description|
+|-------|-----------|
+|SHOW DATABASES; | List all databases |
+|CREATE DATABASE <dsn>; | Create a new database |
+|DROP DATABASE <id>; | Drop a database |
+|SET DATABASE TO <id>; | Send commands to a specific database |
+|UNSET DATABASE; | Use default database |
+|EXIT; | Quit client (ctrl+d) |
+
+
+#### 3.1 HA Client
+
+```sh
+ha -r http://localhost:8080
+```
+
+#### 3.2. PostgreSQL Client
 
 ```sh
 PGPASSWORD=ha psql -h localhost -U ha
+```
+
+#### 3.3 MySQL Client
+
+```sh
+mysql -h localhost --port 3306 -u ha
 ```
 
 Create and populate a table:
@@ -70,6 +96,12 @@ INSERT INTO users(name) VALUES('HA user');
 ```
 
 ### 4. Verify replication on the second instance
+
+```sh
+ha -r http://localhost:8081
+```
+
+Using postgresql client:
 
 ```sh
 PGPASSWORD=ha psql -h localhost -U ha -p 5433

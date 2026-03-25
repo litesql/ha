@@ -68,6 +68,20 @@ paths:
       responses:
         '200':
           description: Database file.
+    delete:
+      summary: Delete a specific database.
+      operationId: deleteDatabase
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Database removed.
     post:
       summary: Query a specific database.
       operationId: queryDatabase

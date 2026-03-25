@@ -2,10 +2,12 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/litesql/go-ha"
@@ -20,7 +22,7 @@ func DatabasesHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func CreateDatabasesHandler(createDatabaseDir string, memDB bool, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) http.HandlerFunc {
+func CreateDatabaseHandler(createDatabaseDir string, memDB bool, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) http.HandlerFunc {
 	type request struct {
 		DSN string `json:"dsn"`
 	}
@@ -46,6 +48,26 @@ func CreateDatabasesHandler(createDatabaseDir string, memDB bool, fromLatestSnap
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
+	}
+}
+
+func DropDatabaseHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		dbfile, err := sqlite.Drop(r.Context(), id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if dbfile != "" {
+			err = os.Remove(dbfile)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				http.Error(w, fmt.Sprintf("failed to remove database file: %v", err), http.StatusInternalServerError)
+				return
+			}
+			os.Remove(dbfile + "-shm")
+			os.Remove(dbfile + "-wal")
+		}
 	}
 }
 
