@@ -13,6 +13,7 @@ Highly available SQLite cluster powered by embedded NATS JetStream server.
 - Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
 - Use [ha-sync SQLite extension](https://github.com/litesql/ha-sync) to create live local read replicas
 - Change Data Capture (CDC)
+- Execute Cross-Database queries (without ATTACH DATABASE)
 - [Open Source](https://github.com/litesql/ha)
 
 ## Overview
@@ -29,7 +30,8 @@ Highly available SQLite cluster powered by embedded NATS JetStream server.
 - [3. Local Replicas](#3)
   - [3.1 Local Read/Write Replicas](#3.1)
   - [3.2 Local Read Replicas](#3.2)
-- [4. PostgreSQL and MySQL Wire Protocol](#4)
+- [4. HA Client, PostgreSQL and MySQL Wire Protocol](#4)
+  - [4.1 Using HA Client](#4.1)
 - [5. HTTP API](#5)
   - [5.1 Using bind parameters](#5.1)
   - [5.2 Multiple commands (one transaction)](#5.2)
@@ -43,7 +45,8 @@ Highly available SQLite cluster powered by embedded NATS JetStream server.
   - [6.1 CDC message format](#6.1)
   - [6.2 Replication limitations](#6.2)
   - [6.3 Conflict resolution](#6.3)
-- [7. Configuration](#7)
+- [7. Cross-shard Queries](#7)
+- [8. Configuration](#8)
 
 
 ## 1. Installation<a id='1'></a>
@@ -53,9 +56,7 @@ Highly available SQLite cluster powered by embedded NATS JetStream server.
 ### 1.1 Install from source<a id='1.1'></a>
 
 ```sh
-git clone https://github.com/litesql/ha.git
-cd ha
-go install
+go install github.com/litesql/ha@latest
 ```
 
 ### 1.2 Install using Docker<a id='1.2'></a>
@@ -202,12 +203,28 @@ ha *.db
 - Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
 - Use with any programming language
 
-## 4. PostgreSQL and MySQL Wire Protocol<a id='4'></a>
+## 4. HA Client, PostgreSQL and MySQL Wire Protocol<a id='4'></a>
 
-- You can use any PostgreSQL or MySQL driver to connect to ha.
+- You can use any ha, PostgreSQL or MySQL driver to connect to ha.
 - The SQLite parser engine will proccess the commands.
 - MySQL and PostgreSQL functions are not supported.
 - DBeaver support: use the [JDBC HA](https://github.com/litesql/jdbc-ha) driver to manage the database.
+
+### 4.1 Using HA Client<a id='4.1'></a>
+
+```sh
+ha -r http://localhost:8080
+```
+You can send any SQL statement to the HA database, plus the following special commands:
+
+|Command|Description|
+|-------|-----------|
+|SHOW DATABASES; | List all databases |
+|CREATE DATABASE <dsn>; | Create a new database |
+|DROP DATABASE <id>; | Drop a database |
+|SET DATABASE TO <id>; | Send commands to a specific database |
+|UNSET DATABASE; | Use default database |
+|EXIT; | Quit client (ctrl+d) |
 
 ## 5. HTTP API<a id='5'></a>
 
@@ -403,7 +420,23 @@ In the event of conflicting writes, the following conflict resolution strategy i
 
 See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/testdata/ignore_alter_table_errors.go).
 
-## 7. Configuration<a id='7'></a>
+## 7. Cross-shard Queries<a id='7'></a>
+
+HA supports cross-database queries across multiple SQLite databases hosted on the same node. This lets you query data from all matching shard databases in a single request.
+
+Use the SQL optimizer hint `/*+ db=<regex> */` to select which shard databases should participate in the query. For example:
+
+```sql
+SELECT id, name /*+ db=.* */ FROM users;
+```
+
+In this example, `db=.*` runs the query against all available database IDs. To target a subset, use a narrower regular expression, e.g. `db=users_.*`.
+
+- Discover database IDs with:
+  - `SHOW DATABASES;`
+- Limit results to specific shards by adjusting the regex.
+
+## 8. Configuration<a id='8'></a>
 
 | Flag | Environment Variable | Default | Description |
 |------|----------------------|---------|-------------|

@@ -13,13 +13,12 @@ permalink: /downloads/
 | MacOS              | amd64 (x86)| [ha_Darwin_x86_64.tar.gz](https://github.com/litesql/ha/releases/latest/download/ha_Darwin_x86_64.tar.gz) |
 | MacOS              | arm64 | [ha_Darwin_arm64.tar.gz](https://github.com/litesql/ha/releases/latest/download/ha_Darwin_arm64.tar.gz) |
 | Windows            | amd64 (x86) | [ha_Windows_x86_64.zip](https://github.com/litesql/ha/releases/latest/download/ha_Windows_x86_64.zip) |
+| Windows            | arm64 | [ha_Windows_arm64.zip](https://github.com/litesql/ha/releases/latest/download/ha_Windows_arm64.zip) |
 
 ## Install from source
 
 ```sh
-git clone https://github.com/litesql/ha.git
-cd ha
-go install
+go install github.com/litesql/ha@latest
 ```
 
 ## Install from docker
