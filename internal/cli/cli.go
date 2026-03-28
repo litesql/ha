@@ -137,7 +137,11 @@ func Start(remote string, token string) {
 		case <-exitChan:
 			return
 		default:
-			m.Prompt = fmt.Sprintf("%s> ", replicationID)
+			if command == "" {
+				m.Prompt = fmt.Sprintf("%s> ", replicationID)
+			} else {
+				m.Prompt = ""
+			}
 
 			line, err := m.GetLine()
 			if err != nil {
@@ -158,12 +162,13 @@ func Start(remote string, token string) {
 				continue
 			}
 			command += line
-			if !strings.HasSuffix(strings.TrimSpace(command), ";") {
+			command = strings.TrimSpace(command)
+			if !strings.HasSuffix(command, ";") {
 				command += "\n"
 				continue
 			}
 
-			m.AddHistoryEntry(strings.TrimSpace(command))
+			m.AddHistoryEntry(command)
 			history.SaveHistory(m.GetHistory(), historyPath)
 
 			if strings.HasPrefix(strings.ToUpper(command), "EXIT") {
