@@ -214,7 +214,20 @@ func run() error {
 	}
 	patterns := flagSet.GetArgs()
 	if *createDatabaseDir != "" {
-		patterns = append(patterns, filepath.Join(*createDatabaseDir, "*.db"))
+		err := os.MkdirAll(*createDatabaseDir, os.ModePerm)
+		if err != nil {
+			return fmt.Errorf("failed to create database directory: %w", err)
+		}
+		filepath.Walk(*createDatabaseDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() && isSQLiteFile(path) {
+				dsn := fmt.Sprintf("%s%s?%s", dsnPrefix, path, dsnParams)
+				dsnList = append(dsnList, dsn)
+			}
+			return nil
+		})
 	}
 	for _, pattern := range patterns {
 		matches, err := filepath.Glob(pattern)
@@ -235,7 +248,7 @@ func run() error {
 		}
 	}
 	if len(dsnList) == 0 {
-		dsnList = append(dsnList, fmt.Sprintf("%s%s?%s", dsnPrefix, "ha.db", dsnParams))
+		dsnList = append(dsnList, fmt.Sprintf("%s%s?%s", dsnPrefix, filepath.Join(*createDatabaseDir, "ha.db"), dsnParams))
 	}
 
 	opts := []ha.Option{
@@ -318,7 +331,7 @@ func run() error {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /databases", hahttp.DatabasesHandler)
-	mux.HandleFunc("POST /databases", hahttp.CreateDatabaseHandler(*createDatabaseDir, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...))
+	mux.HandleFunc("POST /databases", hahttp.CreateDatabaseHandler(*createDatabaseDir, *memDB, dsnParams, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...))
 	mux.HandleFunc("DELETE /databases/{id}", hahttp.DropDatabaseHandler())
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
@@ -448,4 +461,20 @@ func run() error {
 
 	slog.Info("starting HA HTTP server", "port", *port, "version", version, "commit", commit, "date", date)
 	return server.ListenAndServe()
+}
+
+func isSQLiteFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	header := make([]byte, 16)
+	_, err = f.Read(header)
+	if err != nil {
+		return false
+	}
+
+	return string(header) == "SQLite format 3\x00"
 }

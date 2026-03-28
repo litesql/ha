@@ -95,8 +95,8 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
 github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
-github.com/litesql/go-ha v0.9.5 h1:Izsiwx7bx7N8Gaakvuj0H5wQX0vCCgIm+cdetKJMgIg=
-github.com/litesql/go-ha v0.9.5/go.mod h1:k45D7A+ieUWMRhq8aR9PrhV+A8n58mwuJhUuTS6n4Ew=
+github.com/litesql/go-ha v0.9.6 h1:xbTjOH72iZNRZC7rcV7ftKTKvtIbWr8gDXLNGtGDdRU=
+github.com/litesql/go-ha v0.9.6/go.mod h1:k45D7A+ieUWMRhq8aR9PrhV+A8n58mwuJhUuTS6n4Ew=
 github.com/litesql/go-sqlite-ha v0.9.2 h1:RvLI+Xxcabmdt/+Yv7DNmLKacoujgNO3S2a2sPU+3dg=
 github.com/litesql/go-sqlite-ha v0.9.2/go.mod h1:dlrA9Ne+Zl36gmXnxuSg/Pn2bznPcCTPrkTf8WcXaxc=
 github.com/litesql/go-sqlite3 v1.14.38 h1:DJ7sUNjkyIyb9j/OD4Ax08MNhodI6LdOgsNC6qP40hM=

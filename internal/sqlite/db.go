@@ -90,7 +90,7 @@ func Load(ctx context.Context, dsn string, memDB bool, fromLatestSnapshot bool, 
 		}
 	} else {
 		if memDB {
-			slog.Info("using in-memory database")
+			slog.Info("using in-memory database", "dsn", dsn)
 			filename := filenameFromDSN(dsn)
 			options := slices.Clone(opts)
 			if filename != "" && deliverPolicy == "" {

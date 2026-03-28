@@ -9,7 +9,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/jeroenrinzema/psql-wire v0.18.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
-	github.com/litesql/go-ha v0.9.5
+	github.com/litesql/go-ha v0.9.6
 	github.com/litesql/go-sqlite-ha v0.9.2
 	github.com/litesql/go-sqlite3-ha v0.9.2
 	github.com/modelcontextprotocol/go-sdk v1.4.1

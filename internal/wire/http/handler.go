@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/litesql/go-ha"
@@ -22,7 +24,7 @@ func DatabasesHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func CreateDatabaseHandler(createDatabaseDir string, memDB bool, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) http.HandlerFunc {
+func CreateDatabaseHandler(createDatabaseDir string, memDB bool, defaultDSNOpts string, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) http.HandlerFunc {
 	type request struct {
 		DSN string `json:"dsn"`
 	}
@@ -41,8 +43,14 @@ func CreateDatabaseHandler(createDatabaseDir string, memDB bool, fromLatestSnaps
 			http.Error(w, "create database is disabled, inform flag --create-db-dir at startup", http.StatusInternalServerError)
 			return
 		}
+		dsn := req.DSN
 
-		err = sqlite.Load(r.Context(), req.DSN, memDB, fromLatestSnapshot, deliverPolicy, maxConns, opts...)
+		dsn = fmt.Sprintf("file:%s", filepath.Join(createDatabaseDir, req.DSN))
+		if !strings.Contains(dsn, "?") {
+			dsn += "?" + defaultDSNOpts
+		}
+
+		err = sqlite.Load(r.Context(), dsn, memDB, fromLatestSnapshot, deliverPolicy, maxConns, opts...)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
