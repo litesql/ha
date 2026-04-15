@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"github.com/litesql/go-ha"
+	"github.com/litesql/go-ha/connect"
 	"go/constant"
 	"go/token"
 	"io"
@@ -262,16 +263,24 @@ func (W _github_com_litesql_go_ha_SequenceProvider) LatestSeq() uint64 {
 type _github_com_litesql_go_ha_Subscriber struct {
 	IValue          interface{}
 	WDeliveredInfo  func(ctx context.Context, name string) (any, error)
+	WHistoryBySeq   func(ctx context.Context, startSeq uint64) ([]grpc.HistoryItem, error)
+	WHistoryByTime  func(ctx context.Context, duration time.Duration) ([]grpc.HistoryItem, error)
 	WLatestSeq      func() uint64
 	WRemoveConsumer func(ctx context.Context, name string) error
 	WSetDB          func(a0 *sql.DB)
 	WStart          func() error
-	WUndo           func(ctx context.Context, transactionsCount uint64) error
+	WUndoBySeq      func(ctx context.Context, startSeq uint64) error
 	WUndoByTime     func(ctx context.Context, duration time.Duration) error
 }
 
 func (W _github_com_litesql_go_ha_Subscriber) DeliveredInfo(ctx context.Context, name string) (any, error) {
 	return W.WDeliveredInfo(ctx, name)
+}
+func (W _github_com_litesql_go_ha_Subscriber) HistoryBySeq(ctx context.Context, startSeq uint64) ([]grpc.HistoryItem, error) {
+	return W.WHistoryBySeq(ctx, startSeq)
+}
+func (W _github_com_litesql_go_ha_Subscriber) HistoryByTime(ctx context.Context, duration time.Duration) ([]grpc.HistoryItem, error) {
+	return W.WHistoryByTime(ctx, duration)
 }
 func (W _github_com_litesql_go_ha_Subscriber) LatestSeq() uint64 {
 	return W.WLatestSeq()
@@ -285,8 +294,8 @@ func (W _github_com_litesql_go_ha_Subscriber) SetDB(a0 *sql.DB) {
 func (W _github_com_litesql_go_ha_Subscriber) Start() error {
 	return W.WStart()
 }
-func (W _github_com_litesql_go_ha_Subscriber) Undo(ctx context.Context, transactionsCount uint64) error {
-	return W.WUndo(ctx, transactionsCount)
+func (W _github_com_litesql_go_ha_Subscriber) UndoBySeq(ctx context.Context, startSeq uint64) error {
+	return W.WUndoBySeq(ctx, startSeq)
 }
 func (W _github_com_litesql_go_ha_Subscriber) UndoByTime(ctx context.Context, duration time.Duration) error {
 	return W.WUndoByTime(ctx, duration)

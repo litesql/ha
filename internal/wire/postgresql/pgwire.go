@@ -231,7 +231,7 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 			}
 			undoParam := strings.TrimSpace(sql[5:])
 			undoParam = strings.TrimSuffix(undoParam, ";")
-			txCount, err := strconv.Atoi(undoParam)
+			seq, err := strconv.Atoi(undoParam)
 			if err != nil {
 				duration, err := time.ParseDuration(undoParam)
 				if err != nil {
@@ -242,16 +242,16 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 				}
 				c.UndoByTime(ctx, duration)
 			}
-			if txCount <= 0 {
-				return nil, fmt.Errorf("txcount must be greater than 0")
+			if seq < 0 {
+				return nil, fmt.Errorf("sequence must be a non-negative integer")
 			}
 
-			err = c.Undo(ctx, uint64(txCount))
+			err = c.UndoBySeq(ctx, uint64(seq))
 			if err != nil {
 				return nil, fmt.Errorf("undo failed: %v", err)
 			}
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
-				return writer.Complete(fmt.Sprintf("undone %d transactions", txCount))
+				return writer.Complete(fmt.Sprintf("undone transactions until sequence %d", seq))
 			})), nil
 		}
 

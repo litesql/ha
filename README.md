@@ -62,13 +62,14 @@ Special HA Client commands:
 
 |Command|Description|
 |-------|-----------|
-|SHOW DATABASES; | List all databases |
-|CREATE DATABASE dsn; | Create a new database |
-|DROP DATABASE id; | Drop a database |
-|SET DATABASE TO id; | Send commands to a specific database |
-|UNSET DATABASE; | Use default database |
-|UNDO n; | Undo the last n transactions. Where n is a number or a time duration |
-|EXIT; | Quit client (ctrl+d) |
+|SHOW DATABASES;|List all databases|
+|CREATE DATABASE dsn;|Create a new database|
+|DROP DATABASE id;|Drop a database|
+|SET DATABASE TO id;|Send commands to a specific database|
+|UNSET DATABASE;|Use default database|
+|HISTORY n;|Show the last n transactions (n can be a number or time duration like '5m')|
+|UNDO n;|Undo the last n transactions (n can be a number or time duration like '5m')|
+|EXIT;|Quit client (ctrl+d)|
 
 
 #### 3.1 HA Client

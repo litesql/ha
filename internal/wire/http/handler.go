@@ -167,7 +167,7 @@ func UndoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	param := r.PathValue("param")
-	txCount, err := strconv.Atoi(param)
+	seq, err := strconv.Atoi(param)
 	if err != nil {
 		duration, err := time.ParseDuration(param)
 		if err != nil {
@@ -185,11 +185,11 @@ func UndoHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if txCount <= 0 {
-		http.Error(w, "txcount must be greater than 0", http.StatusBadRequest)
+	if seq < 0 {
+		http.Error(w, "sequence must be a non-negative integer", http.StatusBadRequest)
 		return
 	}
-	err = c.Undo(r.Context(), uint64(txCount))
+	err = c.UndoBySeq(r.Context(), uint64(seq))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

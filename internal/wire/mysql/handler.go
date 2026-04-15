@@ -149,7 +149,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	if strings.HasPrefix(cleanQuery, "UNDO ") {
 		undoParam := strings.TrimSpace(keepCaseQuery[5:])
 		undoParam = strings.TrimSuffix(undoParam, ";")
-		txCount, err := strconv.Atoi(undoParam)
+		seq, err := strconv.Atoi(undoParam)
 		if err != nil {
 			duration, err := time.ParseDuration(undoParam)
 			if err != nil {
@@ -161,10 +161,10 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 			h.connector.UndoByTime(context.Background(), duration)
 			return mysql.NewResult(nil), nil
 		}
-		if txCount <= 0 {
-			return nil, fmt.Errorf("txcount must be greater than 0")
+		if seq < 0 {
+			return nil, fmt.Errorf("sequence must be a non-negative integer")
 		}
-		err = h.connector.Undo(context.Background(), uint64(txCount))
+		err = h.connector.UndoBySeq(context.Background(), uint64(seq))
 		if err != nil {
 			return nil, err
 		}
