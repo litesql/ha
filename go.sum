@@ -95,8 +95,6 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
 github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
-github.com/litesql/go-ha v0.10.3 h1:6Qc0FeRK6HzUcZ2bxTKYSQRWwm18GNsY5GaaC0ZpzvA=
-github.com/litesql/go-ha v0.10.3/go.mod h1:krMx03VIl7CWqCuaovmfsMpHRvI9s5X2N9EYT5JyLGw=
 github.com/litesql/go-ha v0.10.4 h1:cMMcc3/6N6ud2DRIvqxX2DCUJmybboqryKTdP4bi7fU=
 github.com/litesql/go-ha v0.10.4/go.mod h1:krMx03VIl7CWqCuaovmfsMpHRvI9s5X2N9EYT5JyLGw=
 github.com/litesql/go-sqlite-ha v0.10.0 h1:z5JH4opmBGw9ZzTqSNO32Z4X+BRu/DviUcpTPfLpusA=

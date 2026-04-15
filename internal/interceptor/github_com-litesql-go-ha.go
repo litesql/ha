@@ -11,6 +11,7 @@ import (
 	"go/token"
 	"io"
 	"reflect"
+	"time"
 )
 
 func init() {
@@ -266,6 +267,7 @@ type _github_com_litesql_go_ha_Subscriber struct {
 	WSetDB          func(a0 *sql.DB)
 	WStart          func() error
 	WUndo           func(ctx context.Context, transactionsCount uint64) error
+	WUndoByTime     func(ctx context.Context, duration time.Duration) error
 }
 
 func (W _github_com_litesql_go_ha_Subscriber) DeliveredInfo(ctx context.Context, name string) (any, error) {
@@ -285,6 +287,9 @@ func (W _github_com_litesql_go_ha_Subscriber) Start() error {
 }
 func (W _github_com_litesql_go_ha_Subscriber) Undo(ctx context.Context, transactionsCount uint64) error {
 	return W.WUndo(ctx, transactionsCount)
+}
+func (W _github_com_litesql_go_ha_Subscriber) UndoByTime(ctx context.Context, duration time.Duration) error {
+	return W.WUndoByTime(ctx, duration)
 }
 
 // _github_com_litesql_go_ha_TxSeqTracker is an interface wrapper for TxSeqTracker type
