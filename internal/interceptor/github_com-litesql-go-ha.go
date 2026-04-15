@@ -265,6 +265,7 @@ type _github_com_litesql_go_ha_Subscriber struct {
 	WRemoveConsumer func(ctx context.Context, name string) error
 	WSetDB          func(a0 *sql.DB)
 	WStart          func() error
+	WUndo           func(ctx context.Context, transactionsCount uint64) error
 }
 
 func (W _github_com_litesql_go_ha_Subscriber) DeliveredInfo(ctx context.Context, name string) (any, error) {
@@ -281,6 +282,9 @@ func (W _github_com_litesql_go_ha_Subscriber) SetDB(a0 *sql.DB) {
 }
 func (W _github_com_litesql_go_ha_Subscriber) Start() error {
 	return W.WStart()
+}
+func (W _github_com_litesql_go_ha_Subscriber) Undo(ctx context.Context, transactionsCount uint64) error {
+	return W.WUndo(ctx, transactionsCount)
 }
 
 // _github_com_litesql_go_ha_TxSeqTracker is an interface wrapper for TxSeqTracker type
