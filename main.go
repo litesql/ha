@@ -335,7 +335,9 @@ func run() error {
 	mux.HandleFunc("DELETE /databases/{id}", hahttp.DropDatabaseHandler())
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
+	mux.HandleFunc("POST /databases/{id}/undo/{txcount}", hahttp.UndoHandler)
 	mux.HandleFunc("POST /query", hahttp.QueryHandler)
+	mux.HandleFunc("POST /query/undo/{txcount}", hahttp.UndoHandler)
 
 	mux.HandleFunc("GET /databases/{id}", hahttp.DownloadHandler)
 	mux.HandleFunc("GET /download", hahttp.DownloadHandler)
@@ -360,6 +362,13 @@ func run() error {
 		Port: *mysqlPort,
 		User: *mysqlUser,
 		Pass: *mysqlPass,
+		ConnectorProvider: func(dbName string) (*ha.Connector, bool) {
+			connector, err := sqlite.Connector(dbName)
+			if err != nil {
+				return nil, false
+			}
+			return connector, true
+		},
 		DBProvider: func(dbName string) (*sql.DB, bool) {
 			db, err := sqlite.DB(dbName)
 			if err != nil {

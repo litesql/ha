@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -219,6 +220,29 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 			}
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete("OK")
+			})), nil
+		}
+
+		if strings.HasPrefix(upper, "UNDO ") {
+			txCountStr := strings.TrimSpace(sql[5:])
+			txCountStr = strings.TrimSuffix(txCountStr, ";")
+			txCount, err := strconv.Atoi(txCountStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid txcount: %v", err)
+			}
+			if txCount <= 0 {
+				return nil, fmt.Errorf("txcount must be greater than 0")
+			}
+			c, err := sqlite.Connector(dbID)
+			if err != nil {
+				return nil, fmt.Errorf("database %q not found", dbID)
+			}
+			err = c.Undo(ctx, uint64(txCount))
+			if err != nil {
+				return nil, fmt.Errorf("undo failed: %v", err)
+			}
+			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+				return writer.Complete(fmt.Sprintf("undone %d transactions", txCount))
 			})), nil
 		}
 

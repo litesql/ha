@@ -13,6 +13,7 @@ type Config struct {
 	Port                  int
 	User                  string
 	Pass                  string
+	ConnectorProvider     ConnectorProvider
 	DBProvider            DBProvider
 	CreateDatabaseOptions CreateDatabaseOptions
 }
@@ -27,10 +28,11 @@ type CreateDatabaseOptions struct {
 }
 
 type Server struct {
-	DBProvider DBProvider
-	Port       int
-	User       string
-	Pass       string
+	ConnectorProvider ConnectorProvider
+	DBProvider        DBProvider
+	Port              int
+	User              string
+	Pass              string
 
 	createDatabaseOptions CreateDatabaseOptions
 	listener              net.Listener
@@ -73,7 +75,8 @@ func (s *Server) ListenAndServe() error {
 				slog.Debug("New mysql connection", "remote", c.RemoteAddr().String())
 				slog.Info("MySQL user/pass", "user", s.User, "pass", s.Pass)
 				conn, err := mysqlServer.NewConn(c, s.User, s.Pass, &Handler{
-					provider:              s.DBProvider,
+					connectorProvider:     s.ConnectorProvider,
+					dbProvider:            s.DBProvider,
 					createDatabaseOptions: s.createDatabaseOptions,
 				})
 				if err != nil {

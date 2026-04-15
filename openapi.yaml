@@ -29,6 +29,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/QueryResponse"
+  /undo/{txcount}:
+    post:
+      summary: Undo the last N transactions on the main database.
+      operationId: undoMainDatabase
+      tags:
+        - Main Database
+      parameters:
+        - name: txcount
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Undo successful.
   /databases:
     get:
       summary: List all databases.
@@ -145,6 +161,27 @@ paths:
       responses:
         '200':
           description: Snapshot file.
+  /databases/{id}/undo/{txcount}:
+    post:
+      summary: Undo the last N transactions on a specific database.
+      operationId: undoDatabase
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: txcount
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Undo successful.
   /snapshot:
     post:
       summary: Take a snapshot of the main database.

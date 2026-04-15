@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -155,6 +156,31 @@ func QueryHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string][]*sqlite.Response{
 		"results": res,
 	})
+}
+
+func UndoHandler(w http.ResponseWriter, r *http.Request) {
+	dbID := r.PathValue("id")
+	c, err := sqlite.Connector(dbID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	txCountStr := r.PathValue("txcount")
+	txCount, err := strconv.Atoi(txCountStr)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("invalid txcount: %v", err), http.StatusBadRequest)
+		return
+	}
+	if txCount <= 0 {
+		http.Error(w, "txcount must be greater than 0", http.StatusBadRequest)
+		return
+	}
+	err = c.Undo(r.Context(), uint64(txCount))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {

@@ -9,26 +9,36 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/litesql/go-ha"
 	"github.com/litesql/ha/internal/sqlite"
 )
 
 type Handler struct {
+	connector             *ha.Connector
 	db                    *sql.DB
 	tx                    *sql.Tx
-	provider              DBProvider
+	dbProvider            DBProvider
+	connectorProvider     ConnectorProvider
 	createDatabaseOptions CreateDatabaseOptions
 }
 
 type DBProvider func(dbName string) (*sql.DB, bool)
 
+type ConnectorProvider func(dbName string) (*ha.Connector, bool)
+
 func (h *Handler) UseDB(dbName string) error {
 	slog.Debug("Received: UseDB", "dbname", dbName)
-	db, ok := h.provider(dbName)
+	db, ok := h.dbProvider(dbName)
 	if ok {
 		h.db = db
+	}
+	connector, ok := h.connectorProvider(dbName)
+	if ok {
+		h.connector = connector
 	}
 
 	return nil
@@ -131,6 +141,23 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 			}
 			os.Remove(dbfile + "-shm")
 			os.Remove(dbfile + "-wal")
+		}
+		return mysql.NewResult(nil), nil
+	}
+
+	if strings.HasPrefix(cleanQuery, "UNDO ") {
+		txCountStr := strings.TrimSpace(keepCaseQuery[5:])
+		txCountStr = strings.TrimSuffix(txCountStr, ";")
+		txCount, err := strconv.Atoi(txCountStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid txcount: %v", err)
+		}
+		if txCount <= 0 {
+			return nil, fmt.Errorf("txcount must be greater than 0")
+		}
+		err = h.connector.Undo(context.Background(), uint64(txCount))
+		if err != nil {
+			return nil, err
 		}
 		return mysql.NewResult(nil), nil
 	}
