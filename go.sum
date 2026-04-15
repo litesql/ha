@@ -95,8 +95,10 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
 github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
-github.com/litesql/go-ha v0.10.1 h1:XmV5RrmpGLyM+/NL5dtLdQzLAGkegpkR9+Rrf8yn+pw=
-github.com/litesql/go-ha v0.10.1/go.mod h1:krMx03VIl7CWqCuaovmfsMpHRvI9s5X2N9EYT5JyLGw=
+github.com/litesql/go-ha v0.10.3 h1:6Qc0FeRK6HzUcZ2bxTKYSQRWwm18GNsY5GaaC0ZpzvA=
+github.com/litesql/go-ha v0.10.3/go.mod h1:krMx03VIl7CWqCuaovmfsMpHRvI9s5X2N9EYT5JyLGw=
+github.com/litesql/go-ha v0.10.4 h1:cMMcc3/6N6ud2DRIvqxX2DCUJmybboqryKTdP4bi7fU=
+github.com/litesql/go-ha v0.10.4/go.mod h1:krMx03VIl7CWqCuaovmfsMpHRvI9s5X2N9EYT5JyLGw=
 github.com/litesql/go-sqlite-ha v0.10.0 h1:z5JH4opmBGw9ZzTqSNO32Z4X+BRu/DviUcpTPfLpusA=
 github.com/litesql/go-sqlite-ha v0.10.0/go.mod h1:qd9qvsEa8wyU/EM4KuGbABRNcUwmkp4pj4lhoFappyA=
 github.com/litesql/go-sqlite3 v1.14.43 h1:KOaoqFIdKfR8RpyTblx+X3TvGACUCbUhYXDV9qhoVY8=
@@ -148,8 +150,8 @@ github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2 h1:cLgCk5mwDG9lD
 github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2/go.mod h1:ktAJCA9lxrHHjVyVl2pKJFvzBnq2eZbb+CUOjBRPlXo=
 github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1 h1:A2bEfgSb7hLwR9mxDszgGKweF+xY9YoTDG+8RjdFjDE=
 github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1/go.mod h1:pxfz2oJfAuhwrb3/rcLqD//GS/5gRP4gD022iP3cEO0=
-github.com/pingcap/tidb/pkg/parser v0.0.0-20260415023248-f1434df8b00d h1:lAwbSP5w1HWWLbaSu7JdpNqGdnF1/MfJeF+orRyeZzs=
-github.com/pingcap/tidb/pkg/parser v0.0.0-20260415023248-f1434df8b00d/go.mod h1:zDLDsfNBU5+L6T4J9/OgWAHc/WZvMUjbpgHqQ/t3yKo=
+github.com/pingcap/tidb/pkg/parser v0.0.0-20260415032309-212ded5950d4 h1:Pb2eR25EENQpweHh/GQ/EF89UZU904DUSXrjW5LIvHc=
+github.com/pingcap/tidb/pkg/parser v0.0.0-20260415032309-212ded5950d4/go.mod h1:zDLDsfNBU5+L6T4J9/OgWAHc/WZvMUjbpgHqQ/t3yKo=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=

@@ -335,9 +335,9 @@ func run() error {
 	mux.HandleFunc("DELETE /databases/{id}", hahttp.DropDatabaseHandler())
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
-	mux.HandleFunc("POST /databases/{id}/undo/{txcount}", hahttp.UndoHandler)
+	mux.HandleFunc("POST /databases/{id}/undo/{param}", hahttp.UndoHandler)
 	mux.HandleFunc("POST /query", hahttp.QueryHandler)
-	mux.HandleFunc("POST /query/undo/{txcount}", hahttp.UndoHandler)
+	mux.HandleFunc("POST /query/undo/{param}", hahttp.UndoHandler)
 
 	mux.HandleFunc("GET /databases/{id}", hahttp.DownloadHandler)
 	mux.HandleFunc("GET /download", hahttp.DownloadHandler)

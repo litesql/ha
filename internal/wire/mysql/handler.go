@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/litesql/go-ha"
@@ -146,11 +147,19 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	}
 
 	if strings.HasPrefix(cleanQuery, "UNDO ") {
-		txCountStr := strings.TrimSpace(keepCaseQuery[5:])
-		txCountStr = strings.TrimSuffix(txCountStr, ";")
-		txCount, err := strconv.Atoi(txCountStr)
+		undoParam := strings.TrimSpace(keepCaseQuery[5:])
+		undoParam = strings.TrimSuffix(undoParam, ";")
+		txCount, err := strconv.Atoi(undoParam)
 		if err != nil {
-			return nil, fmt.Errorf("invalid txcount: %v", err)
+			duration, err := time.ParseDuration(undoParam)
+			if err != nil {
+				return nil, fmt.Errorf("invalid undo argument: %v", err)
+			}
+			if duration <= 0 {
+				return nil, fmt.Errorf("duration must be greater than 0")
+			}
+			h.connector.UndoByTime(context.Background(), duration)
+			return mysql.NewResult(nil), nil
 		}
 		if txCount <= 0 {
 			return nil, fmt.Errorf("txcount must be greater than 0")

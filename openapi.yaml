@@ -29,14 +29,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/QueryResponse"
-  /undo/{txcount}:
+  /undo/{param}:
     post:
       summary: Undo the last N transactions on the main database.
       operationId: undoMainDatabase
       tags:
         - Main Database
       parameters:
-        - name: txcount
+        - name: param
           in: path
           required: true
           schema:
@@ -161,7 +161,7 @@ paths:
       responses:
         '200':
           description: Snapshot file.
-  /databases/{id}/undo/{txcount}:
+  /databases/{id}/undo/{param}:
     post:
       summary: Undo the last N transactions on a specific database.
       operationId: undoDatabase
@@ -173,7 +173,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: txcount
+        - name: param
           in: path
           required: true
           schema:

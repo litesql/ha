@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	wire "github.com/jeroenrinzema/psql-wire"
@@ -224,19 +225,27 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 		}
 
 		if strings.HasPrefix(upper, "UNDO ") {
-			txCountStr := strings.TrimSpace(sql[5:])
-			txCountStr = strings.TrimSuffix(txCountStr, ";")
-			txCount, err := strconv.Atoi(txCountStr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid txcount: %v", err)
-			}
-			if txCount <= 0 {
-				return nil, fmt.Errorf("txcount must be greater than 0")
-			}
 			c, err := sqlite.Connector(dbID)
 			if err != nil {
 				return nil, fmt.Errorf("database %q not found", dbID)
 			}
+			undoParam := strings.TrimSpace(sql[5:])
+			undoParam = strings.TrimSuffix(undoParam, ";")
+			txCount, err := strconv.Atoi(undoParam)
+			if err != nil {
+				duration, err := time.ParseDuration(undoParam)
+				if err != nil {
+					return nil, fmt.Errorf("invalid undo argument: %v", err)
+				}
+				if duration <= 0 {
+					return nil, fmt.Errorf("duration must be greater than 0")
+				}
+				c.UndoByTime(ctx, duration)
+			}
+			if txCount <= 0 {
+				return nil, fmt.Errorf("txcount must be greater than 0")
+			}
+
 			err = c.Undo(ctx, uint64(txCount))
 			if err != nil {
 				return nil, fmt.Errorf("undo failed: %v", err)

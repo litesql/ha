@@ -67,7 +67,7 @@ Special HA Client commands:
 |DROP DATABASE id; | Drop a database |
 |SET DATABASE TO id; | Send commands to a specific database |
 |UNSET DATABASE; | Use default database |
-|UNDO n; | Undo the last n transactions |
+|UNDO n; | Undo the last n transactions. Where n is a number or a time duration |
 |EXIT; | Quit client (ctrl+d) |
 
 

@@ -166,10 +166,23 @@ func UndoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	txCountStr := r.PathValue("txcount")
-	txCount, err := strconv.Atoi(txCountStr)
+	param := r.PathValue("param")
+	txCount, err := strconv.Atoi(param)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid txcount: %v", err), http.StatusBadRequest)
+		duration, err := time.ParseDuration(param)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid param: %v", err), http.StatusBadRequest)
+			return
+		}
+		if duration <= 0 {
+			http.Error(w, "duration must be greater than 0", http.StatusBadRequest)
+			return
+		}
+		err = c.UndoByTime(r.Context(), duration)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 	if txCount <= 0 {
