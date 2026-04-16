@@ -182,7 +182,7 @@ type _github_com_litesql_go_ha_ConnHooksProvider struct {
 	IValue         interface{}
 	WDisableHooks  func(a0 *sql.Conn) error
 	WEnableHooks   func(a0 *sql.Conn) error
-	WRegisterHooks func(a0 driver.Conn) (driver.Conn, error)
+	WRegisterHooks func(a0 driver.Conn, a1 *ha.Connector) (driver.Conn, error)
 }
 
 func (W _github_com_litesql_go_ha_ConnHooksProvider) DisableHooks(a0 *sql.Conn) error {
@@ -191,8 +191,8 @@ func (W _github_com_litesql_go_ha_ConnHooksProvider) DisableHooks(a0 *sql.Conn) 
 func (W _github_com_litesql_go_ha_ConnHooksProvider) EnableHooks(a0 *sql.Conn) error {
 	return W.WEnableHooks(a0)
 }
-func (W _github_com_litesql_go_ha_ConnHooksProvider) RegisterHooks(a0 driver.Conn) (driver.Conn, error) {
-	return W.WRegisterHooks(a0)
+func (W _github_com_litesql_go_ha_ConnHooksProvider) RegisterHooks(a0 driver.Conn, a1 *ha.Connector) (driver.Conn, error) {
+	return W.WRegisterHooks(a0, a1)
 }
 
 // _github_com_litesql_go_ha_DBSnapshotter is an interface wrapper for DBSnapshotter type
