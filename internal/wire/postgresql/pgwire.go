@@ -21,6 +21,7 @@ import (
 	"github.com/jeroenrinzema/psql-wire/codes"
 	psqlerr "github.com/jeroenrinzema/psql-wire/errors"
 	"github.com/litesql/go-ha"
+	haconnect "github.com/litesql/go-ha/connect"
 
 	"github.com/litesql/ha/internal/sqlite"
 )
@@ -240,7 +241,13 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 				if duration <= 0 {
 					return nil, fmt.Errorf("duration must be greater than 0")
 				}
-				c.UndoByTime(ctx, duration)
+				err = c.UndoByTime(ctx, duration)
+				if err != nil {
+					return nil, fmt.Errorf("undo failed: %v", err)
+				}
+				return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+					return writer.Complete(fmt.Sprintf("undone transactions in the last %s", duration))
+				})), nil
 			}
 			if seq < 0 {
 				return nil, fmt.Errorf("sequence must be a non-negative integer")
@@ -251,8 +258,82 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 				return nil, fmt.Errorf("undo failed: %v", err)
 			}
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+				if seq == 0 {
+					return writer.Complete("undone the last transaction")
+				}
 				return writer.Complete(fmt.Sprintf("undone transactions until sequence %d", seq))
 			})), nil
+		}
+
+		if strings.HasPrefix(upper, "HISTORY ") {
+			c, err := sqlite.Connector(dbID)
+			if err != nil {
+				return nil, fmt.Errorf("database %q not found", dbID)
+			}
+			param := strings.TrimSpace(sql[8:])
+			param = strings.TrimSuffix(param, ";")
+			seq, err := strconv.Atoi(param)
+			var items []haconnect.HistoryItem
+			if err != nil {
+				duration, err := time.ParseDuration(param)
+				if err != nil {
+					return nil, fmt.Errorf("invalid undo argument: %v", err)
+				}
+				if duration <= 0 {
+					return nil, fmt.Errorf("duration must be greater than 0")
+				}
+				items, err = c.HistoryByTime(ctx, duration)
+				if err != nil {
+					return nil, fmt.Errorf("history retrieval failed: %v", err)
+				}
+			} else {
+				if seq < 0 {
+					return nil, fmt.Errorf("sequence must be a non-negative integer")
+				}
+
+				items, err = c.HistoryBySeq(ctx, uint64(seq))
+				if err != nil {
+					return nil, fmt.Errorf("history retrieval failed: %v", err)
+				}
+			}
+			columns := []wire.Column{
+				{
+					Table: 0,
+					Name:  "seq",
+					Oid:   pgtype.Int8OID,
+					Width: columnWidth,
+				},
+				{
+					Table: 0,
+					Name:  "sql",
+					Oid:   pgtype.TextOID,
+					Width: columnWidth,
+				},
+				{
+					Table: 0,
+					Name:  "timestamp",
+					Oid:   pgtype.TimestamptzOID,
+					Width: columnWidth,
+				},
+			}
+			handle := func(_ context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+				for _, row := range items {
+					sqls := strings.Join(row.SQL, ";\n")
+					timestamp := time.Unix(0, row.Timestamp).Format(time.RFC3339Nano)
+					err := writer.Row([]any{row.Seq, sqls, timestamp})
+					if err != nil {
+						slog.ErrorContext(ctx, "pg-wire: write row", "error", err)
+						return err
+					}
+				}
+				err := writer.Complete(fmt.Sprintf("SELECT %d", len(items)))
+				if err != nil {
+					slog.ErrorContext(ctx, "pg-wire: write history data", "error", err)
+					return err
+				}
+				return nil
+			}
+			return wire.Prepared(wire.NewStatement(handle, wire.WithColumns(columns))), nil
 		}
 
 		db, err := sqlite.DB(dbID)

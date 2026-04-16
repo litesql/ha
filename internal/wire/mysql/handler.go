@@ -15,6 +15,8 @@ import (
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/litesql/go-ha"
+	haconnect "github.com/litesql/go-ha/connect"
+
 	"github.com/litesql/ha/internal/sqlite"
 )
 
@@ -158,7 +160,10 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 			if duration <= 0 {
 				return nil, fmt.Errorf("duration must be greater than 0")
 			}
-			h.connector.UndoByTime(context.Background(), duration)
+			err = h.connector.UndoByTime(context.Background(), duration)
+			if err != nil {
+				return nil, fmt.Errorf("undo failed: %v", err)
+			}
 			return mysql.NewResult(nil), nil
 		}
 		if seq < 0 {
@@ -169,6 +174,44 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 			return nil, err
 		}
 		return mysql.NewResult(nil), nil
+	}
+
+	if strings.HasPrefix(cleanQuery, "HISTORY ") {
+		historyParam := strings.TrimSpace(keepCaseQuery[8:])
+		historyParam = strings.TrimSuffix(historyParam, ";")
+		var items []haconnect.HistoryItem
+		seq, err := strconv.Atoi(historyParam)
+		if err != nil {
+			duration, err := time.ParseDuration(historyParam)
+			if err != nil {
+				return nil, fmt.Errorf("invalid history argument: %v", err)
+			}
+			if duration <= 0 {
+				return nil, fmt.Errorf("duration must be greater than 0")
+			}
+			items, err = h.connector.HistoryByTime(context.Background(), duration)
+			if err != nil {
+				return nil, fmt.Errorf("history retrieval failed: %v", err)
+			}
+		} else {
+			if seq < 0 {
+				return nil, fmt.Errorf("sequence must be a non-negative integer")
+			}
+			items, err = h.connector.HistoryBySeq(context.Background(), uint64(seq))
+			if err != nil {
+				return nil, fmt.Errorf("history retrieval failed: %v", err)
+			}
+		}
+		vals := make([][]any, 0, len(items))
+		for _, item := range items {
+			sqls := strings.Join(item.SQL, ";\n")
+			vals = append(vals, []any{item.Seq, sqls, time.Unix(0, item.Timestamp).Format(time.RFC3339Nano)})
+		}
+		resultSet, err := mysql.BuildSimpleResultset([]string{"Sequence", "SQL", "Timestamp"}, vals, false)
+		if err != nil {
+			return nil, err
+		}
+		return mysql.NewResult(resultSet), nil
 	}
 
 	if isSelect(cleanQuery) {

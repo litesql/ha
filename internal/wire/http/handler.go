@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/litesql/go-ha"
+	haconnect "github.com/litesql/go-ha/connect"
+
 	"github.com/litesql/ha/internal/sqlite"
 )
 
@@ -194,6 +196,50 @@ func UndoHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func HistoryHandler(w http.ResponseWriter, r *http.Request) {
+	dbID := r.PathValue("id")
+	c, err := sqlite.Connector(dbID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	param := r.PathValue("param")
+	var items []haconnect.HistoryItem
+	seq, err := strconv.Atoi(param)
+	if err != nil {
+		duration, err := time.ParseDuration(param)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid param: %v", err), http.StatusBadRequest)
+			return
+		}
+		if duration <= 0 {
+			http.Error(w, "duration must be greater than 0", http.StatusBadRequest)
+			return
+		}
+		items, err = c.HistoryByTime(r.Context(), duration)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("history retrieval failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+	} else {
+		if seq < 0 {
+			http.Error(w, "sequence must be a non-negative integer", http.StatusBadRequest)
+			return
+		}
+		items, err = c.HistoryBySeq(r.Context(), uint64(seq))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("history retrieval failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"history": items,
+	})
 }
 
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {

@@ -45,6 +45,36 @@ paths:
       responses:
         '200':
           description: Undo successful.
+  /history/{param}:
+    get:
+      summary: Get the history of the last N transactions from stream sequence on the main database.
+      operationId: historyMainDatabase
+      tags:
+        - Main Database
+      parameters:
+        - name: param
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: History retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    sequence:
+                      type: integer
+                    timestamp:
+                      type: string
+                      format: date-time
+                    sql:
+                      type: string
   /databases:
     get:
       summary: List all databases.
@@ -182,6 +212,41 @@ paths:
       responses:
         '200':
           description: Undo successful.
+  /databases/{id}/history/{param}:
+    get:
+      summary: Get the history of the last N transactions from stream sequence on a specific database.
+      operationId: historyDatabase
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: param
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: History retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    sequence:
+                      type: integer
+                    timestamp:
+                      type: string
+                      format: date-time
+                    sql:
+                      type: string
   /snapshot:
     post:
       summary: Take a snapshot of the main database.
