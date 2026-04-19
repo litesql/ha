@@ -6,12 +6,12 @@ require (
 	connectrpc.com/connect v1.19.1
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-mysql-org/go-mysql v1.14.0
-	github.com/jackc/pgx/v5 v5.9.1
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jeroenrinzema/psql-wire v0.19.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/go-ha v0.10.10
-	github.com/litesql/go-sqlite-ha v0.10.1
-	github.com/litesql/go-sqlite3-ha v0.10.1
+	github.com/litesql/go-sqlite-ha v0.10.10
+	github.com/litesql/go-sqlite3-ha v0.10.10
 	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/nats-io/nats.go v1.51.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
@@ -63,7 +63,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2 // indirect
 	github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20260418072757-ce92298d1124 // indirect
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20260419050009-a10a43ada5ab // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rqlite/sql v0.0.0-20260224021119-1b2524a41372 // indirect
