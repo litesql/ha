@@ -10,8 +10,8 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.19.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/go-ha v0.11.0
-	github.com/litesql/go-sqlite-ha v0.10.10
-	github.com/litesql/go-sqlite3-ha v0.10.10
+	github.com/litesql/go-sqlite-ha v0.11.0
+	github.com/litesql/go-sqlite3-ha v0.11.0
 	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/nats-io/nats.go v1.51.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
