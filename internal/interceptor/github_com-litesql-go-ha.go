@@ -204,12 +204,16 @@ func (W _github_com_litesql_go_ha_ConnHooksProvider) RegisterHooks(a0 driver.Con
 // _github_com_litesql_go_ha_DBSnapshotter is an interface wrapper for DBSnapshotter type
 type _github_com_litesql_go_ha_DBSnapshotter struct {
 	IValue          interface{}
+	WDB             func() *sql.DB
 	WLatestSnapshot func(ctx context.Context) (sequence uint64, reader io.ReadCloser, err error)
 	WSetDB          func(a0 *sql.DB)
 	WStart          func()
 	WTakeSnapshot   func(ctx context.Context) (sequence uint64, err error)
 }
 
+func (W _github_com_litesql_go_ha_DBSnapshotter) DB() *sql.DB {
+	return W.WDB()
+}
 func (W _github_com_litesql_go_ha_DBSnapshotter) LatestSnapshot(ctx context.Context) (sequence uint64, reader io.ReadCloser, err error) {
 	return W.WLatestSnapshot(ctx)
 }
@@ -268,6 +272,7 @@ func (W _github_com_litesql_go_ha_SequenceProvider) LatestSeq() uint64 {
 // _github_com_litesql_go_ha_Subscriber is an interface wrapper for Subscriber type
 type _github_com_litesql_go_ha_Subscriber struct {
 	IValue          interface{}
+	WDB             func() *sql.DB
 	WDeliveredInfo  func(ctx context.Context, name string) (any, error)
 	WHistoryBySeq   func(ctx context.Context, startSeq uint64) ([]grpc.HistoryItem, error)
 	WHistoryByTime  func(ctx context.Context, duration time.Duration) ([]grpc.HistoryItem, error)
@@ -279,6 +284,9 @@ type _github_com_litesql_go_ha_Subscriber struct {
 	WUndoByTime     func(ctx context.Context, duration time.Duration) error
 }
 
+func (W _github_com_litesql_go_ha_Subscriber) DB() *sql.DB {
+	return W.WDB()
+}
 func (W _github_com_litesql_go_ha_Subscriber) DeliveredInfo(ctx context.Context, name string) (any, error) {
 	return W.WDeliveredInfo(ctx, name)
 }
