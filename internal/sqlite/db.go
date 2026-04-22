@@ -130,14 +130,18 @@ func Load(ctx context.Context, dsn string, memDB bool, fromLatestSnapshot bool, 
 		}
 	}
 
+	if len(dbs) == 0 {
+		slog.Debug("waiting for the leader...")
+		<-connector.LeaderProvider().Ready()
+	}
+
 	db := sql.OpenDB(connector)
 	db.SetConnMaxIdleTime(0)
 	db.SetConnMaxLifetime(0)
 	db.SetMaxOpenConns(maxConns)
 	db.SetMaxIdleConns(maxConns)
-	if connector.Subscriber() != nil {
-		connector.Subscriber().SetDB(db)
-	}
+	connector.Subscriber().SetDB(db)
+
 	if connector.Snapshotter() != nil {
 		connector.Snapshotter().SetDB(db)
 	}

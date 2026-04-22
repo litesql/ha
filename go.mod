@@ -3,13 +3,13 @@ module github.com/litesql/ha
 go 1.26
 
 require (
-	connectrpc.com/connect v1.19.1
+	connectrpc.com/connect v1.19.2
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-mysql-org/go-mysql v1.14.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jeroenrinzema/psql-wire v0.19.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
-	github.com/litesql/go-ha v0.10.10
+	github.com/litesql/go-ha v0.11.0
 	github.com/litesql/go-sqlite-ha v0.10.10
 	github.com/litesql/go-sqlite3-ha v0.10.10
 	github.com/modelcontextprotocol/go-sdk v1.5.0
@@ -63,7 +63,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2 // indirect
 	github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20260419050009-a10a43ada5ab // indirect
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20260422105015-55811893aac3 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rqlite/sql v0.0.0-20260224021119-1b2524a41372 // indirect
@@ -84,7 +84,7 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260420184626-e10c466a9529 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	modernc.org/libc v1.72.0 // indirect
