@@ -88,7 +88,6 @@ func init() {
 		"WithGrpcToken":                  reflect.ValueOf(ha.WithGrpcToken),
 		"WithLeaderElectionLocalTarget":  reflect.ValueOf(ha.WithLeaderElectionLocalTarget),
 		"WithLeaderProvider":             reflect.ValueOf(ha.WithLeaderProvider),
-		"WithLocalHistoryMaxAge":         reflect.ValueOf(ha.WithLocalHistoryMaxAge),
 		"WithName":                       reflect.ValueOf(ha.WithName),
 		"WithNatsOptions":                reflect.ValueOf(ha.WithNatsOptions),
 		"WithPublisherTimeout":           reflect.ValueOf(ha.WithPublisherTimeout),
@@ -280,7 +279,7 @@ type _github_com_litesql_go_ha_Subscriber struct {
 	WRemoveConsumer func(ctx context.Context, name string) error
 	WSetDB          func(a0 *sql.DB)
 	WStart          func() error
-	WUndoBySeq      func(ctx context.Context, startSeq uint64) error
+	WUndoBySeq      func(ctx context.Context, startSeq uint64, filterType grpc.UndoFilter) error
 	WUndoByTime     func(ctx context.Context, duration time.Duration) error
 }
 
@@ -308,8 +307,8 @@ func (W _github_com_litesql_go_ha_Subscriber) SetDB(a0 *sql.DB) {
 func (W _github_com_litesql_go_ha_Subscriber) Start() error {
 	return W.WStart()
 }
-func (W _github_com_litesql_go_ha_Subscriber) UndoBySeq(ctx context.Context, startSeq uint64) error {
-	return W.WUndoBySeq(ctx, startSeq)
+func (W _github_com_litesql_go_ha_Subscriber) UndoBySeq(ctx context.Context, startSeq uint64, filterType grpc.UndoFilter) error {
+	return W.WUndoBySeq(ctx, startSeq, filterType)
 }
 func (W _github_com_litesql_go_ha_Subscriber) UndoByTime(ctx context.Context, duration time.Duration) error {
 	return W.WUndoByTime(ctx, duration)

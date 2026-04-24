@@ -335,10 +335,14 @@ func run() error {
 	mux.HandleFunc("DELETE /databases/{id}", hahttp.DropDatabaseHandler())
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
-	mux.HandleFunc("POST /databases/{id}/undo/{param}", hahttp.UndoHandler)
+	mux.HandleFunc("POST /databases/{id}/undo/{param}", hahttp.UndoHandler(haconnect.UndoFilterNone))
+	mux.HandleFunc("POST /databases/{id}/undoe/{param}", hahttp.UndoHandler(haconnect.UndoFilterEntity))
+	mux.HandleFunc("POST /databases/{id}/undot/{param}", hahttp.UndoHandler(haconnect.UndoFilterTransaction))
 	mux.HandleFunc("GET /databases/{id}/history/{param}", hahttp.HistoryHandler)
 	mux.HandleFunc("POST /query", hahttp.QueryHandler)
-	mux.HandleFunc("POST /undo/{param}", hahttp.UndoHandler)
+	mux.HandleFunc("POST /undo/{param}", hahttp.UndoHandler(haconnect.UndoFilterNone))
+	mux.HandleFunc("POST /undoe/{param}", hahttp.UndoHandler(haconnect.UndoFilterEntity))
+	mux.HandleFunc("POST /undot/{param}", hahttp.UndoHandler(haconnect.UndoFilterTransaction))
 	mux.HandleFunc("GET /history/{param}", hahttp.HistoryHandler)
 
 	mux.HandleFunc("GET /databases/{id}", hahttp.DownloadHandler)

@@ -46,7 +46,8 @@ Highly available SQLite cluster powered by embedded NATS JetStream server.
   - [6.2 Replication limitations](#6.2)
   - [6.3 Conflict resolution](#6.3)
 - [7. Cross-shard Queries](#7)
-- [8. Configuration](#8)
+- [8. Transaction Operations](#8)
+- [9. Configuration](#9)
 
 
 ## 1. Installation<a id='1'></a>
@@ -436,7 +437,56 @@ In this example, `db=.*` runs the query against all available database IDs. To t
   - `SHOW DATABASES;`
 - Limit results to specific shards by adjusting the regex.
 
-## 8. Configuration<a id='8'></a>
+## 8. Transaction Operations<a id='8'></a>
+
+HA provides advanced transaction history and undo capabilities, allowing you to retrieve and revert changes made to the database.
+
+### Transaction History
+
+Use the `HISTORY` command to retrieve all transactions from a specific sequence point to the present:
+
+```sql
+HISTORY 100;
+```
+
+This retrieves all transactions starting from sequence number 100. You can also use time durations:
+
+```sql
+HISTORY '5m';
+```
+
+This retrieves transactions from the last 5 minutes.
+
+### Undo Operations
+
+HA supports several undo commands to revert transactions:
+
+- `UNDO n`: Revert all transactions from stream sequence `n` through the present, effectively rolling back changes made during this period.
+
+- `UNDOE n`: Roll back all modifications on entities that were affected by transactions occurring from stream sequence `n` to the present, while preserving other changes.
+
+- `UNDOT n`: Revert all transactions on entities that were impacted by the transaction at stream sequence `n` through the present. Only transactions that modified the same entities are affected.
+
+**Parameters:**
+- `n`: Can be specified as a numeric stream sequence number or as a relative time duration (e.g., `'5m'`, `'1h'`, `'30s'`)
+
+**Examples:**
+
+```sql
+UNDO 150;        -- Revert all transactions from sequence 150 onwards
+UNDO '10m';      -- Revert all transactions from the last 10 minutes
+UNDOE 200;       -- Roll back entity modifications from sequence 200
+UNDOT 250;       -- Revert transactions affecting entities from sequence 250
+```
+
+**Note:** These operations work on committed transactions and can be used for point-in-time recovery or correcting erroneous changes.
+
+
+### Limitations 
+
+DDL commands (such as CREATE, ALTER, and DROP) are not affected by undo operations, as they are designed to preserve database schema integrity and avoid potential inconsistencies.
+
+## 9. Configuration<a id='9'></a>
 
 | Flag | Environment Variable | Default | Description |
 |------|----------------------|---------|-------------|

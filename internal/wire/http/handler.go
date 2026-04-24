@@ -160,41 +160,47 @@ func QueryHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func UndoHandler(w http.ResponseWriter, r *http.Request) {
-	dbID := r.PathValue("id")
-	c, err := sqlite.Connector(dbID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	param := r.PathValue("param")
-	seq, err := strconv.Atoi(param)
-	if err != nil {
-		duration, err := time.ParseDuration(param)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid param: %v", err), http.StatusBadRequest)
-			return
-		}
-		if duration <= 0 {
-			http.Error(w, "duration must be greater than 0", http.StatusBadRequest)
-			return
-		}
-		err = c.UndoByTime(r.Context(), duration)
+func UndoHandler(undoType haconnect.UndoFilter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		dbID := r.PathValue("id")
+		c, err := sqlite.Connector(dbID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		return
-	}
-	if seq < 0 {
-		http.Error(w, "sequence must be a non-negative integer", http.StatusBadRequest)
-		return
-	}
-	err = c.UndoBySeq(r.Context(), uint64(seq))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+
+		param := r.PathValue("param")
+		seq, err := strconv.Atoi(param)
+		if err != nil {
+			if undoType != haconnect.UndoFilterNone {
+				http.Error(w, "invalid sequence number for undo", http.StatusBadRequest)
+				return
+			}
+			duration, err := time.ParseDuration(param)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("invalid param: %v", err), http.StatusBadRequest)
+				return
+			}
+			if duration <= 0 {
+				http.Error(w, "duration must be greater than 0", http.StatusBadRequest)
+				return
+			}
+			err = c.UndoByTime(r.Context(), duration)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			return
+		}
+		if seq < 0 {
+			http.Error(w, "sequence must be a non-negative integer", http.StatusBadRequest)
+			return
+		}
+		err = c.UndoBySeq(r.Context(), uint64(seq), undoType)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
 

@@ -113,6 +113,7 @@ func (s *Server) terminateConn(ctx context.Context) error {
 }
 
 var reSetDatabase = regexp.MustCompile(`(?i)^SET\s+DATABASE\s*(=|TO)\s*([^;\s]+)`)
+var reUndo = regexp.MustCompile(`(?i)^UNDO(\s|E|T)\s*([^;\s]+)`)
 
 func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 	return func(ctx context.Context, sql string) (wire.PreparedStatements, error) {
@@ -225,15 +226,32 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 			})), nil
 		}
 
-		if strings.HasPrefix(upper, "UNDO ") {
+		if strings.HasPrefix(upper, "UNDO") {
 			c, err := sqlite.Connector(dbID)
 			if err != nil {
 				return nil, fmt.Errorf("database %q not found", dbID)
 			}
-			undoParam := strings.TrimSpace(sql[5:])
-			undoParam = strings.TrimSuffix(undoParam, ";")
+
+			reUndoMatch := reUndo.FindStringSubmatch(sql)
+			if len(reUndoMatch) != 3 {
+				return nil, fmt.Errorf("invalid undo syntax")
+			}
+			var undoType haconnect.UndoFilter
+			switch strings.TrimSpace(reUndoMatch[1]) {
+			case "E", "e":
+				undoType = haconnect.UndoFilterEntity
+			case "T", "t":
+				undoType = haconnect.UndoFilterNone
+			default:
+				undoType = haconnect.UndoFilterNone
+			}
+
+			undoParam := strings.TrimSpace(reUndoMatch[2])
 			seq, err := strconv.Atoi(undoParam)
 			if err != nil {
+				if undoType != haconnect.UndoFilterNone {
+					return nil, fmt.Errorf("invalid undo syntax: cannot specify undo type without a valid sequence or duration")
+				}
 				duration, err := time.ParseDuration(undoParam)
 				if err != nil {
 					return nil, fmt.Errorf("invalid undo argument: %v", err)
@@ -253,7 +271,7 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 				return nil, fmt.Errorf("sequence must be a non-negative integer")
 			}
 
-			err = c.UndoBySeq(ctx, uint64(seq))
+			err = c.UndoBySeq(ctx, uint64(seq), undoType)
 			if err != nil {
 				return nil, fmt.Errorf("undo failed: %v", err)
 			}

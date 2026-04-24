@@ -45,6 +45,38 @@ paths:
       responses:
         '200':
           description: Undo successful.
+  /undoe/{param}:
+    post:
+      summary: Undo entity changes from stream sequence on the main database.
+      operationId: undoeMainDatabase
+      tags:
+        - Main Database
+      parameters:
+        - name: param
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Undo successful.
+  /undot/{param}:
+    post:
+      summary: Undo transactions from stream sequence on the main database.
+      operationId: undotMainDatabase
+      tags:
+        - Main Database
+      parameters:
+        - name: param
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Undo successful.
   /history/{param}:
     get:
       summary: Get the history of the last N transactions from stream sequence on the main database.
@@ -193,8 +225,50 @@ paths:
           description: Snapshot file.
   /databases/{id}/undo/{param}:
     post:
-      summary: Undo the last N transactions from stream sequence on a specific database.
+      summary: Undo transactions from stream sequence on a specific database.
       operationId: undoDatabase
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: param
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Undo successful.
+  /databases/{id}/undoe/{param}: 
+    post:
+      summary: Undo entity changes from stream sequence on a specific database.
+      operationId: undoeDatabase
+      tags:
+        - All Databases
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: param
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Undo successful.
+  /databases/{id}/undot/{param}: 
+    post:
+      summary: Undo transactions from stream sequence on a specific database.
+      operationId: undotDatabase
       tags:
         - All Databases
       parameters:

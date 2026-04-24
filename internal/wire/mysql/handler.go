@@ -48,12 +48,13 @@ func (h *Handler) UseDB(dbName string) error {
 }
 
 var (
-	commentsRE = regexp.MustCompile(`(?s)//.*?\\n|/\\*.*?\\*/`)
+	reComments = regexp.MustCompile(`(?s)//.*?\\n|/\\*.*?\\*/`)
+	reUndo     = regexp.MustCompile(`(?i)^UNDO(\s|E|T)\s*([^;\s]+)`)
 )
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	slog.Debug("Received: Query", "query", query)
-	cleanQuery := commentsRE.ReplaceAllString(query, "")
+	cleanQuery := reComments.ReplaceAllString(query, "")
 	keepCaseQuery := strings.TrimSpace(cleanQuery)
 	cleanQuery = strings.ToUpper(keepCaseQuery)
 	// These queries are implemented for minimal support for MySQL Shell
@@ -148,11 +149,28 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return mysql.NewResult(nil), nil
 	}
 
-	if strings.HasPrefix(cleanQuery, "UNDO ") {
-		undoParam := strings.TrimSpace(keepCaseQuery[5:])
+	if strings.HasPrefix(cleanQuery, "UNDO") {
+		reUndoMatch := reUndo.FindStringSubmatch(keepCaseQuery)
+		if len(reUndoMatch) != 3 {
+			return nil, fmt.Errorf("invalid undo syntax")
+		}
+		var undoType haconnect.UndoFilter
+		switch strings.TrimSpace(reUndoMatch[1]) {
+		case "E", "e":
+			undoType = haconnect.UndoFilterEntity
+		case "T", "t":
+			undoType = haconnect.UndoFilterNone
+		default:
+			undoType = haconnect.UndoFilterNone
+		}
+
+		undoParam := strings.TrimSpace(reUndoMatch[2])
 		undoParam = strings.TrimSuffix(undoParam, ";")
 		seq, err := strconv.Atoi(undoParam)
 		if err != nil {
+			if undoType != haconnect.UndoFilterNone {
+				return nil, fmt.Errorf("invalid undo syntax: cannot specify undo type without a valid sequence or duration")
+			}
 			duration, err := time.ParseDuration(undoParam)
 			if err != nil {
 				return nil, fmt.Errorf("invalid undo argument: %v", err)
@@ -169,7 +187,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		if seq < 0 {
 			return nil, fmt.Errorf("sequence must be a non-negative integer")
 		}
-		err = h.connector.UndoBySeq(context.Background(), uint64(seq))
+		err = h.connector.UndoBySeq(context.Background(), uint64(seq), undoType)
 		if err != nil {
 			return nil, err
 		}
