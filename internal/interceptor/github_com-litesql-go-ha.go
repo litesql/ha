@@ -279,8 +279,8 @@ type _github_com_litesql_go_ha_Subscriber struct {
 	WRemoveConsumer func(ctx context.Context, name string) error
 	WSetDB          func(a0 *sql.DB)
 	WStart          func() error
-	WUndoBySeq      func(ctx context.Context, startSeq uint64, filterType grpc.UndoFilter) error
-	WUndoByTime     func(ctx context.Context, duration time.Duration) error
+	WUndoBySeq      func(ctx context.Context, startSeq uint64, filterType grpc.UndoFilter, filterEntities map[string][]int64) error
+	WUndoByTime     func(ctx context.Context, duration time.Duration, filterType grpc.UndoFilter, filterEntities map[string][]int64) error
 }
 
 func (W _github_com_litesql_go_ha_Subscriber) DB() *sql.DB {
@@ -307,11 +307,11 @@ func (W _github_com_litesql_go_ha_Subscriber) SetDB(a0 *sql.DB) {
 func (W _github_com_litesql_go_ha_Subscriber) Start() error {
 	return W.WStart()
 }
-func (W _github_com_litesql_go_ha_Subscriber) UndoBySeq(ctx context.Context, startSeq uint64, filterType grpc.UndoFilter) error {
-	return W.WUndoBySeq(ctx, startSeq, filterType)
+func (W _github_com_litesql_go_ha_Subscriber) UndoBySeq(ctx context.Context, startSeq uint64, filterType grpc.UndoFilter, filterEntities map[string][]int64) error {
+	return W.WUndoBySeq(ctx, startSeq, filterType, filterEntities)
 }
-func (W _github_com_litesql_go_ha_Subscriber) UndoByTime(ctx context.Context, duration time.Duration) error {
-	return W.WUndoByTime(ctx, duration)
+func (W _github_com_litesql_go_ha_Subscriber) UndoByTime(ctx context.Context, duration time.Duration, filterType grpc.UndoFilter, filterEntities map[string][]int64) error {
+	return W.WUndoByTime(ctx, duration, filterType, filterEntities)
 }
 
 // _github_com_litesql_go_ha_TxSeqTracker is an interface wrapper for TxSeqTracker type

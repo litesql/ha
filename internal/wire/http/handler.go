@@ -185,7 +185,7 @@ func UndoHandler(undoType haconnect.UndoFilter) http.HandlerFunc {
 				http.Error(w, "duration must be greater than 0", http.StatusBadRequest)
 				return
 			}
-			err = c.UndoByTime(r.Context(), duration)
+			err = c.UndoByTime(r.Context(), duration, haconnect.UndoFilterNone, nil)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -196,7 +196,7 @@ func UndoHandler(undoType haconnect.UndoFilter) http.HandlerFunc {
 			http.Error(w, "sequence must be a non-negative integer", http.StatusBadRequest)
 			return
 		}
-		err = c.UndoBySeq(r.Context(), uint64(seq), undoType)
+		err = c.UndoBySeq(r.Context(), uint64(seq), undoType, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -259,7 +259,7 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 				if duration <= 0 {
 					return nil, fmt.Errorf("duration must be greater than 0")
 				}
-				err = c.UndoByTime(ctx, duration)
+				err = c.UndoByTime(ctx, duration, haconnect.UndoFilterNone, nil)
 				if err != nil {
 					return nil, fmt.Errorf("undo failed: %v", err)
 				}
@@ -271,7 +271,7 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 				return nil, fmt.Errorf("sequence must be a non-negative integer")
 			}
 
-			err = c.UndoBySeq(ctx, uint64(seq), undoType)
+			err = c.UndoBySeq(ctx, uint64(seq), undoType, nil)
 			if err != nil {
 				return nil, fmt.Errorf("undo failed: %v", err)
 			}

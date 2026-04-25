@@ -178,7 +178,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 			if duration <= 0 {
 				return nil, fmt.Errorf("duration must be greater than 0")
 			}
-			err = h.connector.UndoByTime(context.Background(), duration)
+			err = h.connector.UndoByTime(context.Background(), duration, haconnect.UndoFilterNone, nil)
 			if err != nil {
 				return nil, fmt.Errorf("undo failed: %v", err)
 			}
@@ -187,7 +187,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		if seq < 0 {
 			return nil, fmt.Errorf("sequence must be a non-negative integer")
 		}
-		err = h.connector.UndoBySeq(context.Background(), uint64(seq), undoType)
+		err = h.connector.UndoBySeq(context.Background(), uint64(seq), undoType, nil)
 		if err != nil {
 			return nil, err
 		}
