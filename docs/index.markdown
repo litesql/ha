@@ -88,7 +88,7 @@ docker compose up
 |node3     | 8082 | 5434    | 4224 | 3308       |
 
 
-### 1.3 Install using Helm<a id='1.2'></a>
+### 1.3 Install using Helm<a id='1.3'></a>
 
 - Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
 
@@ -494,6 +494,7 @@ DDL commands (such as CREATE, ALTER, and DROP) are not affected by undo operatio
 | -p, --port | HA_PORT        | 8080    | HTTP API tcp port |
 | --token    | HA_TOKEN       |         | API auth token    |
 | -m, --memory | HA_MEMORY    | false   | Store database in memory |
+| --create-db-dir | HA_CREATE_DB_DIR |  | Path to a directory where new databases are created |
 | -i, --interceptor | HA_INTERCEPTOR | | Path to a Go script for customizing replication behavior |
 | -r, --remote | HA_REMOTE    |         | Address of a remote HA server to connect to and interact with (e.g. to run queries) instead of starting a server | 
 | --log-level | HA_LOG_LEVEL  | info    | Log level (info, warn, error or debug) |

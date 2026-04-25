@@ -49,17 +49,39 @@ go install github.com/litesql/ha@latest
 
 ### Docker
 
-Build the Docker image:
+Using a docker image:
 
 ```bash
-make docker-image
+docker run --name node1 \
+-e HA_CREATE_DB_DIR=/data
+-p 5432:5432 -p 8080:8080 -p 4222:4222 \
+ghcr.io/litesql/ha:latest
 ```
 
-Or use the development image:
+- Set up a volume at /data to store the NATS streams state and database files.
 
-```bash
-make docker-image-dev
+### Deploy on Kubernetes using Helm
+
+- Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
+
+```sh
+helm repo add litesql https://litesql.github.io/helm-charts
 ```
+
+- Update the chart repository:
+
+```sh
+helm repo update
+```
+
+- Deploy ha to kubernetes:
+
+```sh
+helm install ha litesql/ha
+```
+
+- Visit [litesql helm charts repository](https://litesql.github.io/helm-charts) to customize the installation;
+
 
 ## Quick Start
 
@@ -74,7 +96,7 @@ This starts:
 - Embedded NATS server on port 4222
 - MySQL Wire Protocol server on port 3306
 - PostgreSQL Wire Protocol server on port 5432
-- HTTP API server on port 8080
+- HTTP/gRPC API server on port 8080
 
 ### 2. Start a Second HA Instance
 
@@ -86,7 +108,7 @@ ha -n node2 --nats-port 0 -p 8081 --pg-port 5433 --mysql-port 3307 --replication
 This starts:
 - PostgreSQL Wire Protocol server on port 5433
 - MySQL Wire Protocol server on port 3307
-- HTTP API server on port 8081
+- HTTP/gRPC API server on port 8081
 
 It connects to the first instance's NATS server for replication.
 
@@ -94,12 +116,18 @@ It connects to the first instance's NATS server for replication.
 
 Create a table and insert data:
 
-```sql
+```bash
+ha -r http://localhost:8080
 CREATE TABLE users(ID INTEGER PRIMARY KEY, name TEXT);
 INSERT INTO users(name) VALUES('HA user');
 ```
 
 Verify replication by connecting to the second instance and querying the data.
+
+```bash
+ha -r http://localhost:8081
+SELECT * FROM users
+```
 
 ## Configuration
 
@@ -113,7 +141,7 @@ Key options:
 - `--nats-port`: NATS server port (0 to disable embedded server)
 - `--replication-url`: NATS server URL for replication
 
-For advanced configuration, see the [full documentation](https://litesql.github.io/ha/).
+For advanced configuration, see the [full documentation](https://litesql.github.io/ha/#9).
 
 ## Usage
 
