@@ -88,6 +88,11 @@ var (
 
 	interceptorPath *string
 
+	proxiedDSN             *string
+	proxiedLocalDB         *string
+	proxiedPublicationName *string
+	proxiedSlotName        *string
+
 	remote *string
 )
 
@@ -142,6 +147,11 @@ func main() {
 	replicationURL = flagSet.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
 	replicationPolicy = flagSet.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
 	rowIdentify = flagSet.StringLong("row-identify", "pk", "Strategy used to identify rows during replication. Options: pk, rowid or full")
+
+	proxiedDSN = flagSet.StringLong("proxied-dsn", "", "A DSN to replicate data from a PostgreSQL database")
+	proxiedPublicationName = flagSet.StringLong("proxied-publication", "ha_publication", "The name of the publication to create in the proxied PostgreSQL database (only used if --proxied-dsn is set)")
+	proxiedSlotName = flagSet.StringLong("proxied-slot", "ha_slot", "The name of the replication slot to create in the proxied PostgreSQL database (only used if --proxied-dsn is set)")
+	proxiedLocalDB = flagSet.StringLong("proxied-local-db", "ha.db", "The name of the local database to create for the proxied PostgreSQL database (only used if --proxied-dsn is set)")
 
 	remote = flagSet.String('r', "remote", "", "Address of a remote HA server to connect to and interact with (e.g. to run queries) instead of starting a server")
 	initDynamicFlags()
@@ -315,7 +325,19 @@ func run() error {
 	}
 
 	for _, dsn := range dsnList {
-		err := sqlite.Load(context.Background(), dsn, *memDB, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...)
+		err := sqlite.Load(context.Background(), dsn, sqlite.LoadConfig{
+			MemDB:              *memDB,
+			FromLatestSnapshot: *fromLatestSnapshot,
+			DeliverPolicy:      *replicationPolicy,
+			MaxConns:           *concurrentQueries,
+			ProxiedDBConfig: sqlite.ProxiedDBConfig{
+				DSN:             *proxiedDSN,
+				PublicationName: *proxiedPublicationName,
+				SlotName:        *proxiedSlotName,
+				LocalDB:         *proxiedLocalDB,
+			},
+			Options: opts,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to load database %q: %w", dsn, err)
 		}
@@ -331,7 +353,14 @@ func run() error {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /databases", hahttp.DatabasesHandler)
-	mux.HandleFunc("POST /databases", hahttp.CreateDatabaseHandler(*createDatabaseDir, *memDB, dsnParams, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, opts...))
+	mux.HandleFunc("POST /databases", hahttp.CreateDatabaseHandler(*createDatabaseDir,
+		*memDB, dsnParams, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries,
+		sqlite.ProxiedDBConfig{
+			DSN:             *proxiedDSN,
+			PublicationName: *proxiedPublicationName,
+			SlotName:        *proxiedSlotName,
+			LocalDB:         *proxiedLocalDB,
+		}, opts...))
 	mux.HandleFunc("DELETE /databases/{id}", hahttp.DropDatabaseHandler())
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
@@ -382,13 +411,13 @@ func run() error {
 			}
 			return db, true
 		},
-		CreateDatabaseOptions: mysql.CreateDatabaseOptions{
+		CreateDatabaseOptions: sqlite.LoadConfig{
 			Dir:                *createDatabaseDir,
 			MemDB:              *memDB,
 			FromLatestSnapshot: *fromLatestSnapshot,
 			DeliverPolicy:      *replicationPolicy,
 			MaxConns:           *concurrentQueries,
-			Opts:               opts,
+			Options:            opts,
 		},
 	})
 	if err != nil {
@@ -406,13 +435,13 @@ func run() error {
 		Pass:    *pgPass,
 		TLSCert: *pgCert,
 		TLSKey:  *pgKey,
-		CreateOpts: postgresql.CreateDatabaseOptions{
+		CreateOpts: sqlite.LoadConfig{
 			Dir:                *createDatabaseDir,
 			MemDB:              *memDB,
 			FromLatestSnapshot: *fromLatestSnapshot,
 			DeliverPolicy:      *replicationPolicy,
 			MaxConns:           *concurrentQueries,
-			Opts:               opts,
+			Options:            opts,
 		},
 	})
 	if err != nil {

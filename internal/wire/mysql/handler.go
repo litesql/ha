@@ -26,7 +26,7 @@ type Handler struct {
 	tx                    *sql.Tx
 	dbProvider            DBProvider
 	connectorProvider     ConnectorProvider
-	createDatabaseOptions CreateDatabaseOptions
+	createDatabaseOptions sqlite.LoadConfig
 }
 
 type DBProvider func(dbName string) (*sql.DB, bool)
@@ -126,8 +126,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		destPath = filepath.Join(h.createDatabaseOptions.Dir, filepath.Base(destPath))
 		dsn = fmt.Sprintf("file:%s%s", destPath, params)
 
-		err := sqlite.Load(context.Background(), dsn, h.createDatabaseOptions.MemDB, h.createDatabaseOptions.FromLatestSnapshot,
-			h.createDatabaseOptions.DeliverPolicy, h.createDatabaseOptions.MaxConns, h.createDatabaseOptions.Opts...)
+		err := sqlite.Load(context.Background(), dsn, h.createDatabaseOptions)
 		if err != nil {
 			return nil, err
 		}

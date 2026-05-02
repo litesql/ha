@@ -27,7 +27,7 @@ func DatabasesHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func CreateDatabaseHandler(createDatabaseDir string, memDB bool, defaultDSNOpts string, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) http.HandlerFunc {
+func CreateDatabaseHandler(createDatabaseDir string, memDB bool, defaultDSNOpts string, fromLatestSnapshot bool, deliverPolicy string, maxConns int, proxiedConfig sqlite.ProxiedDBConfig, opts ...ha.Option) http.HandlerFunc {
 	type request struct {
 		DSN string `json:"dsn"`
 	}
@@ -53,7 +53,15 @@ func CreateDatabaseHandler(createDatabaseDir string, memDB bool, defaultDSNOpts 
 			dsn += "?" + defaultDSNOpts
 		}
 
-		err = sqlite.Load(r.Context(), dsn, memDB, fromLatestSnapshot, deliverPolicy, maxConns, opts...)
+		err = sqlite.Load(r.Context(), dsn, sqlite.LoadConfig{
+			Dir:                createDatabaseDir,
+			MemDB:              memDB,
+			FromLatestSnapshot: fromLatestSnapshot,
+			DeliverPolicy:      deliverPolicy,
+			MaxConns:           maxConns,
+			ProxiedDBConfig:    proxiedConfig,
+			Options:            opts,
+		})
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

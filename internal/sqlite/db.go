@@ -17,7 +17,9 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/litesql/go-ha"
+	"github.com/litesql/postgresql/replication"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
@@ -27,13 +29,31 @@ type connectorDB struct {
 }
 
 var (
-	dbs   = make(map[string]*connectorDB)
-	muDBs sync.Mutex
+	dbs                 = make(map[string]*connectorDB)
+	proxiedSubscription = make(map[string]*replication.Subscription)
+	muDBs               sync.Mutex
 )
 
 var reDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
 
-func Load(ctx context.Context, dsn string, memDB bool, fromLatestSnapshot bool, deliverPolicy string, maxConns int, opts ...ha.Option) error {
+type LoadConfig struct {
+	Dir                string
+	MemDB              bool
+	FromLatestSnapshot bool
+	DeliverPolicy      string
+	MaxConns           int
+	ProxiedDBConfig    ProxiedDBConfig
+	Options            []ha.Option
+}
+
+type ProxiedDBConfig struct {
+	DSN             string
+	PublicationName string
+	SlotName        string
+	LocalDB         string
+}
+
+func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	muDBs.Lock()
 	defer muDBs.Unlock()
 	defaultDB := false
@@ -44,23 +64,33 @@ func Load(ctx context.Context, dsn string, memDB bool, fromLatestSnapshot bool, 
 	if _, exists := dbs[id]; exists {
 		return fmt.Errorf("database with id %q already added", id)
 	}
-	options := slices.Clone(opts)
+	options := slices.Clone(cfg.Options)
+
+	if cfg.ProxiedDBConfig.DSN != "" && cfg.ProxiedDBConfig.LocalDB == id {
+		var err error
+		proxiedDB, err := sql.Open("pgx", cfg.ProxiedDBConfig.DSN)
+		if err != nil {
+			return fmt.Errorf("failed to open proxied db: %w", err)
+		}
+		options = append(options, ha.WithProxiedDB(proxiedDB))
+	}
+
 	waitFor := make(chan struct{})
 	options = append(options, ha.WithWaitFor(waitFor))
 	var connector *ha.Connector
-	if fromLatestSnapshot {
+	if cfg.FromLatestSnapshot {
 		slog.Info("loading latest snapshot from NATS JetStream Object Store", "dsn", dsn)
-		sequence, reader, err := ha.LatestSnapshot(ctx, dsn, opts...)
+		sequence, reader, err := ha.LatestSnapshot(ctx, dsn, cfg.Options...)
 		if err != nil && !errors.Is(err, jetstream.ErrObjectNotFound) {
 			return fmt.Errorf("failed to load latest snapshot: %w", err)
 		}
 
-		if sequence > 0 && deliverPolicy == "" {
+		if sequence > 0 && cfg.DeliverPolicy == "" {
 			policy := fmt.Sprintf("by_start_sequence=%d", sequence)
 			options = append(options, ha.WithDeliverPolicy(policy))
 		}
 		if reader != nil {
-			if memDB {
+			if cfg.MemDB {
 				connector, err = newConnector(dsn, options...)
 				if err != nil {
 					return err
@@ -89,11 +119,11 @@ func Load(ctx context.Context, dsn string, memDB bool, fromLatestSnapshot bool, 
 			}
 		}
 	} else {
-		if memDB {
+		if cfg.MemDB {
 			slog.Info("using in-memory database", "dsn", dsn)
 			filename := filenameFromDSN(dsn)
-			options := slices.Clone(opts)
-			if filename != "" && deliverPolicy == "" {
+			options := slices.Clone(cfg.Options)
+			if filename != "" && cfg.DeliverPolicy == "" {
 				matched := reDateTime.MatchString(filepath.Base(filename))
 				if matched {
 					dateTime := filepath.Base(filename)[0:len(time.DateTime)]
@@ -123,7 +153,7 @@ func Load(ctx context.Context, dsn string, memDB bool, fromLatestSnapshot bool, 
 		} else {
 			slog.Info("using data source name", "dsn", dsn)
 			var err error
-			connector, err = newConnector(dsn, opts...)
+			connector, err = newConnector(dsn, options...)
 			if err != nil {
 				return err
 			}
@@ -138,14 +168,47 @@ func Load(ctx context.Context, dsn string, memDB bool, fromLatestSnapshot bool, 
 	db := sql.OpenDB(connector)
 	db.SetConnMaxIdleTime(0)
 	db.SetConnMaxLifetime(0)
-	db.SetMaxOpenConns(maxConns)
-	db.SetMaxIdleConns(maxConns)
+	db.SetMaxOpenConns(cfg.MaxConns)
+	db.SetMaxIdleConns(cfg.MaxConns)
 	connector.Subscriber().SetDB(db)
 
 	if connector.Snapshotter() != nil {
 		connector.Snapshotter().SetDB(db)
 	}
+
+	if cfg.ProxiedDBConfig.DSN != "" && cfg.ProxiedDBConfig.LocalDB == id {
+		slog.Info("setting up replication proxy", "source_dsn", cfg.ProxiedDBConfig.DSN, "publication", cfg.ProxiedDBConfig.PublicationName, "slot", cfg.ProxiedDBConfig.SlotName)
+		info, err := replication.CreateSlot(cfg.ProxiedDBConfig.DSN, cfg.ProxiedDBConfig.SlotName)
+		if err != nil {
+			slog.Warn("failed to create replication slot", "error", err)
+		} else {
+			slog.Info("replication slot created", "lsn", info.RestartLSN, "snapshot_name", info.SnapshotName, "plugin", info.Plugin)
+		}
+		subscription, err := replication.Subscribe(replication.Config{
+			DSN:             cfg.ProxiedDBConfig.DSN,
+			PublicationName: cfg.ProxiedDBConfig.PublicationName,
+			SlotName:        cfg.ProxiedDBConfig.SlotName,
+			Timeout:         15 * time.Second,
+		}, handleProxyChanges(db), false)
+		if err != nil {
+			return fmt.Errorf("subscribe to proxied db: %w", err)
+		} else {
+			proxiedSubscription[id] = subscription
+		}
+		_, err = db.ExecContext(ha.ContextLocalDB(ctx, true),
+			`CREATE TABLE IF NOT EXISTS ha_proxied_tracker(
+				position TEXT,
+				server_time,
+				CHECK (rowid = 1)
+			)`)
+		if err != nil {
+			return fmt.Errorf("create proxied tracker table: %w", err)
+		}
+
+		go subscription.Start(slog.Default(), checkpointLoader(db), true)
+	}
 	close(waitFor)
+
 	connDB := &connectorDB{
 		db:        db,
 		connector: connector,
@@ -250,6 +313,10 @@ func Drop(ctx context.Context, id string) (string, error) {
 	err := dbConnector.db.QueryRowContext(ctx, "SELECT file FROM pragma_database_list WHERE name = ?", "main").Scan(&filename)
 	if err != nil {
 		return "", fmt.Errorf("failed to get db filename: %w", err)
+	}
+	if proxiedSubscription[id] != nil {
+		proxiedSubscription[id].Stop()
+		delete(proxiedSubscription, id)
 	}
 	dbConnector.connector.Close()
 	delete(dbs, id)

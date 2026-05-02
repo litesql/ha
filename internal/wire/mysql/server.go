@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/go-mysql-org/go-mysql/server"
-	"github.com/litesql/go-ha"
+	"github.com/litesql/ha/internal/sqlite"
 )
 
 type Config struct {
@@ -15,16 +15,7 @@ type Config struct {
 	Pass                  string
 	ConnectorProvider     ConnectorProvider
 	DBProvider            DBProvider
-	CreateDatabaseOptions CreateDatabaseOptions
-}
-
-type CreateDatabaseOptions struct {
-	Dir                string
-	MemDB              bool
-	FromLatestSnapshot bool
-	DeliverPolicy      string
-	MaxConns           int
-	Opts               []ha.Option
+	CreateDatabaseOptions sqlite.LoadConfig
 }
 
 type Server struct {
@@ -34,7 +25,7 @@ type Server struct {
 	User              string
 	Pass              string
 
-	createDatabaseOptions CreateDatabaseOptions
+	createDatabaseOptions sqlite.LoadConfig
 	listener              net.Listener
 	closed                bool
 }

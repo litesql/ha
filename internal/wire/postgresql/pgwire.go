@@ -36,16 +36,7 @@ type Config struct {
 	Pass       string
 	TLSCert    string
 	TLSKey     string
-	CreateOpts CreateDatabaseOptions
-}
-
-type CreateDatabaseOptions struct {
-	Dir                string
-	MemDB              bool
-	FromLatestSnapshot bool
-	DeliverPolicy      string
-	MaxConns           int
-	Opts               []ha.Option
+	CreateOpts sqlite.LoadConfig
 }
 
 const columnWidth = 256
@@ -115,7 +106,7 @@ func (s *Server) terminateConn(ctx context.Context) error {
 var reSetDatabase = regexp.MustCompile(`(?i)^SET\s+DATABASE\s*(=|TO)\s*([^;\s]+)`)
 var reUndo = regexp.MustCompile(`(?i)^UNDO(\s|E|T)\s*([^;\s]+)`)
 
-func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
+func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 	return func(ctx context.Context, sql string) (wire.PreparedStatements, error) {
 		slog.InfoContext(ctx, "pg-wire: query received", "remote", wire.RemoteAddress(ctx), "sql", sql)
 		upper := strings.ToUpper(strings.TrimSpace(sql))
@@ -200,8 +191,7 @@ func parseFn(createDatabaseOptions CreateDatabaseOptions) wire.ParseFn {
 			destPath = filepath.Join(createDatabaseOptions.Dir, filepath.Base(destPath))
 			dsn = fmt.Sprintf("file:%s%s", destPath, params)
 
-			err := sqlite.Load(ctx, dsn, createDatabaseOptions.MemDB, createDatabaseOptions.FromLatestSnapshot,
-				createDatabaseOptions.DeliverPolicy, createDatabaseOptions.MaxConns, createDatabaseOptions.Opts...)
+			err := sqlite.Load(ctx, dsn, createDatabaseOptions)
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				if err != nil {
 					return writer.Complete(fmt.Sprintf("failed to create database: %v", err))
