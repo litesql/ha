@@ -19,6 +19,7 @@ func init() {
 	Symbols["github.com/litesql/go-ha/ha"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"ConnectHandler":                 reflect.ValueOf(ha.ConnectHandler),
+		"ContextLocalDB":                 reflect.ValueOf(ha.ContextLocalDB),
 		"CrossShardQuery":                reflect.ValueOf(ha.CrossShardQuery),
 		"DefaultStream":                  reflect.ValueOf(constant.MakeFromLiteral("\"ha_replication\"", token.STRING, 0)),
 		"ErrInvalidSQL":                  reflect.ValueOf(&ha.ErrInvalidSQL).Elem(),
@@ -27,6 +28,7 @@ func init() {
 		"LatestSnapshot":                 reflect.ValueOf(ha.LatestSnapshot),
 		"ListDSN":                        reflect.ValueOf(ha.ListDSN),
 		"ListReplicationIDs":             reflect.ValueOf(ha.ListReplicationIDs),
+		"LocalDB":                        reflect.ValueOf(ha.LocalDB),
 		"LookupConnector":                reflect.ValueOf(ha.LookupConnector),
 		"LookupConnectorByReplicationID": reflect.ValueOf(ha.LookupConnectorByReplicationID),
 		"NameToOptions":                  reflect.ValueOf(ha.NameToOptions),
@@ -90,6 +92,7 @@ func init() {
 		"WithLeaderProvider":             reflect.ValueOf(ha.WithLeaderProvider),
 		"WithName":                       reflect.ValueOf(ha.WithName),
 		"WithNatsOptions":                reflect.ValueOf(ha.WithNatsOptions),
+		"WithProxiedDB":                  reflect.ValueOf(ha.WithProxiedDB),
 		"WithPublisherTimeout":           reflect.ValueOf(ha.WithPublisherTimeout),
 		"WithQueryRouter":                reflect.ValueOf(ha.WithQueryRouter),
 		"WithReplicas":                   reflect.ValueOf(ha.WithReplicas),
