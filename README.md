@@ -28,6 +28,7 @@ HA is a highly available SQLite cluster powered by an embedded NATS JetStream se
 - 📝 **Read/Write Replicas**: Create live local read/write replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
 - 📚 **Read Replicas**: Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)
 - 🔄 **Change Data Capture (CDC)**: Supports CDC for real-time data streaming
+- 🔌 **Proxy**: Proxy and replicate PostgreSQL or MySQL databases to the edge
 - ⚙️ **Cluster Modes**: Configure leader-based or leaderless clusters with custom conflict resolution strategies
 - 📚 **Cross-Shard Queries**: Execute queries across shards using SQL hints like `/*+ db=DSN */`
 - 🔄 **Transaction Undo**: Supports undo operations on committed transactions, allowing rollback to previous states
@@ -181,6 +182,20 @@ PGPASSWORD=ha psql -h localhost -U ha -p 5432
 ```bash
 mysql -h localhost --port 3306 -u ha
 ```
+
+## Proxy and Replicate Other Databases
+
+HA can proxy connections to PostgreSQL and MySQL databases, replicating their data to achieve high availability and enable faster queries.
+
+![HA Proxy Architecture](ha_proxy.png)
+
+### Proxy and Replicate PostgreSQL
+
+[PostgreSQL Example](https://github.com/litesql/ha/tree/main/examples/proxy-postgresql)
+
+### Proxy and Replicate MySQL
+
+[MySQL Example](https://github.com/litesql/ha/tree/main/examples/proxy-mysql)
 
 ## API Documentation
 

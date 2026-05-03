@@ -2,7 +2,7 @@ services:
   node1:
     image: ghcr.io/litesql/ha:latest
     volumes:
-      - ./testdata:/etc/nats
+      - ./conf:/etc/nats
       - node1_data:/data
     ports:
       - "3306:3306"
@@ -22,7 +22,7 @@ services:
   node2:
     image: ghcr.io/litesql/ha:latest
     volumes:
-      - ./testdata:/etc/nats
+      - ./conf:/etc/nats
       - node2_data:/data
     ports:
       - "3307:3306"
@@ -41,7 +41,7 @@ services:
   node3:
     image: ghcr.io/litesql/ha:latest
     volumes:
-      - ./testdata:/etc/nats
+      - ./conf:/etc/nats
       - node3_data:/data
     ports:
       - "3308:3306"

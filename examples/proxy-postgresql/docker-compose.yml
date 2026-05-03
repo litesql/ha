@@ -17,16 +17,15 @@ services:
   node1:
     image: ghcr.io/litesql/ha:latest
     volumes:
-      - ./testdata:/etc/nats
       - node1_data:/data
-    ports:      
-      - "4222:4222"
+    ports:            
       - "5433:5432"
       - "8080:8080"
     environment:
       - HA_NAME=node1-proxy-pg
       - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
-      - HA_CONCURRENT_QUERIES=50      
+      - HA_CONCURRENT_QUERIES=50
+      - HA_NATS_PORT=0      
       - HA_PG_PORT=5432
       - HA_PROXY_LOCAL=db.sqlite
       - HA_PG_PROXIED=postgres://rep_user:secret@postgres:5432/postgres

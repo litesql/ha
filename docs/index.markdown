@@ -73,9 +73,10 @@ ghcr.io/litesql/ha:latest
 ```
 #### Cluster example
 
-- [Docker compose cluster](https://github.com/litesql/ha/blob/main/docker-compose.yml) example
+- [Docker compose cluster](https://github.com/litesql/ha/blob/main/examples/leader-based/docker-compose.yml) example
 
 ```sh
+cd examples/leader-based
 docker compose up
 ```
 
@@ -506,7 +507,14 @@ DDL commands (such as CREATE, ALTER, and DROP) are not affected by undo operatio
 | --leader-static | HA_LEADER_STATIC |    | Address of a static leader. This will disable the leader election |
 | --mysql-port| HA_MYSQL_PORT|       | Port to MySQL Wire Protocol Server  |
 | --mysql-user| HA_MYSQL_USER| ha    | MySQL Auth user  |
-| --mysql-pass| HA_MYSQL_PASS|       | MySQL Auth password  | 
+| --mysql-pass| HA_MYSQL_PASS|       | MySQL Auth password  |
+| --mysql-proxied | HA_MYSQL_PROXIED | | DSN of a source MySQL database to replicate into the local HA instance |
+| --mysql-include | HA_MYSQL_INCLUDE | `^db.*` | Regexp to include tables from the proxied MySQL database replication; empty means include all |
+| --mysql-exclude | HA_MYSQL_EXCLUDE | | Regexp to exclude tables from the proxied MySQL database replication |
+| --mysql-dump-bin| HA_MYSQL_DUMP_BIN | | Filesystem path to the mysqldump executable used for proxied MySQL import. Example: /usr/bin/mysqldump |
+| --mysql-dump-db | HA_MYSQL_DUMP_DB | | Database name used for mysqldump when importing from the proxied MySQL source |
+| --mysql-dump-include | HA_MYSQL_DUMP_INCLUDE | |Table filter to pass to mysqldump during proxied MySQL import |
+| --mysql-proxy-id | HA_MYSQL_PROXY_ID | sqlite-ha | Identifier for this proxied MySQL connection, used in replication metadata |
 | --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS Server logging |
 | --nats-port | HA_NATS_PORT | 4222 | Embedded NATS server port (0 to disable) |
 | --nats-store-dir | HA_NATS_STORE_DIR | /tmp/nats | Embedded NATS server store directory |
@@ -518,6 +526,12 @@ DDL commands (such as CREATE, ALTER, and DROP) are not affected by undo operatio
 | --pg-pass | HA_PG_PASS | ha   | PostgreSQL Auth password |
 | --pg-cert | HA_PG_CERT |      | Path to PostgreSQL TLS certificate file |
 | --pg-key  | HA_PG_KEY  |      | Path to PostgreSQL TLS key file |
+| --pg-proxied | HA_PG_PROXIED | |DSN of the source PostgreSQL database to replicate from and proxy to |
+| --pg-publication | HA_PG_PUBLICATION | ha_publication | Name of the publication in the source PostgreSQL database for logical replication (used only when --pg-proxied is specified) |
+| --pg-slot | HA_PG_SLOT | ha_slot | Name of the replication slot to create in the source PostgreSQL database (used only when --pg-proxied is specified) |
+| --proxy-local | HA_PROXY_LOCAL | ha.db | Path to the local SQLite database file that proxies the source database (used only when --pg-proxied or --mysql-proxied is set) |
+| --proxy-use-schema | HA_PROXY_USE_SCHEMA | false | Create local tables using the schema from the source database (used only when --pg-proxied or --mysql-proxied is set) |
+| --proxy-disable-redirect | HA_PROXY_DISABLE_REDIRECT | false | Disable redirecting queries to the source database; all queries will run on the local HA SQLite database (used only when --pg-proxied or --mysql-proxied is set) |
 | --concurrent-queries | HA_CONCURRENT_QUERIES | 50 | Number of concurrent queries (DB pool max) |
 | --extensions | HA_EXTENSIONS |  | Comma-separated list of SQLite extensions path to load |
 | --async-replication | HA_ASYNC_REPLICATION | false | Enables asynchronous replication message publishing |
