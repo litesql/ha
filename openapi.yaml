@@ -15,6 +15,13 @@ paths:
       operationId: queryMainDatabase
       tags:
         - Main Database
+      parameters:
+        - name: local
+          description: force query execution on local database (do not redirect to leader or proxied db)
+          in: query
+          required: false
+          schema:
+            type: boolean
       requestBody:
         description: Payload for the query request.
         required: true
@@ -170,7 +177,13 @@ paths:
           in: path
           required: true
           schema:
-            type: string
+            type: string      
+        - name: local
+          description: force query execution on local database (do not redirect to leader or proxied db)
+          in: query
+          required: false
+          schema:
+            type: boolean
       requestBody:
         description: Payload for the query request.
         required: true

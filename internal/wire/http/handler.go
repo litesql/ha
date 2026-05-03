@@ -135,13 +135,18 @@ func QueryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
+	if r.URL.Query().Get("local") == "true" {
+		ctx = ha.ContextLocalDB(ctx, true)
+	}
+
 	if len(req.Queries) == 1 {
-		stmt, err := ha.ParseStatement(r.Context(), req.Queries[0].Sql)
+		stmt, err := ha.ParseStatement(ctx, req.Queries[0].Sql)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		res, err := sqlite.Exec(r.Context(), db, stmt, req.Queries[0].Params)
+		res, err := sqlite.Exec(ctx, db, stmt, req.Queries[0].Params)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -157,7 +162,7 @@ func QueryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := sqlite.Transaction(r.Context(), db, req.Queries)
+	res, err := sqlite.Transaction(ctx, db, req.Queries)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
