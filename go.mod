@@ -11,9 +11,10 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.19.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/go-ha v0.11.7
-	github.com/litesql/go-sqlite-ha v0.11.5
-	github.com/litesql/go-sqlite3-ha v0.11.5
-	github.com/litesql/postgresql v0.1.2
+	github.com/litesql/go-sqlite-ha v0.11.7
+	github.com/litesql/go-sqlite3-ha v0.11.7
+	github.com/litesql/mysql v0.0.2
+	github.com/litesql/postgresql v0.1.3
 	github.com/modelcontextprotocol/go-sdk v1.6.0
 	github.com/nats-io/nats.go v1.51.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
@@ -23,6 +24,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
+	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/antithesishq/antithesis-sdk-go v0.7.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
@@ -65,6 +67,7 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2 // indirect
+	github.com/pingcap/failpoint v0.0.0-20260406204437-bbc9d102c19e // indirect
 	github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1 // indirect
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20260501060436-33ae9e3cb52f // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect

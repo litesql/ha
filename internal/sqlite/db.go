@@ -17,9 +17,11 @@ import (
 	"sync"
 	"time"
 
+	_ "github.com/go-mysql-org/go-mysql/driver"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/litesql/go-ha"
-	"github.com/litesql/postgresql/replication"
+	mysqlreplication "github.com/litesql/mysql/replication"
+	pgreplication "github.com/litesql/postgresql/replication"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
@@ -28,9 +30,13 @@ type connectorDB struct {
 	connector *ha.Connector
 }
 
+type stoppableSubscription interface {
+	Stop()
+}
+
 var (
 	dbs                 = make(map[string]*connectorDB)
-	proxiedSubscription = make(map[string]*replication.Subscription)
+	proxiedSubscription = make(map[string]stoppableSubscription)
 	muDBs               sync.Mutex
 )
 
@@ -47,10 +53,20 @@ type LoadConfig struct {
 }
 
 type ProxiedDBConfig struct {
-	DSN             string
-	PublicationName string
-	SlotName        string
-	LocalDB         string
+	PgDSN             string
+	PgPublicationName string
+	PgSlotName        string
+
+	MysqlDSN        string
+	MysqlInclude    string
+	MysqlExclude    string
+	MysqlID         string
+	MysqlDumpBin    string
+	MysqlDumpDB     string
+	MysqlDumpTables []string
+
+	LocalDB   string
+	UseSchema bool
 }
 
 func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
@@ -66,13 +82,20 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	}
 	options := slices.Clone(cfg.Options)
 
-	if cfg.ProxiedDBConfig.DSN != "" && cfg.ProxiedDBConfig.LocalDB == id {
-		var err error
-		proxiedDB, err := sql.Open("pgx", cfg.ProxiedDBConfig.DSN)
-		if err != nil {
-			return fmt.Errorf("failed to open proxied db: %w", err)
+	if cfg.ProxiedDBConfig.LocalDB == id {
+		if cfg.ProxiedDBConfig.PgDSN != "" {
+			proxiedDB, err := sql.Open("pgx", cfg.ProxiedDBConfig.PgDSN)
+			if err != nil {
+				return fmt.Errorf("failed to open proxied db: %w", err)
+			}
+			options = append(options, ha.WithProxiedDB(proxiedDB))
+		} else if cfg.ProxiedDBConfig.MysqlDSN != "" {
+			proxiedDB, err := sql.Open("mysql", cfg.ProxiedDBConfig.MysqlDSN)
+			if err != nil {
+				return fmt.Errorf("failed to open proxied db: %w", err)
+			}
+			options = append(options, ha.WithProxiedDB(proxiedDB))
 		}
-		options = append(options, ha.WithProxiedDB(proxiedDB))
 	}
 
 	waitFor := make(chan struct{})
@@ -176,26 +199,8 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		connector.Snapshotter().SetDB(db)
 	}
 
-	if cfg.ProxiedDBConfig.DSN != "" && cfg.ProxiedDBConfig.LocalDB == id {
-		slog.Info("setting up replication proxy", "source_dsn", cfg.ProxiedDBConfig.DSN, "publication", cfg.ProxiedDBConfig.PublicationName, "slot", cfg.ProxiedDBConfig.SlotName)
-		info, err := replication.CreateSlot(cfg.ProxiedDBConfig.DSN, cfg.ProxiedDBConfig.SlotName)
-		if err != nil {
-			slog.Warn("failed to create replication slot", "error", err)
-		} else {
-			slog.Info("replication slot created", "lsn", info.RestartLSN, "snapshot_name", info.SnapshotName, "plugin", info.Plugin)
-		}
-		subscription, err := replication.Subscribe(replication.Config{
-			DSN:             cfg.ProxiedDBConfig.DSN,
-			PublicationName: cfg.ProxiedDBConfig.PublicationName,
-			SlotName:        cfg.ProxiedDBConfig.SlotName,
-			Timeout:         15 * time.Second,
-		}, handleProxyChanges(db), false)
-		if err != nil {
-			return fmt.Errorf("subscribe to proxied db: %w", err)
-		} else {
-			proxiedSubscription[id] = subscription
-		}
-		_, err = db.ExecContext(ha.ContextLocalDB(ctx, true),
+	if cfg.ProxiedDBConfig.LocalDB == id {
+		_, err := db.ExecContext(ha.ContextLocalDB(ctx, true),
 			`CREATE TABLE IF NOT EXISTS ha_proxied_tracker(
 				position TEXT,
 				server_time,
@@ -204,8 +209,46 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		if err != nil {
 			return fmt.Errorf("create proxied tracker table: %w", err)
 		}
+		if cfg.ProxiedDBConfig.PgDSN != "" {
+			slog.Info("setting up replication proxy", "source_dsn", cfg.ProxiedDBConfig.PgDSN, "publication", cfg.ProxiedDBConfig.PgPublicationName, "slot", cfg.ProxiedDBConfig.PgSlotName)
+			info, err := pgreplication.CreateSlot(cfg.ProxiedDBConfig.PgDSN, cfg.ProxiedDBConfig.PgSlotName)
+			if err != nil {
+				slog.Warn("failed to create replication slot", "error", err)
+			} else {
+				slog.Info("replication slot created", "lsn", info.RestartLSN, "snapshot_name", info.SnapshotName, "plugin", info.Plugin)
+			}
+			subscription, err := pgreplication.Subscribe(pgreplication.Config{
+				DSN:             cfg.ProxiedDBConfig.PgDSN,
+				PublicationName: cfg.ProxiedDBConfig.PgPublicationName,
+				SlotName:        cfg.ProxiedDBConfig.PgSlotName,
+				Timeout:         15 * time.Second,
+			}, handlePgProxiedChanges(db), cfg.ProxiedDBConfig.UseSchema)
+			if err != nil {
+				return fmt.Errorf("subscribe to proxied db: %w", err)
+			} else {
+				proxiedSubscription[id] = subscription
+			}
+			go subscription.Start(slog.Default(), pgCheckpointLoader(db), true)
+		} else if cfg.ProxiedDBConfig.MysqlDSN != "" {
+			slog.Info("setting up replication proxy", "source_dsn", cfg.ProxiedDBConfig.MysqlDSN, "id", cfg.ProxiedDBConfig.MysqlID, "includes", cfg.ProxiedDBConfig.MysqlInclude, "excludes", cfg.ProxiedDBConfig.MysqlExclude, "dump", cfg.ProxiedDBConfig.MysqlDumpBin, "dump_db", cfg.ProxiedDBConfig.MysqlDumpDB, "dump_tables", cfg.ProxiedDBConfig.MysqlDumpTables)
 
-		go subscription.Start(slog.Default(), checkpointLoader(db), true)
+			subscription, err := mysqlreplication.Subscribe(mysqlreplication.Config{
+				DSN:                cfg.ProxiedDBConfig.MysqlDSN,
+				IncludeTablesRegex: cfg.ProxiedDBConfig.MysqlInclude,
+				ExcludeTablesRegex: cfg.ProxiedDBConfig.MysqlExclude,
+				Localhost:          cfg.ProxiedDBConfig.MysqlID,
+				DumpExecutionPath:  cfg.ProxiedDBConfig.MysqlDumpBin,
+				DumpDB:             cfg.ProxiedDBConfig.MysqlDumpDB,
+				DumpTables:         cfg.ProxiedDBConfig.MysqlDumpTables,
+				Logger:             slog.Default(),
+			}, handleMysqlProxiedChanges(db), cfg.ProxiedDBConfig.UseSchema)
+			if err != nil {
+				return fmt.Errorf("subscribe to proxied db: %w", err)
+			} else {
+				proxiedSubscription[id] = subscription
+			}
+			go subscription.Start(slog.Default(), mysqlCheckpointLoader(db))
+		}
 	}
 	close(waitFor)
 

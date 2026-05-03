@@ -13,7 +13,7 @@ import (
 	"github.com/litesql/postgresql/replication"
 )
 
-func handleProxyChanges(db *sql.DB) replication.HandleChanges {
+func handlePgProxiedChanges(db *sql.DB) replication.HandleChanges {
 	return func(changeset []replication.Change, currentPosition pglogrepl.LSN) error {
 		ctx := ha.ContextLocalDB(context.Background(), true)
 		tx, err := db.BeginTx(ctx, &sql.TxOptions{})
@@ -76,7 +76,7 @@ func handleProxyChanges(db *sql.DB) replication.HandleChanges {
 	}
 }
 
-func checkpointLoader(db *sql.DB) replication.CheckpointLoader {
+func pgCheckpointLoader(db *sql.DB) replication.CheckpointLoader {
 	return func() (pglogrepl.LSN, error) {
 		var position string
 		err := db.QueryRowContext(ha.ContextLocalDB(context.Background(), true), "SELECT position FROM ha_proxied_tracker WHERE rowid = 1").Scan(&position)

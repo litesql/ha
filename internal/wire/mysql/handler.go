@@ -137,6 +137,9 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		id = strings.TrimSuffix(id, ";")
 
 		dbfile, err := sqlite.Drop(context.Background(), id)
+		if err != nil {
+			return nil, err
+		}
 		if dbfile != "" {
 			err = os.Remove(dbfile)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {

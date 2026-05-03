@@ -46,9 +46,8 @@ func CreateDatabaseHandler(createDatabaseDir string, memDB bool, defaultDSNOpts 
 			http.Error(w, "create database is disabled, inform flag --create-db-dir at startup", http.StatusInternalServerError)
 			return
 		}
-		dsn := req.DSN
 
-		dsn = fmt.Sprintf("file:%s", filepath.Join(createDatabaseDir, req.DSN))
+		dsn := fmt.Sprintf("file:%s", filepath.Join(createDatabaseDir, req.DSN))
 		if !strings.Contains(dsn, "?") {
 			dsn += "?" + defaultDSNOpts
 		}

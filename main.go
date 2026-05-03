@@ -56,15 +56,28 @@ var (
 	dynamicLocalLeaderAddr *string
 	grpcInsecure           *bool
 
-	pgPort *int
-	pgUser *string
-	pgPass *string
-	pgCert *string
-	pgKey  *string
+	pgPort            *int
+	pgUser            *string
+	pgPass            *string
+	pgCert            *string
+	pgKey             *string
+	pgProxied         *string
+	pgPublicationName *string
+	pgSlotName        *string
 
-	mysqlPort *int
-	mysqlUser *string
-	mysqlPass *string
+	proxyLocalDB   *string
+	proxyUseSchema *bool
+
+	mysqlPort              *int
+	mysqlUser              *string
+	mysqlPass              *string
+	mysqlProxied           *string
+	mysqlProxiedInclude    *string
+	mysqlProxiedExclude    *string
+	mysqlProxiedDumpBin    *string
+	mysqlProxiedDumpDB     *string
+	mysqlProxiedDumpTables *string
+	mysqlProxyID           *string
 
 	concurrentQueries *int
 	extensions        *string
@@ -87,11 +100,6 @@ var (
 	rowIdentify               *string
 
 	interceptorPath *string
-
-	proxiedDSN             *string
-	proxiedLocalDB         *string
-	proxiedPublicationName *string
-	proxiedSlotName        *string
 
 	remote *string
 )
@@ -132,12 +140,25 @@ func main() {
 	mysqlPort = flagSet.IntLong("mysql-port", 0, "MySQL Server port")
 	mysqlUser = flagSet.StringLong("mysql-user", "ha", "MySQL Auth user")
 	mysqlPass = flagSet.StringLong("mysql-pass", "", "MySQL Auth password")
+	mysqlProxied = flagSet.StringLong("mysql-proxied", "", "A DSN to replicate data from a MySQL database")
+	mysqlProxiedInclude = flagSet.StringLong("mysql-include", "^db.*", "A regexp to filter the tables replicated by the proxied DB (only used if --mysql-proxied is set). Set to empty to replicate all tables")
+	mysqlProxiedExclude = flagSet.StringLong("mysql-exclude", "", "A regexp to filter the tables replicated by the proxied DB (only used if --mysql-proxied is set)")
+	mysqlProxiedDumpBin = flagSet.StringLong("mysql-dump-bin", "", "Path to mysqldump binary (only used if --mysql-proxied is set). Example /usr/bin/mysqldump")
+	mysqlProxiedDumpDB = flagSet.StringLong("mysql-dump-db", "", "The database to execute dump (only used if --mysql-proxied is set)")
+	mysqlProxiedDumpTables = flagSet.StringLong("mysql-dump-include", "", "Filter tables to execute dump (only used if --mysql-proxied is set)")
+	mysqlProxyID = flagSet.StringLong("mysql-proxy-id", "sqlite-ha", "Identify this proxy connection to MySQL server (only used if --mysql-proxied is set)")
 
 	pgPort = flagSet.IntLong("pg-port", 0, "PostgreSQL Server port")
 	pgUser = flagSet.StringLong("pg-user", "ha", "PostgreSQL Auth user")
 	pgPass = flagSet.StringLong("pg-pass", "ha", "PostgreSQL Auth password")
 	pgCert = flagSet.StringLong("pg-cert", "", "PostgreSQL TLS certificate file")
 	pgKey = flagSet.StringLong("pg-key", "", "PostgreSQL TLS key file")
+	pgProxied = flagSet.StringLong("pg-proxied", "", "A DSN to replicate data from a PostgreSQL database")
+	pgPublicationName = flagSet.StringLong("pg-publication", "ha_publication", "The name of the publication to create in the proxied PostgreSQL database (only used if --pg-proxied is set)")
+	pgSlotName = flagSet.StringLong("pg-slot", "ha_slot", "The name of the replication slot to create in the proxied PostgreSQL database (only used if --pg-proxied is set)")
+
+	proxyLocalDB = flagSet.StringLong("proxy-local", "ha.db", "The name of the local database to proxy for the proxied PostgreSQL database (only used if --pg-proxied or --mysql-proxied is set)")
+	proxyUseSchema = flagSet.BoolLong("proxy-use-schema", "Use proxied database schema to create local tables (only used if --pg-proxied or --mysql-proxied is set)")
 
 	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Number of concurrent queries")
 
@@ -150,11 +171,6 @@ func main() {
 	replicationURL = flagSet.StringLong("replication-url", "", "Replication NATS url (defaults to embedded NATS server)")
 	replicationPolicy = flagSet.StringLong("replication-policy", "", "Replication subscriber delivery policy (all|last|new|by_start_sequence=X|by_start_time=x)")
 	rowIdentify = flagSet.StringLong("row-identify", "pk", "Strategy used to identify rows during replication. Options: pk, rowid or full")
-
-	proxiedDSN = flagSet.StringLong("proxied-dsn", "", "A DSN to replicate data from a PostgreSQL database")
-	proxiedPublicationName = flagSet.StringLong("proxied-publication", "ha_publication", "The name of the publication to create in the proxied PostgreSQL database (only used if --proxied-dsn is set)")
-	proxiedSlotName = flagSet.StringLong("proxied-slot", "ha_slot", "The name of the replication slot to create in the proxied PostgreSQL database (only used if --proxied-dsn is set)")
-	proxiedLocalDB = flagSet.StringLong("proxied-local-db", "ha.db", "The name of the local database to create for the proxied PostgreSQL database (only used if --proxied-dsn is set)")
 
 	remote = flagSet.String('r', "remote", "", "Address of a remote HA server to connect to and interact with (e.g. to run queries) instead of starting a server")
 	initDynamicFlags()
@@ -327,6 +343,7 @@ func run() error {
 		}
 	}
 
+	dumpTables := strings.Split(*mysqlProxiedDumpTables, ",")
 	for _, dsn := range dsnList {
 		err := sqlite.Load(context.Background(), dsn, sqlite.LoadConfig{
 			MemDB:              *memDB,
@@ -334,10 +351,18 @@ func run() error {
 			DeliverPolicy:      *replicationPolicy,
 			MaxConns:           *concurrentQueries,
 			ProxiedDBConfig: sqlite.ProxiedDBConfig{
-				DSN:             *proxiedDSN,
-				PublicationName: *proxiedPublicationName,
-				SlotName:        *proxiedSlotName,
-				LocalDB:         *proxiedLocalDB,
+				PgDSN:             *pgProxied,
+				PgPublicationName: *pgPublicationName,
+				PgSlotName:        *pgSlotName,
+				MysqlDSN:          *mysqlProxied,
+				MysqlInclude:      *mysqlProxiedInclude,
+				MysqlExclude:      *mysqlProxiedExclude,
+				MysqlID:           *mysqlProxyID,
+				MysqlDumpBin:      *mysqlProxiedDumpBin,
+				MysqlDumpDB:       *mysqlProxiedDumpDB,
+				MysqlDumpTables:   dumpTables,
+				LocalDB:           *proxyLocalDB,
+				UseSchema:         *proxyUseSchema,
 			},
 			Options: opts,
 		})
@@ -363,10 +388,18 @@ func run() error {
 	mux.HandleFunc("POST /databases", hahttp.CreateDatabaseHandler(*createDatabaseDir,
 		*memDB, dsnParams, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries,
 		sqlite.ProxiedDBConfig{
-			DSN:             *proxiedDSN,
-			PublicationName: *proxiedPublicationName,
-			SlotName:        *proxiedSlotName,
-			LocalDB:         *proxiedLocalDB,
+			PgDSN:             *pgProxied,
+			PgPublicationName: *pgPublicationName,
+			PgSlotName:        *pgSlotName,
+			MysqlDSN:          *mysqlProxied,
+			MysqlInclude:      *mysqlProxiedInclude,
+			MysqlExclude:      *mysqlProxiedExclude,
+			MysqlID:           *mysqlProxyID,
+			MysqlDumpBin:      *mysqlProxiedDumpBin,
+			MysqlDumpDB:       *mysqlProxiedDumpDB,
+			MysqlDumpTables:   dumpTables,
+			LocalDB:           *proxyLocalDB,
+			UseSchema:         *proxyUseSchema,
 		}, opts...))
 	mux.HandleFunc("DELETE /databases/{id}", hahttp.DropDatabaseHandler())
 

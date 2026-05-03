@@ -1,0 +1,13 @@
+services:
+  mysql:
+    image: mysql:5.7
+    ports:
+      - '3306:3306' 
+    restart: always
+    command: [ "mysqld", "--log-bin=mysql-bin", "--server-id=1", "--binlog-format=ROW", "--binlog-row-image=FULL", "--expire-logs-days=10", "--max_allowed_packet=32505856","--gtid-mode=ON", "--enforce-gtid-consistency=ON","--sql_mode=ALLOW_INVALID_DATES" ]
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d:ro
+    environment:
+      MYSQL_DATABASE: 'db'
+      MYSQL_ROOT_PASSWORD: 'password'
+      MYSQL_ROOT: 'root'    
