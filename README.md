@@ -186,7 +186,7 @@ mysql -h localhost --port 3306 -u ha
 
 - **HTTP API**: [https://litesql.github.io/ha/#5](https://litesql.github.io/ha/#5)
 - **gRPC API**: [https://buf.build/litesql/sqlite-ha/sdks/main:grpc](https://buf.build/litesql/sqlite-ha/sdks/main:grpc)
-- **OpenAPI Spec**: See `openapi.yaml` in the repository
+- **OpenAPI Spec**: See `openapi.yaml` in the repository or access http://localhost:8080/docs
 
 ## Contributing
 

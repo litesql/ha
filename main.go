@@ -99,6 +99,9 @@ var (
 //go:embed openapi.yaml
 var openAPI []byte
 
+//go:embed docs.html
+var docsHTML []byte
+
 func main() {
 	flagSet = ff.NewFlagSet("ha")
 	dbParams = flagSet.StringLong("db-params", defaultDBOptions, "SQLite DSN parameters (added to each database file DSN if not defined)")
@@ -348,6 +351,10 @@ func run() error {
 		w.Header().Set("Content-Type", "application/yaml")
 		w.Write(openAPI)
 	}))
+	mux.Handle("GET /docs", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write(docsHTML)
+	}))
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -476,7 +483,7 @@ func run() error {
 	if *token != "" {
 		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
-			if authHeader != *token && r.URL.Path != "/healthz" && r.URL.Path != "/openapi.yaml" {
+			if authHeader != *token && r.URL.Path != "/healthz" && r.URL.Path != "/openapi.yaml" && r.URL.Path != "/docs" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
