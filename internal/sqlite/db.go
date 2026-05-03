@@ -65,8 +65,9 @@ type ProxiedDBConfig struct {
 	MysqlDumpDB     string
 	MysqlDumpTables []string
 
-	LocalDB   string
-	UseSchema bool
+	LocalDB         string
+	UseSchema       bool
+	DisableRedirect bool
 }
 
 func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
@@ -82,7 +83,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	}
 	options := slices.Clone(cfg.Options)
 
-	if cfg.ProxiedDBConfig.LocalDB == id {
+	if cfg.ProxiedDBConfig.LocalDB == id && !cfg.ProxiedDBConfig.DisableRedirect {
 		if cfg.ProxiedDBConfig.PgDSN != "" {
 			proxiedDB, err := sql.Open("pgx", cfg.ProxiedDBConfig.PgDSN)
 			if err != nil {

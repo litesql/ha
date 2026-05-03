@@ -7,8 +7,34 @@ services:
     command: ["-c", "wal_level=logical", "-c", "max_wal_senders=10", "-c", "max_replication_slots=10"]
     volumes:
       - ./init:/docker-entrypoint-initdb.d:ro
+      - pg_data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_HOST_AUTH_METHOD: trust
+
+  node1:
+    image: ghcr.io/litesql/ha:latest
+    volumes:
+      - ./testdata:/etc/nats
+      - node1_data:/data
+    ports:      
+      - "4222:4222"
+      - "5433:5432"
+      - "8080:8080"
+    environment:
+      - HA_NAME=node1-proxy-pg
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
+      - HA_CONCURRENT_QUERIES=50      
+      - HA_PG_PORT=5432
+      - HA_PROXY_LOCAL=db.sqlite
+      - HA_PG_PROXIED=postgres://rep_user:secret@postgres:5432/postgres
+      - HA_PG_PUBLICATION=my_publication
+      - HA_PG_SLOT=my_slot
+
+volumes:
+  pg_data:
+    driver: local
+  node1_data:
+    driver: local

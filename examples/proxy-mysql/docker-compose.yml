@@ -7,7 +7,32 @@ services:
     command: [ "mysqld", "--log-bin=mysql-bin", "--server-id=1", "--binlog-format=ROW", "--binlog-row-image=FULL", "--expire-logs-days=10", "--max_allowed_packet=32505856","--gtid-mode=ON", "--enforce-gtid-consistency=ON","--sql_mode=ALLOW_INVALID_DATES" ]
     volumes:
       - ./init:/docker-entrypoint-initdb.d:ro
+      - mysql_data:/var/lib/mysql
     environment:
       MYSQL_DATABASE: 'db'
       MYSQL_ROOT_PASSWORD: 'password'
-      MYSQL_ROOT: 'root'    
+      MYSQL_ROOT: 'root'
+
+  node1:
+    image: ghcr.io/litesql/ha:latest
+    restart: always
+    volumes:
+      - ./testdata:/etc/nats
+      - node1_data:/data
+    ports:      
+      - "4222:4222"
+      - "3307:3306"
+      - "8080:8080"
+    environment:
+      - HA_NAME=node1-proxy-mysql
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
+      - HA_CONCURRENT_QUERIES=50      
+      - HA_MYSQL_PORT=3306
+      - HA_PROXY_LOCAL=db.sqlite
+      - HA_MYSQL_PROXIED=mysql://root:password@mysql:3306/db      
+
+volumes:
+  mysql_data:
+    driver: local
+  node1_data:
+    driver: local

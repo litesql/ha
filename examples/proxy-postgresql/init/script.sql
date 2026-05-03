@@ -10,5 +10,8 @@ CREATE TABLE users(
 
 ALTER TABLE users REPLICA IDENTITY FULL;
 
+GRANT INSERT, UPDATE, DELETE ON users TO rep_user;
+
 CREATE PUBLICATION my_publication FOR TABLE users;
 
+SELECT pg_create_logical_replication_slot('my_slot', 'pgoutput');

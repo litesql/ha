@@ -65,8 +65,9 @@ var (
 	pgPublicationName *string
 	pgSlotName        *string
 
-	proxyLocalDB   *string
-	proxyUseSchema *bool
+	proxyLocalDB         *string
+	proxyUseSchema       *bool
+	proxyDisableRedirect *bool
 
 	mysqlPort              *int
 	mysqlUser              *string
@@ -159,6 +160,7 @@ func main() {
 
 	proxyLocalDB = flagSet.StringLong("proxy-local", "ha.db", "The name of the local database to proxy for the proxied PostgreSQL database (only used if --pg-proxied or --mysql-proxied is set)")
 	proxyUseSchema = flagSet.BoolLong("proxy-use-schema", "Use proxied database schema to create local tables (only used if --pg-proxied or --mysql-proxied is set)")
+	proxyDisableRedirect = flagSet.BoolLong("proxy-disable-redirect", "Disable redirect queries to proxied database (only used if --pg-proxied or --mysql-proxied is set). All queries will be executed on the HA SQLite database")
 
 	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Number of concurrent queries")
 
@@ -344,27 +346,29 @@ func run() error {
 	}
 
 	dumpTables := strings.Split(*mysqlProxiedDumpTables, ",")
+	proxyCfg := sqlite.ProxiedDBConfig{
+		PgDSN:             *pgProxied,
+		PgPublicationName: *pgPublicationName,
+		PgSlotName:        *pgSlotName,
+		MysqlDSN:          *mysqlProxied,
+		MysqlInclude:      *mysqlProxiedInclude,
+		MysqlExclude:      *mysqlProxiedExclude,
+		MysqlID:           *mysqlProxyID,
+		MysqlDumpBin:      *mysqlProxiedDumpBin,
+		MysqlDumpDB:       *mysqlProxiedDumpDB,
+		MysqlDumpTables:   dumpTables,
+		LocalDB:           *proxyLocalDB,
+		UseSchema:         *proxyUseSchema,
+		DisableRedirect:   *proxyDisableRedirect,
+	}
 	for _, dsn := range dsnList {
 		err := sqlite.Load(context.Background(), dsn, sqlite.LoadConfig{
 			MemDB:              *memDB,
 			FromLatestSnapshot: *fromLatestSnapshot,
 			DeliverPolicy:      *replicationPolicy,
 			MaxConns:           *concurrentQueries,
-			ProxiedDBConfig: sqlite.ProxiedDBConfig{
-				PgDSN:             *pgProxied,
-				PgPublicationName: *pgPublicationName,
-				PgSlotName:        *pgSlotName,
-				MysqlDSN:          *mysqlProxied,
-				MysqlInclude:      *mysqlProxiedInclude,
-				MysqlExclude:      *mysqlProxiedExclude,
-				MysqlID:           *mysqlProxyID,
-				MysqlDumpBin:      *mysqlProxiedDumpBin,
-				MysqlDumpDB:       *mysqlProxiedDumpDB,
-				MysqlDumpTables:   dumpTables,
-				LocalDB:           *proxyLocalDB,
-				UseSchema:         *proxyUseSchema,
-			},
-			Options: opts,
+			ProxiedDBConfig:    proxyCfg,
+			Options:            opts,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to load database %q: %w", dsn, err)
@@ -386,21 +390,7 @@ func run() error {
 	})
 	mux.HandleFunc("GET /databases", hahttp.DatabasesHandler)
 	mux.HandleFunc("POST /databases", hahttp.CreateDatabaseHandler(*createDatabaseDir,
-		*memDB, dsnParams, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries,
-		sqlite.ProxiedDBConfig{
-			PgDSN:             *pgProxied,
-			PgPublicationName: *pgPublicationName,
-			PgSlotName:        *pgSlotName,
-			MysqlDSN:          *mysqlProxied,
-			MysqlInclude:      *mysqlProxiedInclude,
-			MysqlExclude:      *mysqlProxiedExclude,
-			MysqlID:           *mysqlProxyID,
-			MysqlDumpBin:      *mysqlProxiedDumpBin,
-			MysqlDumpDB:       *mysqlProxiedDumpDB,
-			MysqlDumpTables:   dumpTables,
-			LocalDB:           *proxyLocalDB,
-			UseSchema:         *proxyUseSchema,
-		}, opts...))
+		*memDB, dsnParams, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, proxyCfg, opts...))
 	mux.HandleFunc("DELETE /databases/{id}", hahttp.DropDatabaseHandler())
 
 	mux.HandleFunc("POST /databases/{id}", hahttp.QueryHandler)
@@ -457,6 +447,7 @@ func run() error {
 			FromLatestSnapshot: *fromLatestSnapshot,
 			DeliverPolicy:      *replicationPolicy,
 			MaxConns:           *concurrentQueries,
+			ProxiedDBConfig:    proxyCfg,
 			Options:            opts,
 		},
 	})
@@ -481,6 +472,7 @@ func run() error {
 			FromLatestSnapshot: *fromLatestSnapshot,
 			DeliverPolicy:      *replicationPolicy,
 			MaxConns:           *concurrentQueries,
+			ProxiedDBConfig:    proxyCfg,
 			Options:            opts,
 		},
 	})
