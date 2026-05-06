@@ -68,6 +68,7 @@ var (
 	proxyLocalDB         *string
 	proxyUseSchema       *bool
 	proxyDisableRedirect *bool
+	proxyReadYourWrites  *bool
 
 	mysqlPort              *int
 	mysqlUser              *string
@@ -161,6 +162,7 @@ func main() {
 	proxyLocalDB = flagSet.StringLong("proxy-local", "ha.db", "Path to the local SQLite database file that proxies the source database (used only when --pg-proxied or --mysql-proxied is set)")
 	proxyUseSchema = flagSet.BoolLong("proxy-use-schema", "Create local tables using the schema from the source database (used only when --pg-proxied or --mysql-proxied is set)")
 	proxyDisableRedirect = flagSet.BoolLong("proxy-disable-redirect", "Disable redirecting queries to the source database; all queries will run on the local HA SQLite database (used only when --pg-proxied or --mysql-proxied is set)")
+	proxyReadYourWrites = flagSet.BoolLong("proxy-read-your-writes", "Enable read-your-writes to the proxy (used only when --pg-proxied or --mysql-proxied is set)")
 
 	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Number of concurrent queries")
 
@@ -360,6 +362,7 @@ func run() error {
 		LocalDB:           *proxyLocalDB,
 		UseSchema:         *proxyUseSchema,
 		DisableRedirect:   *proxyDisableRedirect,
+		ReadYourWrites:    *proxyReadYourWrites,
 	}
 	for _, dsn := range dsnList {
 		err := sqlite.Load(context.Background(), dsn, sqlite.LoadConfig{

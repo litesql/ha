@@ -532,6 +532,7 @@ DDL commands (such as CREATE, ALTER, and DROP) are not affected by undo operatio
 | --proxy-local | HA_PROXY_LOCAL | ha.db | Path to the local SQLite database file that proxies the source database (used only when --pg-proxied or --mysql-proxied is set) |
 | --proxy-use-schema | HA_PROXY_USE_SCHEMA | false | Create local tables using the schema from the source database (used only when --pg-proxied or --mysql-proxied is set) |
 | --proxy-disable-redirect | HA_PROXY_DISABLE_REDIRECT | false | Disable redirecting queries to the source database; all queries will run on the local HA SQLite database (used only when --pg-proxied or --mysql-proxied is set) |
+| --proxy-read-your-writes | HA_PROXY_READ_YOUR_WRITES | false | Enable read-your-writes to the proxy (used only when --pg-proxied or --mysql-proxied is set) |
 | --concurrent-queries | HA_CONCURRENT_QUERIES | 50 | Number of concurrent queries (DB pool max) |
 | --extensions | HA_EXTENSIONS |  | Comma-separated list of SQLite extensions path to load |
 | --async-replication | HA_ASYNC_REPLICATION | false | Enables asynchronous replication message publishing |

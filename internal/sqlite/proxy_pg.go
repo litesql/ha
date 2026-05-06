@@ -13,6 +13,43 @@ import (
 	"github.com/litesql/postgresql/replication"
 )
 
+type baseProxiedPositionTracker interface {
+	ha.ProxiedPositionProvider
+	SetReplicaDB(*sql.DB)
+}
+
+type pgPositionTracker struct {
+	sourceDB  *sql.DB
+	replicaDB *sql.DB
+}
+
+func (t *pgPositionTracker) SetReplicaDB(db *sql.DB) {
+	t.replicaDB = db
+}
+
+func (t *pgPositionTracker) ReplicaPosition(ctx context.Context) (uint64, error) {
+	if t.replicaDB == nil {
+		return 0, nil
+	}
+	var position pglogrepl.LSN
+	err := t.replicaDB.QueryRowContext(ctx, "SELECT position FROM ha_proxied_tracker LIMIT 1").Scan(&position)
+	if err != nil {
+		return 0, err
+	}
+	slog.Warn("replica position", "pos", position)
+	return uint64(position), nil
+}
+
+func (t *pgPositionTracker) SourcePosition(ctx context.Context) (uint64, error) {
+	var position pglogrepl.LSN
+	err := t.sourceDB.QueryRowContext(ctx, "SELECT pg_current_wal_lsn()").Scan(&position)
+	if err != nil {
+		return 0, err
+	}
+	slog.Warn("source position", "pos", position)
+	return uint64(position), nil
+}
+
 func handlePgProxiedChanges(db *sql.DB) replication.HandleChanges {
 	return func(changeset []replication.Change, currentPosition pglogrepl.LSN) error {
 		ctx := ha.ContextLocalDB(context.Background(), true)
@@ -23,7 +60,7 @@ func handlePgProxiedChanges(db *sql.DB) replication.HandleChanges {
 		defer tx.Rollback()
 		var serverTime time.Time
 		for _, change := range changeset {
-			slog.Debug("received proxied db data", "change", change)
+			slog.Debug("received proxied db data", "change", change, "currentPosition", currentPosition)
 			serverTime = change.ServerTime
 			var sql string
 			switch change.Kind {

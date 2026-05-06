@@ -269,7 +269,12 @@ func Start(remote string, token string) {
 				for _, row := range resp.ResultSet.Rows {
 					var cells []string
 					for _, val := range row.Values {
-						cells = append(cells, fmt.Sprint(haconnect.FromAnypb(val)))
+						v := haconnect.FromAnypb(val)
+						if v == nil {
+							cells = append(cells, "")
+							continue
+						}
+						cells = append(cells, fmt.Sprint(v))
 					}
 					t.Row(cells...)
 				}

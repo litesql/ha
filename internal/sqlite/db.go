@@ -68,6 +68,7 @@ type ProxiedDBConfig struct {
 	LocalDB         string
 	UseSchema       bool
 	DisableRedirect bool
+	ReadYourWrites  bool
 }
 
 func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
@@ -83,6 +84,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	}
 	options := slices.Clone(cfg.Options)
 
+	var proxiedPositionProvider baseProxiedPositionTracker
 	if cfg.ProxiedDBConfig.LocalDB == id && !cfg.ProxiedDBConfig.DisableRedirect {
 		if cfg.ProxiedDBConfig.PgDSN != "" {
 			proxiedDB, err := sql.Open("pgx", cfg.ProxiedDBConfig.PgDSN)
@@ -90,12 +92,19 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 				return fmt.Errorf("failed to open proxied db: %w", err)
 			}
 			options = append(options, ha.WithProxiedDB(proxiedDB))
+
+			proxiedPositionProvider = &pgPositionTracker{
+				sourceDB: proxiedDB,
+			}
 		} else if cfg.ProxiedDBConfig.MysqlDSN != "" {
 			proxiedDB, err := sql.Open("mysql", cfg.ProxiedDBConfig.MysqlDSN)
 			if err != nil {
 				return fmt.Errorf("failed to open proxied db: %w", err)
 			}
 			options = append(options, ha.WithProxiedDB(proxiedDB))
+		}
+		if cfg.ProxiedDBConfig.ReadYourWrites {
+			options = append(options, ha.WithProxiedPositionProvider(proxiedPositionProvider))
 		}
 	}
 
@@ -194,6 +203,11 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	db.SetConnMaxLifetime(0)
 	db.SetMaxOpenConns(cfg.MaxConns)
 	db.SetMaxIdleConns(cfg.MaxConns)
+
+	if proxiedPositionProvider != nil {
+		proxiedPositionProvider.SetReplicaDB(db)
+	}
+
 	connector.Subscriber().SetDB(db)
 
 	if connector.Snapshotter() != nil {
