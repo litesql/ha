@@ -239,6 +239,7 @@ func TestTransaction(t *testing.T) {
 	err = tx.QueryRow(context.TODO(), "SELECT name FROM user_transaction WHERE id = 1").Scan(&name)
 	if err != nil {
 		t.Fatalf("failed to select row: %v", err)
+		return
 	}
 	if name != "User 1" {
 		t.Fatalf("unexpected name: want %q got %q", "User 1", name)

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	//_ "github.com/go-sql-driver/mysql"
 	_ "github.com/go-mysql-org/go-mysql/driver"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/litesql/go-ha"
@@ -32,6 +33,11 @@ type connectorDB struct {
 
 type stoppableSubscription interface {
 	Stop()
+}
+
+type baseProxiedPositionTracker interface {
+	ha.ProxiedPositionProvider
+	SetReplicaDB(*sql.DB)
 }
 
 var (
@@ -102,6 +108,10 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 				return fmt.Errorf("failed to open proxied db: %w", err)
 			}
 			options = append(options, ha.WithProxiedDB(proxiedDB))
+
+			proxiedPositionProvider = &mysqlPositionTracker{
+				sourceDB: proxiedDB,
+			}
 		}
 		if cfg.ProxiedDBConfig.ReadYourWrites {
 			options = append(options, ha.WithProxiedPositionProvider(proxiedPositionProvider))
@@ -423,6 +433,7 @@ type querier interface {
 }
 
 func doQuery(ctx context.Context, querier querier, query string, args map[string]any) (*Response, error) {
+	slog.Warn("Query", "q", querier, "query", query, "ctx", ctx)
 	rows, err := querier.QueryContext(ctx, query, getArgs(args)...)
 	if err != nil {
 		return nil, err

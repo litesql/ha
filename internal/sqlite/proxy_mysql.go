@@ -14,6 +14,51 @@ import (
 	"github.com/litesql/mysql/replication"
 )
 
+type mysqlPositionTracker struct {
+	sourceDB  *sql.DB
+	replicaDB *sql.DB
+}
+
+func (t *mysqlPositionTracker) SetReplicaDB(db *sql.DB) {
+	t.replicaDB = db
+}
+
+func (t *mysqlPositionTracker) ReplicaPosition(ctx context.Context) (uint64, error) {
+	if t.replicaDB == nil {
+		return 0, nil
+	}
+	var positionJson string
+	err := t.replicaDB.QueryRowContext(ctx, "SELECT position FROM ha_proxied_tracker WHERE rowid = 1").Scan(&positionJson)
+	if err != nil {
+		return 0, err
+	}
+	var position mysql.Position
+	err = json.Unmarshal([]byte(positionJson), &position)
+	slog.Debug("replica position", "pos", position.Pos)
+	return uint64(position.Pos), nil
+}
+
+func (t *mysqlPositionTracker) SourcePosition(ctx context.Context) (uint64, error) {
+	var position string
+	err := t.sourceDB.QueryRowContext(ctx, "SELECT local FROM performance_schema.log_status LIMIT 1").Scan(&position)
+	if err != nil {
+		return 0, err
+	}
+	var logStatus mysqlLogStatus
+	err = json.Unmarshal([]byte(position), &logStatus)
+	if err != nil {
+		return 0, err
+	}
+	slog.Debug("source position", "pos", logStatus.BinaryLogPosition)
+	return logStatus.BinaryLogPosition, nil
+}
+
+type mysqlLogStatus struct {
+	GTID              string `json:"gtid_executed"`
+	BinaryLogFile     string `json:"binary_log_file"`
+	BinaryLogPosition uint64 `json:"binary_log_position"`
+}
+
 func handleMysqlProxiedChanges(db *sql.DB) replication.HandleChanges {
 	return func(changeset []replication.Change, currentPosition mysql.Position) error {
 		ctx := ha.ContextLocalDB(context.Background(), true)

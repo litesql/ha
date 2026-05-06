@@ -11,8 +11,8 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.19.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/go-ha v0.11.8
-	github.com/litesql/go-sqlite-ha v0.11.8
-	github.com/litesql/go-sqlite3-ha v0.11.8
+	github.com/litesql/go-sqlite-ha v0.11.10
+	github.com/litesql/go-sqlite3-ha v0.11.10
 	github.com/litesql/mysql v0.0.2
 	github.com/litesql/postgresql v0.1.4
 	github.com/modelcontextprotocol/go-sdk v1.6.0
@@ -69,7 +69,7 @@ require (
 	github.com/pingcap/errors v0.11.5-0.20260310054046-9c8b3586e4b2 // indirect
 	github.com/pingcap/failpoint v0.0.0-20260406204437-bbc9d102c19e // indirect
 	github.com/pingcap/log v1.1.1-0.20260227082333-572e590d08f1 // indirect
-	github.com/pingcap/tidb/pkg/parser v0.0.0-20260505151236-49398d2ae543 // indirect
+	github.com/pingcap/tidb/pkg/parser v0.0.0-20260506044349-7cc8b157bd6c // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rqlite/sql v0.0.0-20260224021119-1b2524a41372 // indirect

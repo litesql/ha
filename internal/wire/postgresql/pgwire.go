@@ -406,6 +406,9 @@ func handler(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.Prepared
 	} else {
 		eq = db
 	}
+	if eq == nil {
+		panic("eq nil")
+	}
 	resp, err := sqlite.Exec(ctx, eq, stmt, nil)
 	if err != nil {
 		return nil, err
