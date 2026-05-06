@@ -93,6 +93,7 @@ func init() {
 		"WithName":                       reflect.ValueOf(ha.WithName),
 		"WithNatsOptions":                reflect.ValueOf(ha.WithNatsOptions),
 		"WithProxiedDB":                  reflect.ValueOf(ha.WithProxiedDB),
+		"WithProxiedPositionProvider":    reflect.ValueOf(ha.WithProxiedPositionProvider),
 		"WithPublisherTimeout":           reflect.ValueOf(ha.WithPublisherTimeout),
 		"WithQueryRouter":                reflect.ValueOf(ha.WithQueryRouter),
 		"WithReplicas":                   reflect.ValueOf(ha.WithReplicas),
@@ -107,57 +108,59 @@ func init() {
 		"WithWaitFor":                    reflect.ValueOf(ha.WithWaitFor),
 
 		// type definitions
-		"AsyncNATSPublisher":   reflect.ValueOf((*ha.AsyncNATSPublisher)(nil)),
-		"BackupFn":             reflect.ValueOf((*ha.BackupFn)(nil)),
-		"CDCPublisher":         reflect.ValueOf((*ha.CDCPublisher)(nil)),
-		"Change":               reflect.ValueOf((*ha.Change)(nil)),
-		"ChangeSet":            reflect.ValueOf((*ha.ChangeSet)(nil)),
-		"ChangeSetInterceptor": reflect.ValueOf((*ha.ChangeSetInterceptor)(nil)),
-		"ChangeSetSerializer":  reflect.ValueOf((*ha.ChangeSetSerializer)(nil)),
-		"ConnHooksConfig":      reflect.ValueOf((*ha.ConnHooksConfig)(nil)),
-		"ConnHooksFactory":     reflect.ValueOf((*ha.ConnHooksFactory)(nil)),
-		"ConnHooksProvider":    reflect.ValueOf((*ha.ConnHooksProvider)(nil)),
-		"Connector":            reflect.ValueOf((*ha.Connector)(nil)),
-		"DBPublisher":          reflect.ValueOf((*ha.DBPublisher)(nil)),
-		"DBSnapshotter":        reflect.ValueOf((*ha.DBSnapshotter)(nil)),
-		"DBSubscriber":         reflect.ValueOf((*ha.DBSubscriber)(nil)),
-		"DBSubscriberConfig":   reflect.ValueOf((*ha.DBSubscriberConfig)(nil)),
-		"DebeziumData":         reflect.ValueOf((*ha.DebeziumData)(nil)),
-		"DebeziumPayload":      reflect.ValueOf((*ha.DebeziumPayload)(nil)),
-		"DebeziumSource":       reflect.ValueOf((*ha.DebeziumSource)(nil)),
-		"DebeziumTransaction":  reflect.ValueOf((*ha.DebeziumTransaction)(nil)),
-		"DynamicLeader":        reflect.ValueOf((*ha.DynamicLeader)(nil)),
-		"EmbeddedNatsConfig":   reflect.ValueOf((*ha.EmbeddedNatsConfig)(nil)),
-		"JSONPublisher":        reflect.ValueOf((*ha.JSONPublisher)(nil)),
-		"LeaderProvider":       reflect.ValueOf((*ha.LeaderProvider)(nil)),
-		"NATSPublisher":        reflect.ValueOf((*ha.NATSPublisher)(nil)),
-		"NATSSnapshotter":      reflect.ValueOf((*ha.NATSSnapshotter)(nil)),
-		"NATSSubscriber":       reflect.ValueOf((*ha.NATSSubscriber)(nil)),
-		"NATSSubscriberConfig": reflect.ValueOf((*ha.NATSSubscriberConfig)(nil)),
-		"NoopPublisher":        reflect.ValueOf((*ha.NoopPublisher)(nil)),
-		"NoopSnapshotter":      reflect.ValueOf((*ha.NoopSnapshotter)(nil)),
-		"NoopSubscriber":       reflect.ValueOf((*ha.NoopSubscriber)(nil)),
-		"Option":               reflect.ValueOf((*ha.Option)(nil)),
-		"Publisher":            reflect.ValueOf((*ha.Publisher)(nil)),
-		"RowIdentify":          reflect.ValueOf((*ha.RowIdentify)(nil)),
-		"SequenceProvider":     reflect.ValueOf((*ha.SequenceProvider)(nil)),
-		"Statement":            reflect.ValueOf((*ha.Statement)(nil)),
-		"StaticLeader":         reflect.ValueOf((*ha.StaticLeader)(nil)),
-		"Subscriber":           reflect.ValueOf((*ha.Subscriber)(nil)),
-		"TxSeqTracker":         reflect.ValueOf((*ha.TxSeqTracker)(nil)),
-		"TxSeqTrackerProvider": reflect.ValueOf((*ha.TxSeqTrackerProvider)(nil)),
-		"WriterPublisher":      reflect.ValueOf((*ha.WriterPublisher)(nil)),
+		"AsyncNATSPublisher":      reflect.ValueOf((*ha.AsyncNATSPublisher)(nil)),
+		"BackupFn":                reflect.ValueOf((*ha.BackupFn)(nil)),
+		"CDCPublisher":            reflect.ValueOf((*ha.CDCPublisher)(nil)),
+		"Change":                  reflect.ValueOf((*ha.Change)(nil)),
+		"ChangeSet":               reflect.ValueOf((*ha.ChangeSet)(nil)),
+		"ChangeSetInterceptor":    reflect.ValueOf((*ha.ChangeSetInterceptor)(nil)),
+		"ChangeSetSerializer":     reflect.ValueOf((*ha.ChangeSetSerializer)(nil)),
+		"ConnHooksConfig":         reflect.ValueOf((*ha.ConnHooksConfig)(nil)),
+		"ConnHooksFactory":        reflect.ValueOf((*ha.ConnHooksFactory)(nil)),
+		"ConnHooksProvider":       reflect.ValueOf((*ha.ConnHooksProvider)(nil)),
+		"Connector":               reflect.ValueOf((*ha.Connector)(nil)),
+		"DBPublisher":             reflect.ValueOf((*ha.DBPublisher)(nil)),
+		"DBSnapshotter":           reflect.ValueOf((*ha.DBSnapshotter)(nil)),
+		"DBSubscriber":            reflect.ValueOf((*ha.DBSubscriber)(nil)),
+		"DBSubscriberConfig":      reflect.ValueOf((*ha.DBSubscriberConfig)(nil)),
+		"DebeziumData":            reflect.ValueOf((*ha.DebeziumData)(nil)),
+		"DebeziumPayload":         reflect.ValueOf((*ha.DebeziumPayload)(nil)),
+		"DebeziumSource":          reflect.ValueOf((*ha.DebeziumSource)(nil)),
+		"DebeziumTransaction":     reflect.ValueOf((*ha.DebeziumTransaction)(nil)),
+		"DynamicLeader":           reflect.ValueOf((*ha.DynamicLeader)(nil)),
+		"EmbeddedNatsConfig":      reflect.ValueOf((*ha.EmbeddedNatsConfig)(nil)),
+		"JSONPublisher":           reflect.ValueOf((*ha.JSONPublisher)(nil)),
+		"LeaderProvider":          reflect.ValueOf((*ha.LeaderProvider)(nil)),
+		"NATSPublisher":           reflect.ValueOf((*ha.NATSPublisher)(nil)),
+		"NATSSnapshotter":         reflect.ValueOf((*ha.NATSSnapshotter)(nil)),
+		"NATSSubscriber":          reflect.ValueOf((*ha.NATSSubscriber)(nil)),
+		"NATSSubscriberConfig":    reflect.ValueOf((*ha.NATSSubscriberConfig)(nil)),
+		"NoopPublisher":           reflect.ValueOf((*ha.NoopPublisher)(nil)),
+		"NoopSnapshotter":         reflect.ValueOf((*ha.NoopSnapshotter)(nil)),
+		"NoopSubscriber":          reflect.ValueOf((*ha.NoopSubscriber)(nil)),
+		"Option":                  reflect.ValueOf((*ha.Option)(nil)),
+		"ProxiedPositionProvider": reflect.ValueOf((*ha.ProxiedPositionProvider)(nil)),
+		"Publisher":               reflect.ValueOf((*ha.Publisher)(nil)),
+		"RowIdentify":             reflect.ValueOf((*ha.RowIdentify)(nil)),
+		"SequenceProvider":        reflect.ValueOf((*ha.SequenceProvider)(nil)),
+		"Statement":               reflect.ValueOf((*ha.Statement)(nil)),
+		"StaticLeader":            reflect.ValueOf((*ha.StaticLeader)(nil)),
+		"Subscriber":              reflect.ValueOf((*ha.Subscriber)(nil)),
+		"TxSeqTracker":            reflect.ValueOf((*ha.TxSeqTracker)(nil)),
+		"TxSeqTrackerProvider":    reflect.ValueOf((*ha.TxSeqTrackerProvider)(nil)),
+		"WriterPublisher":         reflect.ValueOf((*ha.WriterPublisher)(nil)),
 
 		// interface wrapper definitions
-		"_CDCPublisher":         reflect.ValueOf((*_github_com_litesql_go_ha_CDCPublisher)(nil)),
-		"_ChangeSetInterceptor": reflect.ValueOf((*_github_com_litesql_go_ha_ChangeSetInterceptor)(nil)),
-		"_ConnHooksProvider":    reflect.ValueOf((*_github_com_litesql_go_ha_ConnHooksProvider)(nil)),
-		"_DBSnapshotter":        reflect.ValueOf((*_github_com_litesql_go_ha_DBSnapshotter)(nil)),
-		"_LeaderProvider":       reflect.ValueOf((*_github_com_litesql_go_ha_LeaderProvider)(nil)),
-		"_Publisher":            reflect.ValueOf((*_github_com_litesql_go_ha_Publisher)(nil)),
-		"_SequenceProvider":     reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
-		"_Subscriber":           reflect.ValueOf((*_github_com_litesql_go_ha_Subscriber)(nil)),
-		"_TxSeqTracker":         reflect.ValueOf((*_github_com_litesql_go_ha_TxSeqTracker)(nil)),
+		"_CDCPublisher":            reflect.ValueOf((*_github_com_litesql_go_ha_CDCPublisher)(nil)),
+		"_ChangeSetInterceptor":    reflect.ValueOf((*_github_com_litesql_go_ha_ChangeSetInterceptor)(nil)),
+		"_ConnHooksProvider":       reflect.ValueOf((*_github_com_litesql_go_ha_ConnHooksProvider)(nil)),
+		"_DBSnapshotter":           reflect.ValueOf((*_github_com_litesql_go_ha_DBSnapshotter)(nil)),
+		"_LeaderProvider":          reflect.ValueOf((*_github_com_litesql_go_ha_LeaderProvider)(nil)),
+		"_ProxiedPositionProvider": reflect.ValueOf((*_github_com_litesql_go_ha_ProxiedPositionProvider)(nil)),
+		"_Publisher":               reflect.ValueOf((*_github_com_litesql_go_ha_Publisher)(nil)),
+		"_SequenceProvider":        reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
+		"_Subscriber":              reflect.ValueOf((*_github_com_litesql_go_ha_Subscriber)(nil)),
+		"_TxSeqTracker":            reflect.ValueOf((*_github_com_litesql_go_ha_TxSeqTracker)(nil)),
 	}
 }
 
@@ -245,6 +248,20 @@ func (W _github_com_litesql_go_ha_LeaderProvider) Ready() chan struct{} {
 }
 func (W _github_com_litesql_go_ha_LeaderProvider) RedirectTarget() string {
 	return W.WRedirectTarget()
+}
+
+// _github_com_litesql_go_ha_ProxiedPositionProvider is an interface wrapper for ProxiedPositionProvider type
+type _github_com_litesql_go_ha_ProxiedPositionProvider struct {
+	IValue           interface{}
+	WReplicaPosition func(a0 context.Context) (uint64, error)
+	WSourcePosition  func(a0 context.Context) (uint64, error)
+}
+
+func (W _github_com_litesql_go_ha_ProxiedPositionProvider) ReplicaPosition(a0 context.Context) (uint64, error) {
+	return W.WReplicaPosition(a0)
+}
+func (W _github_com_litesql_go_ha_ProxiedPositionProvider) SourcePosition(a0 context.Context) (uint64, error) {
+	return W.WSourcePosition(a0)
 }
 
 // _github_com_litesql_go_ha_Publisher is an interface wrapper for Publisher type
