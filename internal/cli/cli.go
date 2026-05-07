@@ -238,9 +238,11 @@ func Start(remote string, token string) {
 				continue
 			}
 
+			start := time.Now()
 			reqChan <- &sqlv1.QueryRequest{
 				Sql:           command,
 				ReplicationId: replicationID,
+				Type:          queryTypeFromSQL(command),
 			}
 			command = ""
 			resp := <-respChan
@@ -250,7 +252,7 @@ func Start(remote string, token string) {
 			}
 			if resp.ResultSet != nil {
 				if len(resp.ResultSet.Columns) == 2 && resp.ResultSet.Columns[0] == "rows_affected" && len(resp.ResultSet.Rows) == 1 {
-					fmt.Printf("%d rows affected\n", resp.RowsAffected)
+					fmt.Printf("Query OK, %d rows affected (%s)\n", resp.RowsAffected, time.Since(start))
 					continue
 				}
 				t := table.New().
@@ -281,9 +283,9 @@ func Start(remote string, token string) {
 				fmt.Println(t.Render())
 			}
 			if resp.RowsAffected == 0 {
-				continue
+				fmt.Printf("Query OK (%s)\n", resp.RowsAffected, time.Since(start))
 			}
-			fmt.Printf("%d rows affected\n", resp.RowsAffected)
+			fmt.Printf("Query OK, %d rows affected (%s)\n", resp.RowsAffected, time.Since(start))
 		}
 	}
 }
@@ -350,4 +352,13 @@ func dropDatabase(baseURL string, token string, id string) error {
 		return fmt.Errorf("failed to drop database: %s, %s", resp.Status, string(data))
 	}
 	return nil
+}
+
+func queryTypeFromSQL(sql string) sqlv1.QueryType {
+	upper := strings.ToUpper(strings.TrimSpace(sql))
+	if strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "EXPLAIN") {
+		return sqlv1.QueryType_QUERY_TYPE_EXEC_QUERY
+	}
+
+	return sqlv1.QueryType_QUERY_TYPE_EXEC_UPDATE
 }

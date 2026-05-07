@@ -17,13 +17,16 @@ import (
 	"sync"
 	"time"
 
-	//_ "github.com/go-sql-driver/mysql"
 	_ "github.com/go-mysql-org/go-mysql/driver"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	debeziumsink "github.com/litesql/debezium-sink/consumer"
 	"github.com/litesql/go-ha"
 	mysqlreplication "github.com/litesql/mysql/replication"
 	pgreplication "github.com/litesql/postgresql/replication"
+	_ "github.com/microsoft/go-mssqldb"
 	"github.com/nats-io/nats.go/jetstream"
+	_ "github.com/sijms/go-ora/v2"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 type connectorDB struct {
@@ -71,6 +74,11 @@ type ProxiedDBConfig struct {
 	MysqlDumpDB     string
 	MysqlDumpTables []string
 
+	DebeziumBroker    string
+	DebeziumGroup     string
+	DebeziumTopics    []string
+	DebeziumSourceDSN string
+
 	LocalDB         string
 	UseSchema       bool
 	DisableRedirect bool
@@ -92,7 +100,8 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 
 	var proxiedPositionProvider baseProxiedPositionTracker
 	if cfg.ProxiedDBConfig.LocalDB == id && !cfg.ProxiedDBConfig.DisableRedirect {
-		if cfg.ProxiedDBConfig.PgDSN != "" {
+		switch {
+		case cfg.ProxiedDBConfig.PgDSN != "":
 			proxiedDB, err := sql.Open("pgx", cfg.ProxiedDBConfig.PgDSN)
 			if err != nil {
 				return fmt.Errorf("failed to open proxied db: %w", err)
@@ -102,7 +111,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			proxiedPositionProvider = &pgPositionTracker{
 				sourceDB: proxiedDB,
 			}
-		} else if cfg.ProxiedDBConfig.MysqlDSN != "" {
+		case cfg.ProxiedDBConfig.MysqlDSN != "":
 			proxiedDB, err := sql.Open("mysql", cfg.ProxiedDBConfig.MysqlDSN)
 			if err != nil {
 				return fmt.Errorf("failed to open proxied db: %w", err)
@@ -112,6 +121,26 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			proxiedPositionProvider = &mysqlPositionTracker{
 				sourceDB: proxiedDB,
 			}
+		case cfg.ProxiedDBConfig.DebeziumSourceDSN != "":
+			var driver string
+			switch {
+			case strings.HasPrefix(cfg.ProxiedDBConfig.DebeziumSourceDSN, "mysql"), strings.HasPrefix(cfg.ProxiedDBConfig.DebeziumSourceDSN, "mariadb"):
+				driver = "mysql"
+			case strings.HasPrefix(cfg.ProxiedDBConfig.DebeziumSourceDSN, "oracle"):
+				driver = "oracle"
+			case strings.HasPrefix(cfg.ProxiedDBConfig.DebeziumSourceDSN, "postgres"):
+				driver = "pgx"
+			case strings.HasPrefix(cfg.ProxiedDBConfig.DebeziumSourceDSN, "sqlserver"):
+				driver = "sqlserver"
+			default:
+				return fmt.Errorf("unsupported debezium source DSN")
+			}
+
+			proxiedDB, err := sql.Open(driver, cfg.ProxiedDBConfig.DebeziumSourceDSN)
+			if err != nil {
+				return fmt.Errorf("failed to open proxied db: %w", err)
+			}
+			options = append(options, ha.WithProxiedDB(proxiedDB))
 		}
 		if cfg.ProxiedDBConfig.ReadYourWrites {
 			options = append(options, ha.WithProxiedPositionProvider(proxiedPositionProvider))
@@ -234,7 +263,8 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		if err != nil {
 			return fmt.Errorf("create proxied tracker table: %w", err)
 		}
-		if cfg.ProxiedDBConfig.PgDSN != "" {
+		switch {
+		case cfg.ProxiedDBConfig.PgDSN != "":
 			slog.Info("setting up replication proxy", "source_dsn", cfg.ProxiedDBConfig.PgDSN, "publication", cfg.ProxiedDBConfig.PgPublicationName, "slot", cfg.ProxiedDBConfig.PgSlotName)
 			info, err := pgreplication.CreateSlot(cfg.ProxiedDBConfig.PgDSN, cfg.ProxiedDBConfig.PgSlotName)
 			if err != nil {
@@ -254,7 +284,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 				proxiedSubscription[id] = subscription
 			}
 			go subscription.Start(slog.Default(), pgCheckpointLoader(db), true)
-		} else if cfg.ProxiedDBConfig.MysqlDSN != "" {
+		case cfg.ProxiedDBConfig.MysqlDSN != "":
 			slog.Info("setting up replication proxy", "source_dsn", cfg.ProxiedDBConfig.MysqlDSN, "id", cfg.ProxiedDBConfig.MysqlID, "includes", cfg.ProxiedDBConfig.MysqlInclude, "excludes", cfg.ProxiedDBConfig.MysqlExclude, "dump", cfg.ProxiedDBConfig.MysqlDumpBin, "dump_db", cfg.ProxiedDBConfig.MysqlDumpDB, "dump_tables", cfg.ProxiedDBConfig.MysqlDumpTables)
 
 			subscription, err := mysqlreplication.Subscribe(mysqlreplication.Config{
@@ -265,14 +295,23 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 				DumpExecutionPath:  cfg.ProxiedDBConfig.MysqlDumpBin,
 				DumpDB:             cfg.ProxiedDBConfig.MysqlDumpDB,
 				DumpTables:         cfg.ProxiedDBConfig.MysqlDumpTables,
-				Logger:             slog.Default(),
 			}, handleMysqlProxiedChanges(db), cfg.ProxiedDBConfig.UseSchema)
 			if err != nil {
 				return fmt.Errorf("subscribe to proxied db: %w", err)
 			} else {
 				proxiedSubscription[id] = subscription
 			}
-			go subscription.Start(slog.Default(), mysqlCheckpointLoader(db))
+			go subscription.Start(slog.Default(), mysqlCheckpointLoader(db), true)
+		case cfg.ProxiedDBConfig.DebeziumBroker != "":
+			var opts []kgo.Opt
+			opts = append(opts, kgo.SeedBrokers(strings.Split(cfg.ProxiedDBConfig.DebeziumBroker, ",")...))
+			opts = append(opts, kgo.ConsumerGroup(cfg.ProxiedDBConfig.DebeziumGroup))
+			consumer, err := debeziumsink.New(opts, false)
+			if err != nil {
+				return fmt.Errorf("subscribe to proxied debezium: %w", err)
+			}
+			consumer.AddTopics(cfg.ProxiedDBConfig.DebeziumTopics...)
+			go consumer.Start(slog.Default(), handleDebeziumProxiedChanges(db))
 		}
 	}
 	close(waitFor)
@@ -306,13 +345,14 @@ type execerQuerier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
-func Exec(ctx context.Context, eq execerQuerier, stmt *ha.Statement, params map[string]any) (*Response, error) {
-	slog.Info("Executing statement", "type", stmt.Type(), "sql", stmt.Source(), "params", params)
-	if stmt.IsSelect() || stmt.IsExplain() || stmt.HasReturning() {
-		return doQuery(ctx, eq, stmt.Source(), params)
+func Exec(ctx context.Context, eq execerQuerier, sql string, params map[string]any) (*Response, error) {
+	slog.Info("Executing statement", "sql", sql, "params", params)
+	upper := strings.ToUpper(strings.TrimSpace(sql))
+	if strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "EXPLAIN") {
+		return doQuery(ctx, eq, sql, params)
 	}
 
-	return doExec(ctx, eq, stmt.Source(), params)
+	return doExec(ctx, eq, sql, params)
 }
 
 func Databases() []string {
@@ -354,11 +394,7 @@ func Transaction(ctx context.Context, db *sql.DB, queries []Request) ([]*Respons
 
 	var list []*Response
 	for _, query := range queries {
-		stmt, err := ha.ParseStatement(ctx, query.Sql)
-		if err != nil {
-			return nil, err
-		}
-		res, err := Exec(ctx, tx, stmt, query.Params)
+		res, err := Exec(ctx, tx, query.Sql, query.Params)
 		if err != nil {
 			return nil, err
 		}

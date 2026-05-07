@@ -81,6 +81,11 @@ var (
 	mysqlProxiedDumpTables *string
 	mysqlProxyID           *string
 
+	debeziumBrokers   *string
+	debeziumGroup     *string
+	debeziumTopics    *[]string
+	debeziumSourceDSN *string
+
 	concurrentQueries *int
 	extensions        *string
 
@@ -163,6 +168,11 @@ func main() {
 	proxyUseSchema = flagSet.BoolLong("proxy-use-schema", "Create local tables using the schema from the source database (used only when --pg-proxied or --mysql-proxied is set)")
 	proxyDisableRedirect = flagSet.BoolLong("proxy-disable-redirect", "Disable redirecting queries to the source database; all queries will run on the local HA SQLite database (used only when --pg-proxied or --mysql-proxied is set)")
 	proxyReadYourWrites = flagSet.BoolLong("proxy-read-your-writes", "Enable read-your-writes to the proxy (used only when --pg-proxied or --mysql-proxied is set)")
+
+	debeziumBrokers = flagSet.StringLong("debezium-brokers", "", "Comma-separated list of Kafka brokers to configure HA as a Debezium Sink")
+	debeziumGroup = flagSet.StringLong("debezium-group", "", "Kafka consumer group")
+	debeziumTopics = flagSet.StringListLong("debezium-topic", "Kafka topics to consume")
+	debeziumSourceDSN = flagSet.StringLong("debezium-source-dsn", "", "Debezium source DSN to redirect writes")
 
 	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Number of concurrent queries")
 
@@ -359,6 +369,10 @@ func run() error {
 		MysqlDumpBin:      *mysqlProxiedDumpBin,
 		MysqlDumpDB:       *mysqlProxiedDumpDB,
 		MysqlDumpTables:   dumpTables,
+		DebeziumBroker:    *debeziumBrokers,
+		DebeziumGroup:     *debeziumGroup,
+		DebeziumTopics:    *debeziumTopics,
+		DebeziumSourceDSN: *debeziumSourceDSN,
 		LocalDB:           *proxyLocalDB,
 		UseSchema:         *proxyUseSchema,
 		DisableRedirect:   *proxyDisableRedirect,

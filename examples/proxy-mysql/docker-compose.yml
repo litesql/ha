@@ -1,10 +1,10 @@
 services:
   mysql:
-    image: mysql:5.7
+    image: mysql:8.0
     ports:
       - '3306:3306' 
     restart: always
-    command: [ "mysqld", "--log-bin=mysql-bin", "--server-id=1", "--binlog-format=ROW", "--binlog-row-image=FULL", "--expire-logs-days=10", "--max_allowed_packet=32505856","--gtid-mode=ON", "--enforce-gtid-consistency=ON","--sql_mode=ALLOW_INVALID_DATES" ]
+    command: [ "mysqld", "--log-bin=mysql-bin", "--server-id=1", "--binlog-row-image=FULL", "--expire-logs-days=10", "--max_allowed_packet=32505856","--gtid-mode=ON", "--enforce-gtid-consistency=ON","--sql_mode=ALLOW_INVALID_DATES" ]
     volumes:
       - ./init:/docker-entrypoint-initdb.d:ro
       - mysql_data:/var/lib/mysql
@@ -28,7 +28,10 @@ services:
       - HA_NATS_PORT=0      
       - HA_MYSQL_PORT=3306
       - HA_PROXY_LOCAL=db.sqlite
-      - HA_MYSQL_PROXIED=mysql://root:password@mysql:3306/db      
+      - HA_PROXY_READ_YOUR_WRITES=true
+      - HA_MYSQL_PROXIED=mysql://root:password@mysql:3306/db
+      - HA_LOG_LEVEL=debug
+        
 
 volumes:
   mysql_data:

@@ -3,7 +3,6 @@ package mcp
 import (
 	"context"
 
-	"github.com/litesql/go-ha"
 	"github.com/litesql/ha/internal/sqlite"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -26,11 +25,7 @@ func Query(ctx context.Context, req *mcp.CallToolRequest, input QueryInput) (res
 	if err != nil {
 		return
 	}
-	stmt, err := ha.ParseStatement(ctx, input.Query)
-	if err != nil {
-		return
-	}
-	res, err := sqlite.Exec(ctx, db, stmt, input.Params)
+	res, err := sqlite.Exec(ctx, db, input.Query, input.Params)
 	if err != nil {
 		return
 	}

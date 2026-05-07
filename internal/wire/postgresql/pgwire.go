@@ -409,7 +409,7 @@ func handler(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.Prepared
 	if eq == nil {
 		panic("eq nil")
 	}
-	resp, err := sqlite.Exec(ctx, eq, stmt, nil)
+	resp, err := sqlite.Exec(ctx, eq, stmt.Source(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +509,7 @@ func handlerPrepared(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.
 			}
 			params[bindParameters[i]] = value
 		}
-		resp, err := sqlite.Exec(ctxHandle, eq, stmt, params)
+		resp, err := sqlite.Exec(ctxHandle, eq, stmt.Source(), params)
 		if err != nil {
 			slog.ErrorContext(ctx, "pg-wire: local exec", "error", err, "query", stmt.Source())
 			return err
