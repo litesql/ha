@@ -194,7 +194,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		if cfg.MemDB {
 			slog.Info("using in-memory database", "dsn", dsn)
 			filename := filenameFromDSN(dsn)
-			options := slices.Clone(cfg.Options)
+			options := slices.Clone(options)
 			if filename != "" && cfg.DeliverPolicy == "" {
 				matched := reDateTime.MatchString(filepath.Base(filename))
 				if matched {
@@ -306,11 +306,11 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			var opts []kgo.Opt
 			opts = append(opts, kgo.SeedBrokers(strings.Split(cfg.ProxiedDBConfig.DebeziumBroker, ",")...))
 			opts = append(opts, kgo.ConsumerGroup(cfg.ProxiedDBConfig.DebeziumGroup))
+			opts = append(opts, kgo.ConsumeTopics(cfg.ProxiedDBConfig.DebeziumTopics...))
 			consumer, err := debeziumsink.New(opts, false)
 			if err != nil {
 				return fmt.Errorf("subscribe to proxied debezium: %w", err)
 			}
-			consumer.AddTopics(cfg.ProxiedDBConfig.DebeziumTopics...)
 			go consumer.Start(slog.Default(), handleDebeziumProxiedChanges(db))
 		}
 	}

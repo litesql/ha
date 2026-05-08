@@ -1,0 +1,19 @@
+{
+  "name": "oracle-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.oracle.OracleConnector",
+    "tasks.max": "1",
+    "database.hostname": "oracle-26ai",
+    "database.port": "1521",
+    "database.user": "c##dbezium",
+    "database.password": "dbezium123",
+    "database.dbname": "FREE",
+    "database.pdb.name": "FREEPDB1",
+    "topic.prefix": "oracle",
+    "schema.history.internal.kafka.bootstrap.servers": "kafka:9092",
+    "schema.history.internal.kafka.topic": "schema-changes.oracle",
+    "table.include.list": "app.users",
+    "log.mining.strategy": "online_catalog",
+    "log.mining.continuous.mine": "true"
+  }
+}

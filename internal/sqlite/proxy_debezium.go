@@ -61,6 +61,9 @@ func handleDebeziumProxiedChanges(db *sql.DB) consumer.HandlerFn {
 				}
 				sql = fmt.Sprintf("DELETE FROM `%s` WHERE %s", change.Table, strings.Join(whereClause, " AND "))
 				_, err = tx.ExecContext(ctx, sql, args...)
+			case "TRUNCATE":
+				sql = fmt.Sprintf("DELETE FROM %s", change.Table)
+				_, err = tx.ExecContext(ctx, sql)
 			case "SQL":
 				_, err = tx.ExecContext(ctx, change.SQL)
 			}

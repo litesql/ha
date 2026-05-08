@@ -1,0 +1,71 @@
+services:
+  oracle:
+    image: gvenzl/oracle-free:23.6-slim-faststart
+    container_name: oracle-26ai
+    ports:
+      - "1521:1521"
+    environment:
+      ORACLE_PASSWORD: Oracle123      
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./init:/container-entrypoint-startdb.d
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+  kafka:
+    image: quay.io/debezium/kafka:3.5
+    container_name: kafka
+    ports:
+      - 9092:9092
+      - 9093:9093
+    environment:
+      - CLUSTER_ID=oh-sxaDRTcyAr6pFRbXyzA
+      - NODE_ID=1
+      - NODE_ROLE=combined
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_LISTENERS=PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+
+  connect:
+    image: quay.io/debezium/connect:3.5
+    container_name: debezium-connect
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: debezium_configs
+      OFFSET_STORAGE_TOPIC: debezium_offsets
+      STATUS_STORAGE_TOPIC: debezium_status
+    depends_on:
+      - kafka
+      - oracle
+
+  node1:
+    image: ghcr.io/litesql/ha:latest
+    restart: always
+    volumes:
+      - node1_data:/data
+    ports:
+      - "8080:8080"
+    environment:
+      - HA_NAME=node1-proxy-debezium
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL
+      - HA_CONCURRENT_QUERIES=50
+      - HA_NATS_PORT=0      
+      - HA_PROXY_LOCAL=db.sqlite
+      - HA_PROXY_READ_YOUR_WRITES=true
+      - HA_DEBEZIUM_BROKERS=kafka:9092
+      - HA_DEBEZIUM_GROUP=example
+      - HA_DEBEZIUM_TOPICS=oracle.APP.USERS
+      - HA_DEBEZIUM_SOURCE_DSN=oracle://sys:Oracle123@oracle:1521/FREEPDB1
+      - HA_LOG_LEVEL=debug
+    depends_on:
+      - kafka
+      - oracle
+
+volumes:
+  oracle_data:
+  node1_data:

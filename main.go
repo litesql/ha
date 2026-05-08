@@ -171,7 +171,7 @@ func main() {
 
 	debeziumBrokers = flagSet.StringLong("debezium-brokers", "", "Comma-separated list of Kafka brokers to configure HA as a Debezium Sink")
 	debeziumGroup = flagSet.StringLong("debezium-group", "", "Kafka consumer group")
-	debeziumTopics = flagSet.StringListLong("debezium-topic", "Kafka topics to consume")
+	debeziumTopics = flagSet.StringListLong("debezium-topics", "Kafka topics to consume")
 	debeziumSourceDSN = flagSet.StringLong("debezium-source-dsn", "", "Debezium source DSN to redirect writes")
 
 	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Number of concurrent queries")

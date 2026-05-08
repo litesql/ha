@@ -240,7 +240,7 @@ func Start(remote string, token string) {
 
 			start := time.Now()
 			reqChan <- &sqlv1.QueryRequest{
-				Sql:           command,
+				Sql:           strings.TrimSuffix(command, ";"),
 				ReplicationId: replicationID,
 				Type:          queryTypeFromSQL(command),
 			}
@@ -283,7 +283,8 @@ func Start(remote string, token string) {
 				fmt.Println(t.Render())
 			}
 			if resp.RowsAffected == 0 {
-				fmt.Printf("Query OK (%s)\n", resp.RowsAffected, time.Since(start))
+				fmt.Printf("Query OK (%s)\n", time.Since(start))
+				continue
 			}
 			fmt.Printf("Query OK, %d rows affected (%s)\n", resp.RowsAffected, time.Since(start))
 		}
