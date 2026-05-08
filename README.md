@@ -185,7 +185,7 @@ mysql -h localhost --port 3306 -u ha
 
 ## Proxy and Replicate Other Databases
 
-HA can proxy connections to PostgreSQL and MySQL databases, replicating their data to achieve high availability and enable faster queries.
+HA can proxy connections to PostgreSQL, MySQL databases or any [Debezium source connector](https://debezium.io/documentation/reference/stable/connectors/index.html) database, replicating their data to achieve high availability and enable faster queries.
 
 ![HA Proxy Architecture](ha_proxy.png)
 
@@ -196,6 +196,11 @@ HA can proxy connections to PostgreSQL and MySQL databases, replicating their da
 ### Proxy and Replicate MySQL
 
 [MySQL Example](https://github.com/litesql/ha/tree/main/examples/proxy-mysql)
+
+
+### Proxy and Replicate Oracle via Debezium
+
+[Oracle Example](https://github.com/litesql/ha/tree/main/examples/proxy-oracle-debezium)
 
 ## API Documentation
 
