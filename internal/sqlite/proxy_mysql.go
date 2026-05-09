@@ -71,11 +71,11 @@ func handleMysqlProxiedChanges(db *sql.DB) replication.HandleChanges {
 		for _, change := range changeset {
 			slog.Debug("received proxied db data", "change", change)
 			serverTime = change.ServerTime
-			var sql string
+			var query string
 			switch change.Kind {
 			case "INSERT":
-				sql = fmt.Sprintf("REPLACE INTO `%s` (%s) VALUES (%s)", change.Table, strings.Join(change.ColumnNames, ", "), placeholders(len(change.ColumnValues)))
-				_, err = tx.ExecContext(ctx, sql, change.ColumnValues...)
+				query = fmt.Sprintf("REPLACE INTO `%s` (%s) VALUES (%s)", change.Table, strings.Join(change.ColumnNames, ", "), placeholders(len(change.ColumnValues)))
+				_, err = tx.ExecContext(ctx, query, change.ColumnValues...)
 			case "UPDATE":
 				setClauses := make([]string, len(change.ColumnNames))
 				for i, name := range change.ColumnNames {
@@ -92,8 +92,16 @@ func handleMysqlProxiedChanges(db *sql.DB) replication.HandleChanges {
 						args = append(args, change.OldKeys.KeyValues[i])
 					}
 				}
-				sql = fmt.Sprintf("UPDATE `%s` SET %s WHERE %s", change.Table, strings.Join(setClauses, ", "), strings.Join(whereClause, " AND "))
-				_, err = tx.ExecContext(ctx, sql, args...)
+				query = fmt.Sprintf("UPDATE `%s` SET %s WHERE %s", change.Table, strings.Join(setClauses, ", "), strings.Join(whereClause, " AND "))
+				var res sql.Result
+				res, err = tx.ExecContext(ctx, query, args...)
+				if err == nil {
+					affected, _ := res.RowsAffected()
+					if affected == 0 {
+						query = fmt.Sprintf("REPLACE INTO `%s` (%s) VALUES (%s)", change.Table, strings.Join(change.ColumnNames, ", "), placeholders(len(change.ColumnValues)))
+						_, err = tx.ExecContext(ctx, query, change.ColumnValues...)
+					}
+				}
 			case "DELETE":
 				whereClause := make([]string, len(change.ColumnNames))
 				var args []any
@@ -105,13 +113,14 @@ func handleMysqlProxiedChanges(db *sql.DB) replication.HandleChanges {
 						args = append(args, change.ColumnValues[i])
 					}
 				}
-				sql = fmt.Sprintf("DELETE FROM `%s` WHERE %s", change.Table, strings.Join(whereClause, " AND "))
-				_, err = tx.ExecContext(ctx, sql, args...)
+				query = fmt.Sprintf("DELETE FROM `%s` WHERE %s", change.Table, strings.Join(whereClause, " AND "))
+				_, err = tx.ExecContext(ctx, query, args...)
 			case "SQL":
-				_, err = tx.ExecContext(ctx, change.SQL)
+				query = change.SQL
+				_, err = tx.ExecContext(ctx, query)
 			}
 			if err != nil {
-				return fmt.Errorf("apply change: %s: %w", sql, err)
+				return fmt.Errorf("apply change: %s: %w", query, err)
 			}
 		}
 		positionJson, _ := json.Marshal(currentPosition)
