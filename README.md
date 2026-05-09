@@ -197,7 +197,6 @@ HA can proxy connections to PostgreSQL, MySQL databases or any [Debezium source 
 
 [MySQL Example](https://github.com/litesql/ha/tree/main/examples/proxy-mysql)
 
-
 ### Proxy and Replicate Oracle via Debezium
 
 [Oracle Example](https://github.com/litesql/ha/tree/main/examples/proxy-oracle-debezium)

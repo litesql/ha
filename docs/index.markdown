@@ -5,150 +5,136 @@
 layout: home
 ---
 
-![](https://github.com/litesql/ha/blob/main/ha.png?raw=true)
+![HA logo](https://github.com/litesql/ha/blob/main/ha.png?raw=true)
 
-Highly available SQLite cluster powered by embedded NATS JetStream server.
+Highly available SQLite cluster with embedded NATS JetStream.
 
-- Connect using HTTP API, [gRPC API](https://buf.build/litesql/sqlite-ha/sdks/main:grpc), [database/sql go driver](https://github.com/litesql/go-ha), [JDBC driver](https://github.com/litesql/jdbc-ha), MySQL or PostgreSQL Wire Protocol
+- Connect using HTTP API, [gRPC API](https://buf.build/litesql/sqlite-ha/sdks/main:grpc), [database/sql Go driver](https://github.com/litesql/go-ha), [JDBC driver](https://github.com/litesql/jdbc-ha), MySQL, or PostgreSQL Wire Protocol
 - Create live local **read/write** replicas with [go-ha database/sql driver](https://github.com/litesql/go-ha)
-- Use [ha-sync SQLite extension](https://github.com/litesql/ha-sync) to create live local read replicas
+- Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)
 - Change Data Capture (CDC)
-- Execute Cross-Database queries (without ATTACH DATABASE)
+- Execute cross-database queries without `ATTACH DATABASE`
+- Proxy and replicate PostgreSQL, MySQL, or any Debezium Source Connector–compatible database to build a resilient, faster **edge data service**.
 - [Open Source](https://github.com/litesql/ha)
 
 ## Overview
 
-- [1. Installation](#1)
-  - [1.1 Install from source](#1.1)
-  - [1.2 Install using Docker](#1.2)
-  - [1.3 Install using Helm](#1.3)
-- [2. Usage](#2)
-  - [2.1 Loading existed database to memory](#2.1)
-  - [2.2 Use database in disk](#2.2)
-  - [2.3 Load database from latest snapshot](#2.3)
-  - [2.4 Loading multiple databases](#2.4)
-- [3. Local Replicas](#3)
-  - [3.1 Local Read/Write Replicas](#3.1)
-  - [3.2 Local Read Replicas](#3.2)
-- [4. HA Client, PostgreSQL and MySQL Wire Protocol](#4)
-  - [4.1 Using HA Client](#4.1)
-- [5. HTTP API](#5)
-  - [5.1 Using bind parameters](#5.1)
-  - [5.2 Multiple commands (one transaction)](#5.2)
-  - [5.3 Backup database](#5.3)
-  - [5.4 Take a snapshot and save on NATS Object Store](#5.4)
-  - [5.5 Get latest snapshot from NATS Object Store](#5.5)
-  - [5.6 List all replications status](#5.6)
-  - [5.7 Get replication status](#5.7)
-  - [5.8 Remove replication (consumer)](#5.8)
-- [6. Replication](#6)
-  - [6.1 CDC message format](#6.1)
-  - [6.2 Replication limitations](#6.2)
-  - [6.3 Conflict resolution](#6.3)
-- [7. Cross-shard Queries](#7)
-- [8. Transaction Operations](#8)
-- [9. Configuration](#9)
+- [1. Installation](#installation)
+  - [1.1 Install from source](#install-from-source)
+  - [1.2 Install with Docker](#install-with-docker)
+  - [1.3 Install with Helm](#install-with-helm)
+- [2. Quick Start](#quick-start)
+  - [2.1 Load an existing database into memory](#load-an-existing-database-into-memory)
+  - [2.2 Use a database on disk](#use-a-database-on-disk)
+  - [2.3 Load from the latest snapshot](#load-from-the-latest-snapshot)
+  - [2.4 Load multiple databases](#load-multiple-databases)
+- [3. Local Replicas](#local-replicas)
+  - [3.1 Read/write replicas](#readwrite-replicas)
+  - [3.2 Read-only replicas](#read-only-replicas)
+- [4. HA Client, PostgreSQL and MySQL Wire Protocol](#wire-protocols)
+  - [4.1 HA client mode](#ha-client-mode)
+- [5. HTTP API](#http-api)
+  - [5.1 Bind parameters](#bind-parameters)
+  - [5.2 Multiple commands in one transaction](#multiple-commands-in-one-transaction)
+  - [5.3 Backup the database](#backup-the-database)
+  - [5.4 Take a snapshot](#take-a-snapshot)
+  - [5.5 Download the latest snapshot](#download-the-latest-snapshot)
+  - [5.6 List replications](#list-replications)
+  - [5.7 Replication status](#replication-status)
+  - [5.8 Remove replication](#remove-replication)
+- [6. Replication](#replication)
+  - [6.1 CDC message format](#cdc-message-format)
+  - [6.2 Replication limitations](#replication-limitations)
+  - [6.3 Conflict resolution](#conflict-resolution)
+  - [6.4 Proxy and source replication](#proxy-and-source-replication)
+- [7. Cross-shard Queries](#cross-shard-queries)
+- [8. Transaction Operations](#transaction-operations)
+- [9. Configuration](#configuration)
 
+## 1. Installation<a id='installation'></a>
 
-## 1. Installation<a id='1'></a>
+Download the latest release from the [GitHub releases page](https://github.com/litesql/ha/releases).
 
-- Download from [releases page](https://github.com/litesql/ha/releases).
-
-### 1.1 Install from source<a id='1.1'></a>
+### 1.1 Install from source<a id='install-from-source'></a>
 
 ```sh
 go install github.com/litesql/ha@latest
 ```
 
-### 1.2 Install using Docker<a id='1.2'></a>
+### 1.2 Install with Docker<a id='install-with-docker'></a>
 
 ```sh
 docker run --name ha \
--e HA_MEMORY=true \
--p 5432:5432 -p 8080:8080 -p 4222:4222 \
-ghcr.io/litesql/ha:latest
-
-- Set up a volume at /data to store the NATS streams state.
-
+  -e HA_MEMORY=true \
+  -p 5432:5432 -p 8080:8080 -p 4222:4222 \
+  ghcr.io/litesql/ha:latest
 ```
+
+> Mount a volume at `/data` to persist NATS JetStream state.
+
 #### Cluster example
 
-- [Docker compose cluster](https://github.com/litesql/ha/blob/main/examples/leader-based/docker-compose.yml) example
+Use the provided Docker Compose example:
 
 ```sh
 cd examples/leader-based
 docker compose up
 ```
 
-- Services:
+| Instance | HTTP | PostgreSQL Wire | NATS | MySQL Wire |
+|----------|------|-----------------|------|------------|
+| node1    | 8080 | 5432            | 4222 | 3306       |
+| node2    | 8081 | 5433            | 4223 | 3307       |
+| node3    | 8082 | 5434            | 4224 | 3308       |
 
-| Instance | HTTP | Pg Wire | NATS | MySQL Wire |
-|----------|------|---------|------|------------|
-|node1     | 8080 | 5432    | 4222 | 3306       |
-|node2     | 8081 | 5433    | 4223 | 3307       |
-|node3     | 8082 | 5434    | 4224 | 3308       |
-
-
-### 1.3 Install using Helm<a id='1.3'></a>
-
-- Add [litesql helm charts repository](https://litesql.github.io/helm-charts) to Helm:
+### 1.3 Install with Helm<a id='install-with-helm'></a>
 
 ```sh
 helm repo add litesql https://litesql.github.io/helm-charts
-```
-
-- Update the chart repository:
-
-```sh
 helm repo update
-```
-
-- Deploy ha to kubernetes:
-
-```sh
 helm install ha litesql/ha
 ```
 
-- Visit [litesql helm charts repository](https://litesql.github.io/helm-charts) to customize the installation;
+Visit the [litesql Helm charts repository](https://litesql.github.io/helm-charts) for deployment options.
 
-## 2. Usage<a id='2'></a>
+## 2. Quick Start<a id='quick-start'></a>
 
-- Start the first ha node (-m flag if you want to use in-memory)
+### Start a local HA node
 
 ```sh
-ha -n node1 -m -pg-port 5432
+ha -n node1 -m --pg-port 5432
 ```
 
-- Start an another ha node
+Start a second node that connects to the first node:
 
 ```sh
 ha -n node2 -m --port 8081 --pg-port 5433 --nats-port 0 --replication-url nats://localhost:4222
 ```
 
-- Create a table
+### Create a table
 
 ```sh
 curl -d '[
   {
-    "sql": "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)"     
+    "sql": "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)"
   }
 ]' \
 http://localhost:8080
 ```
 
-- Insert some data using HTTP client
+### Insert data using the HTTP API
 
 ```sh
 curl -d '[
   {
-    "sql": "INSERT INTO users(name) VALUES(:name)", 
-    "params": {"name": "HA User"} 
+    "sql": "INSERT INTO users(name) VALUES(:name)",
+    "params": {"name": "HA User"}
   }
 ]' \
 http://localhost:8080
 ```
 
-- Or use a PostgreSQL client
+### Connect with PostgreSQL Wire Protocol
 
 ```sh
 PGPASSWORD="ha" psql -h localhost -U ha
@@ -159,7 +145,7 @@ INSERT INTO users(name) VALUES('HA user from PostgreSQL Wire Protocol');
 SELECT * FROM users;
 ```
 
-- Connect to another server and check the values
+### Check another node
 
 ```sh
 PGPASSWORD="ha" psql -h localhost -U ha -p 5433
@@ -169,202 +155,175 @@ PGPASSWORD="ha" psql -h localhost -U ha -p 5433
 SELECT * FROM users;
 ```
 
-### 2.1 Loading existed database to memory<a id='2.1'></a>
+### 2.1 Load an existing database into memory<a id='load-an-existing-database-into-memory'></a>
 
 ```sh
 ha -m mydatabase.db
 ```
 
-### 2.2 Use database in disk<a id='2.2'></a>
+### 2.2 Use a database on disk<a id='use-a-database-on-disk'></a>
 
 ```sh
 ha "file:mydatabase.db"
 ```
 
-### 2.3 Load database from latest snapshot<a id='2.3'></a>
+### 2.3 Load from the latest snapshot<a id='load-from-the-latest-snapshot'></a>
 
 ```sh
-ha --from-latest-snapsot
+ha --from-latest-snapshot
 ```
 
-### 2.4 Loading multiple databases<a id='2.4'></a>
+### 2.4 Load multiple databases<a id='load-multiple-databases'></a>
 
 ```sh
 ha *.db
 ```
 
-## 3. Local Replicas<a id='3'></a>
+## 3. Local Replicas<a id='local-replicas'></a>
 
-### 3.1 Local Read/Write Replicas<a id='3.1'></a>
+### 3.1 Read/write replicas<a id='readwrite-replicas'></a>
 
-- Use [go-ha](https://github.com/litesql/go-ha) database/sql driver to create embedded read/write replicas
-- Use with go
+- Use the [go-ha](https://github.com/litesql/go-ha) `database/sql` driver to create embedded read/write replicas.
+- Ideal for Go applications that require a local writable HA replica.
 
-### 3.2 Local Read Replicas<a id='3.2'></a>
+### 3.2 Read-only replicas<a id='read-only-replicas'></a>
 
-- Use [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local embedded replicas from a remote HA database.
-- Use with any programming language
+- Use the [ha-sync](https://github.com/litesql/ha-sync) SQLite extension to create local read-only replicas from a remote HA database.
+- Works with any language that supports SQLite.
 
-## 4. HA Client, PostgreSQL and MySQL Wire Protocol<a id='4'></a>
+## 4. HA Client, PostgreSQL and MySQL Wire Protocol<a id='wire-protocols'></a>
 
-- You can use any ha, PostgreSQL or MySQL driver to connect to ha.
-- The SQLite parser engine will proccess the commands.
-- MySQL and PostgreSQL functions are not supported.
-- DBeaver support: use the [JDBC HA](https://github.com/litesql/jdbc-ha) driver to manage the database.
+- Connect with any HA, PostgreSQL, or MySQL compatible client.
+- SQL is parsed by SQLite.
+- MySQL- and PostgreSQL-specific functions are not supported.
+- For GUI tools such as DBeaver, use the [JDBC HA driver](https://github.com/litesql/jdbc-ha).
 
-### 4.1 Using HA Client<a id='4.1'></a>
+### 4.1 HA client mode<a id='ha-client-mode'></a>
 
 ```sh
 ha -r http://localhost:8080
 ```
-You can send any SQL statement to the HA database, plus the following special commands:
 
-|Command|Description|
-|-------|-----------|
-|SHOW DATABASES; | List all databases |
-|CREATE DATABASE <dsn>; | Create a new database |
-|DROP DATABASE <id>; | Drop a database |
-|SET DATABASE TO <id>; | Send commands to a specific database |
-|UNSET DATABASE; | Use default database |
-|EXIT; | Quit client (ctrl+d) |
+The HA client accepts standard SQL plus these special commands:
 
-## 5. HTTP API<a id='5'></a>
+| Command | Description |
+|---------|-------------|
+| `SHOW DATABASES;` | List all available databases |
+| `CREATE DATABASE <dsn>;` | Create a new database |
+| `DROP DATABASE <id>;` | Drop a database |
+| `SET DATABASE TO <id>;` | Run subsequent commands against a specific database |
+| `UNSET DATABASE;` | Reset to the default database |
+| `EXIT;` | Quit the client (`Ctrl+D`) |
 
-Access OpenAPI documentation: [http://localhost:8080/openapi.yaml](http://localhost:8080/openapi.yaml)
+## 5. HTTP API<a id='http-api'></a>
 
-### 5.1 Using bind parameters<a id='5.1'></a>
+Access the OpenAPI definition at [http://localhost:8080/openapi.yaml](http://localhost:8080/openapi.yaml).
+
+### 5.1 Bind parameters<a id='bind-parameters'></a>
 
 ```sh
 curl -d '{
-    "sql": "INSERT INTO users(name) VALUES(:name)", 
-    "params": {"name": "HA user"}
+  "sql": "INSERT INTO users(name) VALUES(:name)",
+  "params": {"name": "HA user"}
 }' \
 http://localhost:8080/query
 ```
 
+Example response:
+
 ```json
 {
-  "columns": [
-    "rows_affected",
-    "last_insert_id"
-  ],
-  "rows": [
-    [
-      1,
-      3
-    ]
-  ]
+  "columns": ["rows_affected", "last_insert_id"],
+  "rows": [[1, 3]]
 }
 ```
 
-### 5.2 Multiple commands (one transaction)<a id='5.2'></a>
+### 5.2 Multiple commands in one transaction<a id='multiple-commands-in-one-transaction'></a>
 
 ```sh
 curl -d '[
-{
-    "sql": "INSERT INTO users(name) VALUES(:name)", 
+  {
+    "sql": "INSERT INTO users(name) VALUES(:name)",
     "params": {"name": "new HA user"}
-},
-{
-    "sql": "DELETE FROM users WHERE name = :name", 
+  },
+  {
+    "sql": "DELETE FROM users WHERE name = :name",
     "params": {"name": "new HA user"}
-},
-{
+  },
+  {
     "sql": "SELECT * FROM users"
-}
+  }
 ]' \
 http://localhost:8080/query
 ```
+
+Example response:
 
 ```json
 {
   "results": [
     {
-      "columns": [
-        "rows_affected",
-        "last_insert_id"
-      ],
-      "rows": [
-        [
-          1,
-          2
-        ]
-      ]
+      "columns": ["rows_affected", "last_insert_id"],
+      "rows": [[1, 2]]
     },
     {
-      "columns": [
-        "rows_affected",
-        "last_insert_id"
-      ],
-      "rows": [
-        [
-          1,
-          2
-        ]
-      ]
+      "columns": ["rows_affected", "last_insert_id"],
+      "rows": [[1, 2]]
     },
     {
-      "columns": [
-        "id",
-        "name"
-      ],
-      "rows": [
-        [
-          1,
-          "HA user"
-        ]        
-      ]
+      "columns": ["id", "name"],
+      "rows": [[1, "HA user"]]
     }
   ]
 }
 ```
 
-### 5.3 Backup database<a id='5.3'></a>
+### 5.3 Backup the database<a id='backup-the-database'></a>
 
 ```sh
 curl -O -J http://localhost:8080/download
 ```
 
-### 5.4 Take a snapshot and save on NATS Object Store<a id='5.4'></a>
+### 5.4 Take a snapshot<a id='take-a-snapshot'></a>
 
 ```sh
 curl -X POST http://localhost:8080/snapshot
 ```
 
-### 5.5 Get latest snapshot from NATS Object Store<a id='5.5'></a>
+### 5.5 Download the latest snapshot<a id='download-the-latest-snapshot'></a>
 
 ```sh
 curl -O -J http://localhost:8080/snapshot
 ```
 
-### 5.6 List all replications status<a id='5.6'></a>
+### 5.6 List replications<a id='list-replications'></a>
 
 ```sh
 curl http://localhost:8080/replications
 ```
 
-### 5.7 Get replication status<a id='5.7'></a>
+### 5.7 Replication status<a id='replication-status'></a>
 
 ```sh
 curl http://localhost:8080/replications/{name}
 ```
 
-### 5.8 Remove replication (consumer)<a id='5.8'></a>
+### 5.8 Remove replication<a id='remove-replication'></a>
 
 ```sh
 curl -X DELETE http://localhost:8080/replications/{name}
 ```
 
-## 6. Replication<a id='6'></a>
+## 6. Replication<a id='replication'></a>
 
-- You can write to any server (in the leaderless mode)
-- Uses embedded or external NATS JetStream cluster
-- NATS JetStream guarantees "at-least-once" message delivery
-- All DML (INSERT, UPDATE, DELETE) operations are idempotent
+- Support writing to any server in leaderless mode.
+- Works with embedded or external NATS JetStream.
+- NATS JetStream delivers at least once.
+- DML operations (INSERT, UPDATE, DELETE) are idempotent.
 - Last writer wins.
-- DDL commands are replicated (since v0.0.7)
+- DDL commands are replicated since v0.0.7.
 
-### 6.1 CDC message format<a id='6.1'></a>
+### 6.1 CDC message format<a id='cdc-message-format'></a>
 
 ```json
 {
@@ -373,176 +332,178 @@ curl -X DELETE http://localhost:8080/replications/{name}
     {
       "database": "main",
       "table": "users",
-      "columns": [
-        "id",
-        "name"
-      ],
-      "operation": "INSERT",      
+      "columns": ["id", "name"],
+      "operation": "INSERT",
       "new_rowid": 2,
-      "new_values": [
-        2,
-        "new HA user"
-      ]
+      "new_values": [2, "new HA user"]
     },
     {
       "database": "main",
       "table": "users",
-      "columns": [
-        "id",
-        "name"
-      ],
+      "columns": ["id", "name"],
       "operation": "DELETE",
       "old_rowid": 2,
-      "old_values": [
-        2,
-        "new HA user"
-      ]
+      "old_values": [2, "new HA user"]
     }
   ],
   "timestamp_ns": 1758574275504509677
 }
 ```
 
-### 6.2 Replication limitations<a id='6.2'></a>
+### 6.2 Replication limitations<a id='replication-limitations'></a>
 
-- Tables WITHOUT ROWID are not replicated
-- The replication is not invoked when conflicting rows are deleted because of an ON CONFLICT REPLACE clause. 
-- Uses "automatic idempotency" for DDL commands (CREATE IF NOT EXISTS and DROP IF EXISTS). But it's dificult to do with ALTER TABLE commands. 
-- Writing to any node in the cluster (the default ha behaviour) improves availability, but it can lead to consistency issues in certain edge cases. If your application values Consistency more than Availability, it's better to route all write operations through a single cluster node or using the leader options **--leader-static** or **leader-addr**.
+- Tables without `ROWID` are not replicated.
+- Replication is not triggered when conflicting rows are removed by `ON CONFLICT REPLACE`.
+- DDL idempotency is automatic for `CREATE IF NOT EXISTS` and `DROP IF EXISTS`, but `ALTER TABLE` replication is less predictable.
+- Writing to multiple nodes improves availability, but may reduce consistency in some edge cases. If consistency is required, route writes through a single node or use `--leader-static` / `--leader-addr`.
 
-### 6.3 Conflict Resolution<a id='6.3'></a>
+### 6.3 Conflict resolution<a id='conflict-resolution'></a>
 
-In the event of conflicting writes, the following conflict resolution strategy is applied:
+HA applies the following rules:
 
-1. **Last Writer Wins**: The most recent write operation is retained. This ensures that the latest data is propagated across the cluster.
+1. **Last Writer Wins**: the most recent write is retained.
+2. **Idempotent operations**: supported DML and DDL commands can be replayed safely.
+3. **Custom conflict handling**: use `--interceptor` with a Go script to implement application-specific logic.
 
-2. **Idempotent Operations**: All DML (INSERT, UPDATE, DELETE) and DDL (CREATE, DROP) operations are converted to idempotent operations on replica nodes, meaning that applying the same operation multiple times will yield the same result. This helps maintain consistency during replication.
+Example interceptor: [ignore_alter_table_errors.go](https://github.com/litesql/ha/blob/main/internal/interceptor/testdata/ignore_alter_table_errors.go).
 
-3. **Custom Conflict Resolution**: You can implement a custom conflict resolution strategy by using the `--interceptor` flag to provide a Go script. This script allows you to define how conflicts are resolved based on your application's specific requirements.
+### 6.4 Proxy and source replication<a id='proxy-and-source-replication'></a>
 
-See [example here](https://github.com/litesql/ha/blob/main/internal/interceptor/testdata/ignore_alter_table_errors.go).
+HA can proxy reads and writes to an external MySQL or PostgreSQL source database while maintaining a local SQLite cache.
 
-## 7. Cross-shard Queries<a id='7'></a>
+- Use `--mysql-proxied` to connect to a source MySQL database.
+- Use `--pg-proxied` to connect to a source PostgreSQL database.
+- The local SQLite proxy file is configured with `--proxy-local`.
+- `--proxy-disable-redirect` forces all queries to run on the local SQLite database instead of redirecting them to the source.
+- `--proxy-read-your-writes` enables read-your-writes semantics for proxied queries.
 
-HA supports cross-database queries across multiple SQLite databases hosted on the same node. This lets you query data from all matching shard databases in a single request.
+For MySQL source replication, provide optional import settings:
 
-Use the SQL optimizer hint `/*+ db=<regex> */` to select which shard databases should participate in the query. For example:
+- `--mysql-include` and `--mysql-exclude` filter source MySQL tables by regexp.
+- `--mysql-dump-bin` - path to the `mysqldump` executable for initial data import.
+- `--mysql-dump-db` - database name used by `mysqldump`.
+- `--mysql-dump-include` - table filter passed to `mysqldump`.
+- `--mysql-proxy-id` - identifier for MySQL replication metadata.
+
+For PostgreSQL source replication, configure logical replication:
+
+- `--pg-publication` - publication name in the source PostgreSQL database.
+- `--pg-slot` - replication slot name created on the source.
+
+### 6.5 Debezium sink mode<a id='debezium-sink-mode'></a>
+
+HA can act as a Debezium sink for Kafka topics.
+
+- `--debezium-brokers` specifies Kafka brokers.
+- `--debezium-group` sets the Kafka consumer group.
+- `--debezium-topics` selects the Kafka topics to consume.
+- `--debezium-source-dsn` redirects writes back to the source database.
+
+This mode is useful when HA is consuming Debezium change events and storing them locally while optionally forwarding writes back to the original source.
+
+## 7. Cross-shard Queries<a id='cross-shard-queries'></a>
+
+HA supports queries across multiple SQLite databases on the same node without `ATTACH DATABASE`.
+
+Use the optimizer hint `/*+ db=<regex> */` to select participating databases:
 
 ```sql
 SELECT id, name /*+ db=.* */ FROM users;
 ```
 
-In this example, `db=.*` runs the query against all available database IDs. To target a subset, use a narrower regular expression, e.g. `db=users_.*`.
+To target a subset, use a narrower regex, for example `db=users_.*`.
 
-- Discover database IDs with:
-  - `SHOW DATABASES;`
-- Limit results to specific shards by adjusting the regex.
+- Discover database IDs with `SHOW DATABASES;`
+- Refine shard selection with the regex pattern
 
-## 8. Transaction Operations<a id='8'></a>
+## 8. Transaction Operations<a id='transaction-operations'></a>
 
-HA provides advanced transaction history and undo capabilities, allowing you to retrieve and revert changes made to the database.
+HA provides transaction history and undo commands for committed changes.
 
 ### Transaction History
 
-Use the `HISTORY` command to retrieve all transactions from a specific sequence point to the present:
-
 ```sql
 HISTORY 100;
-```
-
-This retrieves all transactions starting from sequence number 100. You can also use time durations:
-
-```sql
 HISTORY '5m';
 ```
 
-This retrieves transactions from the last 5 minutes.
-
 ### Undo Operations
 
-HA supports several undo commands to revert transactions:
+- `UNDO n`: revert transactions from sequence `n` onward.
+- `UNDOE n`: revert entity modifications from sequence `n` onward.
+- `UNDOT n`: revert transactions affecting entities modified by sequence `n`.
 
-- `UNDO n`: Revert all transactions from stream sequence `n` through the present, effectively rolling back changes made during this period.
-
-- `UNDOE n`: Roll back all modifications on entities that were affected by transactions occurring from stream sequence `n` to the present, while preserving other changes.
-
-- `UNDOT n`: Revert all transactions on entities that were impacted by the transaction at stream sequence `n` through the present. Only transactions that modified the same entities are affected.
-
-**Parameters:**
-- `n`: Can be specified as a numeric stream sequence number or as a relative time duration (e.g., `'5m'`, `'1h'`, `'30s'`)
-
-**Examples:**
+Examples:
 
 ```sql
-UNDO 150;        -- Revert all transactions from sequence 150 onwards
-UNDO '10m';      -- Revert all transactions from the last 10 minutes
-UNDOE 200;       -- Roll back entity modifications from sequence 200
-UNDOT 250;       -- Revert transactions affecting entities from sequence 250
+UNDO 150;
+UNDO '10m';
+UNDOE 200;
+UNDOT 250;
 ```
 
-**Note:** These operations work on committed transactions and can be used for point-in-time recovery or correcting erroneous changes.
+**Note:** Undo does not revert schema changes such as `CREATE`, `ALTER`, or `DROP`.
 
+## 9. Configuration<a id='configuration'></a>
 
-### Limitations 
-
-DDL commands (such as CREATE, ALTER, and DROP) are not affected by undo operations, as they are designed to preserve database schema integrity and avoid potential inconsistencies.
-
-## 9. Configuration<a id='9'></a>
+Use `ha --help` for the full list of options.
 
 | Flag | Environment Variable | Default | Description |
 |------|----------------------|---------|-------------|
-| -n, --name | HA_NAME        | $HOSTNAME | Node name   |
-| -p, --port | HA_PORT        | 8080    | HTTP API tcp port |
-| --token    | HA_TOKEN       |         | API auth token    |
-| -m, --memory | HA_MEMORY    | false   | Store database in memory |
-| --create-db-dir | HA_CREATE_DB_DIR |  | Path to a directory where new databases are created |
-| -i, --interceptor | HA_INTERCEPTOR | | Path to a Go script for customizing replication behavior |
-| -r, --remote | HA_REMOTE    |         | Address of a remote HA server to connect to and interact with (e.g. to run queries) instead of starting a server | 
-| --log-level | HA_LOG_LEVEL  | info    | Log level (info, warn, error or debug) |
-| --from-latest-snapsot | HA_FROM_LATEST_SNAPSHOT | false | Use the latest database snapshot from NATS JetStream Object Store (if available at startup) |
-| --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval to create database snapshot to NATS JetStream Object Store (0 to disable) |
-| --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable DDL commands publisher |
-| --grpc-insecure | HA_GRPC_INSECURE | false | Use insecure gRPC connection (plaintext, no TLS) for leader messages |
-| --leader-addr | HA_LEADER_ADDR |   | Address when this node become the leader (uses the gRPC server). This will enable the leader election | 
-| --leader-static | HA_LEADER_STATIC |    | Address of a static leader. This will disable the leader election |
-| --mysql-port| HA_MYSQL_PORT|       | Port to MySQL Wire Protocol Server  |
-| --mysql-user| HA_MYSQL_USER| ha    | MySQL Auth user  |
-| --mysql-pass| HA_MYSQL_PASS|       | MySQL Auth password  |
-| --mysql-proxied | HA_MYSQL_PROXIED | | DSN of a source MySQL database to replicate into the local HA instance |
-| --mysql-include | HA_MYSQL_INCLUDE | `^db.*` | Regexp to include tables from the proxied MySQL database replication; empty means include all |
-| --mysql-exclude | HA_MYSQL_EXCLUDE | | Regexp to exclude tables from the proxied MySQL database replication |
-| --mysql-dump-bin| HA_MYSQL_DUMP_BIN | | Filesystem path to the mysqldump executable used for proxied MySQL import. Example: /usr/bin/mysqldump |
-| --mysql-dump-db | HA_MYSQL_DUMP_DB | | Database name used for mysqldump when importing from the proxied MySQL source |
-| --mysql-dump-include | HA_MYSQL_DUMP_INCLUDE | |Table filter to pass to mysqldump during proxied MySQL import |
-| --mysql-proxy-id | HA_MYSQL_PROXY_ID | sqlite-ha | Identifier for this proxied MySQL connection, used in replication metadata |
-| --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS Server logging |
-| --nats-port | HA_NATS_PORT | 4222 | Embedded NATS server port (0 to disable) |
-| --nats-store-dir | HA_NATS_STORE_DIR | /tmp/nats | Embedded NATS server store directory |
-| --nats-user | HA_NATS_USER |  | Embedded NATS server user |
-| --nats-pass | HA_NATS_PASS |  | Embedded NATS server password |
-| --nats-config | HA_NATS_CONFIG | | Path to embedded NATS server config file (override other nats configurations) |
-| --pg-port | HA_PG_PORT |      | Port to PostgreSQL Wire Protocol server |
-| --pg-user | HA_PG_USER | ha   | PostgreSQL Auth user |
-| --pg-pass | HA_PG_PASS | ha   | PostgreSQL Auth password |
-| --pg-cert | HA_PG_CERT |      | Path to PostgreSQL TLS certificate file |
-| --pg-key  | HA_PG_KEY  |      | Path to PostgreSQL TLS key file |
-| --pg-proxied | HA_PG_PROXIED | |DSN of the source PostgreSQL database to replicate from and proxy to |
-| --pg-publication | HA_PG_PUBLICATION | ha_publication | Name of the publication in the source PostgreSQL database for logical replication (used only when --pg-proxied is specified) |
-| --pg-slot | HA_PG_SLOT | ha_slot | Name of the replication slot to create in the source PostgreSQL database (used only when --pg-proxied is specified) |
-| --proxy-local | HA_PROXY_LOCAL | ha.db | Path to the local SQLite database file that proxies the source database (used only when --pg-proxied or --mysql-proxied is set) |
-| --proxy-use-schema | HA_PROXY_USE_SCHEMA | false | Create local tables using the schema from the source database (used only when --pg-proxied or --mysql-proxied is set) |
-| --proxy-disable-redirect | HA_PROXY_DISABLE_REDIRECT | false | Disable redirecting queries to the source database; all queries will run on the local HA SQLite database (used only when --pg-proxied or --mysql-proxied is set) |
-| --proxy-read-your-writes | HA_PROXY_READ_YOUR_WRITES | false | Enable read-your-writes to the proxy (used only when --pg-proxied or --mysql-proxied is set) |
-| --concurrent-queries | HA_CONCURRENT_QUERIES | 50 | Number of concurrent queries (DB pool max) |
-| --extensions | HA_EXTENSIONS |  | Comma-separated list of SQLite extensions path to load |
-| --async-replication | HA_ASYNC_REPLICATION | false | Enables asynchronous replication message publishing |
-| --async-replication-store-dir | HA_ASYNC_REPLICATION_STORE_DIR | | Directory path for storing outbox messages used in asynchronous replication |
-| --replicas | HA_REPLICAS | 1 | Number of replicas to keep for the stream and object store in clustered jetstream |
-| --replication-timeout | HA_REPLICATION_TIMEOUT | 15s | Replication publisher timeout |
+| -n, --name | HA_NAME | hostname | Node name |
+| -p, --port | HA_PORT | 8080 | Server port for HTTP and gRPC endpoints |
+| --token | HA_TOKEN | | API authentication token |
+| -m, --memory | HA_MEMORY | false | Store the database in memory |
+| --db-params | HA_DB_PARAMS | default | SQLite DSN parameters appended to each database file |
+| --create-db-dir | HA_CREATE_DB_DIR | | Directory for new database files |
+| --from-latest-snapshot | HA_FROM_LATEST_SNAPSHOT | false | Load the latest snapshot from NATS JetStream Object Store if available |
+| --snapshot-interval | HA_SNAPSHOT_INTERVAL | 0s | Interval for automatic snapshots to NATS JetStream Object Store |
+| --disable-ddl-sync | HA_DISABLE_DDL_SYNC | false | Disable publishing DDL commands |
+| --nats-logs | HA_NATS_LOGS | false | Enable embedded NATS server logging |
+| --nats-port | HA_NATS_PORT | 4222 | Embedded NATS server port (0 disables embedded NATS) |
+| --nats-store-dir | HA_NATS_STORE_DIR | | Embedded NATS server storage directory |
+| --nats-user | HA_NATS_USER | | Embedded NATS server username |
+| --nats-pass | HA_NATS_PASS | | Embedded NATS server password |
+| --nats-config | HA_NATS_CONFIG | | Embedded NATS server configuration file |
+| --leader-addr | HA_LEADER_ADDR | | Address used when this node becomes leader (enables leader election) |
+| --leader-static | HA_LEADER_STATIC | | Static leader address (disables leader election) |
+| --grpc-insecure | HA_GRPC_INSECURE | false | Use plaintext gRPC for leader messages |
+| --mysql-port | HA_MYSQL_PORT | 0 | Port for MySQL wire protocol server |
+| --mysql-user | HA_MYSQL_USER | ha | MySQL authentication user |
+| --mysql-pass | HA_MYSQL_PASS | | MySQL authentication password |
+| --mysql-proxied | HA_MYSQL_PROXIED | | Source MySQL DSN to replicate into the local HA instance and redirect writes |
+| --mysql-include | HA_MYSQL_INCLUDE | ^db.* | Regexp to include tables from the proxied MySQL source |
+| --mysql-exclude | HA_MYSQL_EXCLUDE | | Regexp to exclude tables from the proxied MySQL source |
+| --mysql-dump-bin | HA_MYSQL_DUMP_BIN | | Path to mysqldump executable for proxied MySQL import |
+| --mysql-dump-db | HA_MYSQL_DUMP_DB | | Database name used by mysqldump for proxied MySQL import |
+| --mysql-dump-include | HA_MYSQL_DUMP_INCLUDE | | Table filter passed to mysqldump for proxied MySQL import |
+| --mysql-proxy-id | HA_MYSQL_PROXY_ID | sqlite-ha | Identifier for proxied MySQL replication metadata |
+| --pg-port | HA_PG_PORT | 0 | Port for PostgreSQL wire protocol server |
+| --pg-user | HA_PG_USER | ha | PostgreSQL authentication user |
+| --pg-pass | HA_PG_PASS | ha | PostgreSQL authentication password |
+| --pg-cert | HA_PG_CERT | | TLS certificate file for PostgreSQL server |
+| --pg-key | HA_PG_KEY | | TLS key file for PostgreSQL server |
+| --pg-proxied | HA_PG_PROXIED | | Source PostgreSQL DSN to replicate from and proxy to |
+| --pg-publication | HA_PG_PUBLICATION | ha_publication | Publication name for source PostgreSQL logical replication |
+| --pg-slot | HA_PG_SLOT | ha_slot | Replication slot name for the source PostgreSQL database |
+| --proxy-local | HA_PROXY_LOCAL | ha.db | Local SQLite proxy database file path |
+| --proxy-use-schema | HA_PROXY_USE_SCHEMA | false | Create local tables based on source database schema |
+| --proxy-disable-redirect | HA_PROXY_DISABLE_REDIRECT | false | Disable redirecting queries to the source database |
+| --proxy-read-your-writes | HA_PROXY_READ_YOUR_WRITES | false | Enable read-your-writes behavior for proxied queries |
+| --debezium-brokers | HA_DEBEZIUM_BROKERS | | Comma-separated Kafka brokers for Debezium sink mode |
+| --debezium-group | HA_DEBEZIUM_GROUP | | Kafka consumer group for Debezium sink |
+| --debezium-topics | HA_DEBEZIUM_TOPICS | | Kafka topics to consume in Debezium sink mode |
+| --debezium-source-dsn | HA_DEBEZIUM_SOURCE_DSN | | Source DSN for Debezium write redirection |
+| --concurrent-queries | HA_CONCURRENT_QUERIES | 50 | Maximum number of concurrent queries |
+| --async-replication | HA_ASYNC_REPLICATION | false | Enable asynchronous replication message publishing |
+| --async-replication-store-dir | HA_ASYNC_REPLICATION_STORE_DIR | | Directory for asynchronous replication outbox storage |
+| --replicas | HA_REPLICAS | 1 | Number of JetStream replicas for stream and object store |
+| --replication-timeout | HA_REPLICATION_TIMEOUT | 15s | Timeout for replication publisher operations |
 | --replication-stream | HA_REPLICATION_STREAM | ha_replication | Replication stream name |
-| --replication-max-age | HA_REPLICATION_MAX_AGE | 24h | Replication stream max age |
-| --replication-url | HA_REPLICATION_URL |  | Replication NATS url (defaults to embedded NATS server) |
-| --replication-policy | HA_REPLICATION_POLICY | all | Replication subscriber delivery policy (all, last, new, by_start_sequence=X, by_start_time=x) |
-| --row-identify | HA_ROW_IDENTIFY | pk | Strategy used to identify rows during replication. Options: pk, rowid or full |
-| --version | HA_VERSION | false | Print version information and exit |
-| -c, --config | | | config file (optional) |
+| --replication-max-age | HA_REPLICATION_MAX_AGE | 24h | Maximum age for messages in the replication stream |
+| --replication-url | HA_REPLICATION_URL | | NATS URL for replication; defaults to embedded NATS when empty |
+| --replication-policy | HA_REPLICATION_POLICY | | Replication subscriber delivery policy: all, last, new, by_start_sequence=X, or by_start_time=x |
+| --row-identify | HA_ROW_IDENTIFY | pk | Row identification strategy for replication: pk, rowid, or full |
+| --extensions | HA_EXTENSIONS | | Comma-separated list of SQLite extensions to load |
+| --config | HA_CONFIG | | Path to an optional config file |
+| --version | HA_VERSION | | Print version information and exit |
