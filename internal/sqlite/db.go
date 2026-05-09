@@ -346,7 +346,7 @@ type execerQuerier interface {
 }
 
 func Exec(ctx context.Context, eq execerQuerier, sql string, params map[string]any) (*Response, error) {
-	slog.Info("Executing statement", "sql", sql, "params", params)
+	slog.Debug("Executing statement", "sql", sql, "params", params)
 	upper := strings.ToUpper(strings.TrimSpace(sql))
 	if strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "EXPLAIN") {
 		return doQuery(ctx, eq, sql, params)

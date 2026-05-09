@@ -6,7 +6,7 @@ This example demonstrates real-time data replication from an Oracle database to 
 
 - Docker and Docker Compose
 - `curl` for API testing
-- `ha` CLI tool installed locally
+- `ha` CLI tool installed locally (Optional)
 
 ```sh
 go install github.com/litesql/ha@latest
@@ -66,6 +66,20 @@ In the HA CLI, run:
 
 ```sql
 INSERT INTO users(name, email) VALUES('Test User', 'test@user');
+```
+
+Alternatively, use the HTTP API:
+
+```sh
+curl http://localhost:8080/query \
+-d '
+{
+  "sql": "INSERT INTO users(name, email) VALUES(:name, :email)", 
+  "params": {
+    "name": "Test User", 
+    "email": "test@user"
+  }
+}'
 ```
 
 This query will be redirect to Oracle and replicated back to HA SQLite.
