@@ -85,6 +85,12 @@ type ProxiedDBConfig struct {
 	ReadYourWrites  bool
 }
 
+const positionTrackerCreateStatement = `CREATE TABLE IF NOT EXISTS ha_proxied_tracker(
+				position TEXT,
+				server_time,
+				CHECK (rowid = 1)
+			)`
+
 func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	muDBs.Lock()
 	defer muDBs.Unlock()
@@ -254,15 +260,6 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	}
 
 	if cfg.ProxiedDBConfig.LocalDB == id {
-		_, err := db.ExecContext(ha.ContextLocalDB(ctx, true),
-			`CREATE TABLE IF NOT EXISTS ha_proxied_tracker(
-				position TEXT,
-				server_time,
-				CHECK (rowid = 1)
-			)`)
-		if err != nil {
-			return fmt.Errorf("create proxied tracker table: %w", err)
-		}
 		switch {
 		case cfg.ProxiedDBConfig.PgDSN != "":
 			slog.Info("setting up replication proxy", "source_dsn", cfg.ProxiedDBConfig.PgDSN, "publication", cfg.ProxiedDBConfig.PgPublicationName, "slot", cfg.ProxiedDBConfig.PgSlotName)
@@ -283,10 +280,14 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			} else {
 				proxiedSubscription[id] = subscription
 			}
+			_, err = db.ExecContext(ha.ContextLocalDB(ctx, true),
+				positionTrackerCreateStatement)
+			if err != nil {
+				return fmt.Errorf("create proxied tracker table: %w", err)
+			}
 			go subscription.Start(slog.Default(), pgCheckpointLoader(db), true)
 		case cfg.ProxiedDBConfig.MysqlDSN != "":
 			slog.Info("setting up replication proxy", "source_dsn", cfg.ProxiedDBConfig.MysqlDSN, "id", cfg.ProxiedDBConfig.MysqlID, "includes", cfg.ProxiedDBConfig.MysqlInclude, "excludes", cfg.ProxiedDBConfig.MysqlExclude, "dump", cfg.ProxiedDBConfig.MysqlDumpBin, "dump_db", cfg.ProxiedDBConfig.MysqlDumpDB, "dump_tables", cfg.ProxiedDBConfig.MysqlDumpTables)
-
 			subscription, err := mysqlreplication.Subscribe(mysqlreplication.Config{
 				DSN:                cfg.ProxiedDBConfig.MysqlDSN,
 				IncludeTablesRegex: cfg.ProxiedDBConfig.MysqlInclude,
@@ -301,6 +302,11 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			} else {
 				proxiedSubscription[id] = subscription
 			}
+			_, err = db.ExecContext(ha.ContextLocalDB(ctx, true),
+				positionTrackerCreateStatement)
+			if err != nil {
+				return fmt.Errorf("create proxied tracker table: %w", err)
+			}
 			go subscription.Start(slog.Default(), mysqlCheckpointLoader(db), true)
 		case cfg.ProxiedDBConfig.DebeziumBroker != "":
 			var opts []kgo.Opt
@@ -310,6 +316,11 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			consumer, err := debeziumsink.New(opts, false)
 			if err != nil {
 				return fmt.Errorf("subscribe to proxied debezium: %w", err)
+			}
+			_, err = db.ExecContext(ha.ContextLocalDB(ctx, true),
+				positionTrackerCreateStatement)
+			if err != nil {
+				return fmt.Errorf("create proxied tracker table: %w", err)
 			}
 			go consumer.Start(slog.Default(), handleDebeziumProxiedChanges(db))
 		}
