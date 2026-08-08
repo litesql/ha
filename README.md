@@ -124,7 +124,7 @@ Verify replication by connecting to the second instance and querying the data.
 
 ```bash
 ha -r http://localhost:8081
-SELECT * FROM users
+SELECT * FROM users;
 ```
 
 ## Configuration
