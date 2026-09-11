@@ -39,7 +39,7 @@ Download the latest release from [GitHub Releases](https://github.com/litesql/ha
 
 ### Build from Source
 
-Ensure you have Go 1.26+ installed.
+Ensure you have Go 1.27+ installed.
 
 ```bash
 go install github.com/litesql/ha@latest
