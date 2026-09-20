@@ -86,6 +86,7 @@ func init() {
 		"WithDisableDDLSync":             reflect.ValueOf(ha.WithDisableDDLSync),
 		"WithEmbeddedNatsConfig":         reflect.ValueOf(ha.WithEmbeddedNatsConfig),
 		"WithExtensions":                 reflect.ValueOf(ha.WithExtensions),
+		"WithForcePublishBeforeStart":    reflect.ValueOf(ha.WithForcePublishBeforeStart),
 		"WithGrpcInsecure":               reflect.ValueOf(ha.WithGrpcInsecure),
 		"WithGrpcPort":                   reflect.ValueOf(ha.WithGrpcPort),
 		"WithGrpcTimeout":                reflect.ValueOf(ha.WithGrpcTimeout),
