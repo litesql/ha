@@ -107,9 +107,9 @@ var reSetDatabase = regexp.MustCompile(`(?i)^SET\s+DATABASE\s*(=|TO)\s*([^;\s]+)
 var reUndo = regexp.MustCompile(`(?i)^UNDO(\s|E|T)\s*([^;\s]+)`)
 
 func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
-	return func(ctx context.Context, sql string) (wire.PreparedStatements, error) {
+	return func(ctx context.Context, sql wire.Query) (wire.PreparedStatements, error) {
 		slog.InfoContext(ctx, "pg-wire: query received", "remote", wire.RemoteAddress(ctx), "sql", sql)
-		upper := strings.ToUpper(strings.TrimSpace(sql))
+		upper := strings.ToUpper(strings.TrimSpace(sql.Query))
 		if strings.HasPrefix(upper, "-- PING") {
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete("pong")
@@ -153,7 +153,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 		}
 
 		if strings.HasPrefix(upper, "SET ") {
-			if match := reSetDatabase.FindStringSubmatch(sql); len(match) == 3 {
+			if match := reSetDatabase.FindStringSubmatch(sql.Query); len(match) == 3 {
 				dbID := match[2]
 				if slices.Contains((sqlite.Databases()), dbID) {
 					rollback(ctx)
@@ -173,7 +173,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 			if !createDatabaseOptions.MemDB && createDatabaseOptions.Dir == "" {
 				return nil, fmt.Errorf("create database is disabled, inform flag --create-db-dir at startup")
 			}
-			dsn := strings.TrimSpace(sql[16:])
+			dsn := strings.TrimSpace(sql.Query[16:])
 			dsn = strings.TrimSuffix(dsn, ";")
 
 			destPath := sqlite.IdFromDSN(dsn)
@@ -199,7 +199,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 				return writer.Complete("DATABASE CREATED")
 			})), nil
 		} else if strings.HasPrefix(upper, "DROP DATABASE ") {
-			id := strings.TrimSpace(sql[14:])
+			id := strings.TrimSpace(sql.Query[14:])
 			id = strings.TrimSuffix(id, ";")
 
 			dbfile, err := sqlite.Drop(ctx, id)
@@ -225,7 +225,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 				return nil, fmt.Errorf("database %q not found", dbID)
 			}
 
-			reUndoMatch := reUndo.FindStringSubmatch(sql)
+			reUndoMatch := reUndo.FindStringSubmatch(sql.Query)
 			if len(reUndoMatch) != 3 {
 				return nil, fmt.Errorf("invalid undo syntax")
 			}
@@ -281,7 +281,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 			if err != nil {
 				return nil, fmt.Errorf("database %q not found", dbID)
 			}
-			param := strings.TrimSpace(sql[8:])
+			param := strings.TrimSpace(sql.Query[8:])
 			param = strings.TrimSuffix(param, ";")
 			seq, err := strconv.Atoi(param)
 			var items []haconnect.HistoryItem
@@ -352,7 +352,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 			return nil, err
 		}
 
-		stmt, err := ha.ParseStatement(ctx, sql)
+		stmt, err := ha.ParseStatement(ctx, sql.Query)
 		if err != nil {
 			return nil, psqlerr.WithCode(err, codes.SyntaxErrorOrAccessRuleViolation)
 		}
