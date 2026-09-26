@@ -1,0 +1,59 @@
+services:
+  node1:
+    image: ghcr.io/litesql/ha:latest
+    volumes:
+      - node1_data:/data
+    ports:
+      - "3306:3306"
+      - "5432:5432"
+      - "8080:8080"
+    environment:
+      - HA_NAME=node1
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node2:8080,http://node3:8080
+      - HA_NATS_PORT=0      
+      - HA_PG_PORT=5432
+      - HA_MYSQL_PORT=3306      
+      - HA_GRPC_INSECURE=true
+      - HA_LOG_LEVEL=debug
+
+  node2:
+    image: ghcr.io/litesql/ha:latest
+    volumes:
+      - node2_data:/data
+    ports:
+      - "3307:3306"
+      - "5433:5432"
+      - "8081:8080"
+    environment:
+      - HA_NAME=node2
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node1:8080,http://node3:8080
+      - HA_NATS_PORT=0  
+      - HA_PG_PORT=5432
+      - HA_MYSQL_PORT=3306
+      - HA_GRPC_INSECURE=true
+      - HA_LOG_LEVEL=debug
+
+  node3:
+    image: ghcr.io/litesql/ha:latest
+    volumes:
+      - node3_data:/data
+    ports:
+      - "3308:3306"
+      - "5434:5432"
+      - "8082:8080"
+    environment:
+      - HA_NAME=node3
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node1:8080,http://node2:8080
+      - HA_NATS_PORT=0  
+      - HA_PG_PORT=5432
+      - HA_MYSQL_PORT=3306
+      - HA_GRPC_INSECURE=true
+      - HA_LOG_LEVEL=debug
+
+volumes:
+  node1_data:
+    driver: local
+  node2_data:
+    driver: local
+  node3_data:
+    driver: local
