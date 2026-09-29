@@ -9,7 +9,7 @@ services:
       - "8080:8080"
     environment:
       - HA_NAME=node1
-      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node2:8080,http://node3:8080
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node2:8080,http://node3:8080&2pcRecoveryPath=/data/2pc_recovery.db 
       - HA_NATS_PORT=0      
       - HA_PG_PORT=5432
       - HA_MYSQL_PORT=3306      
@@ -26,7 +26,7 @@ services:
       - "8081:8080"
     environment:
       - HA_NAME=node2
-      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node1:8080,http://node3:8080
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node1:8080,http://node3:8080&2pcRecoveryPath=/data/2pc_recovery.db
       - HA_NATS_PORT=0  
       - HA_PG_PORT=5432
       - HA_MYSQL_PORT=3306
@@ -43,7 +43,7 @@ services:
       - "8082:8080"
     environment:
       - HA_NAME=node3
-      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node1:8080,http://node2:8080
+      - HA_ARGS=file:/data/db.sqlite?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node1:8080,http://node2:8080&2pcRecoveryPath=/data/2pc_recovery.db
       - HA_NATS_PORT=0  
       - HA_PG_PORT=5432
       - HA_MYSQL_PORT=3306
