@@ -11,9 +11,9 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.20.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/debezium-sink v0.0.3
-	github.com/litesql/go-ha v0.13.14
-	github.com/litesql/go-sqlite-ha v0.13.6
-	github.com/litesql/go-sqlite3-ha v0.13.6
+	github.com/litesql/go-ha v0.13.17
+	github.com/litesql/go-sqlite-ha v0.13.8
+	github.com/litesql/go-sqlite3-ha v0.13.8
 	github.com/litesql/mysql v0.0.4
 	github.com/litesql/postgresql v0.1.5
 	github.com/microsoft/go-mssqldb v1.11.2

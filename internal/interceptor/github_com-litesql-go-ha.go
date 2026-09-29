@@ -24,6 +24,7 @@ func init() {
 		"DefaultStream":                  reflect.ValueOf(constant.MakeFromLiteral("\"ha_replication\"", token.STRING, 0)),
 		"ErrInvalidSQL":                  reflect.ValueOf(&ha.ErrInvalidSQL).Elem(),
 		"ErrSnapshotterNotConfigured":    reflect.ValueOf(&ha.ErrSnapshotterNotConfigured).Elem(),
+		"ErrTwoPhaseCommitPending":       reflect.ValueOf(&ha.ErrTwoPhaseCommitPending).Elem(),
 		"Full":                           reflect.ValueOf(ha.Full),
 		"LatestSnapshot":                 reflect.ValueOf(ha.LatestSnapshot),
 		"ListDSN":                        reflect.ValueOf(ha.ListDSN),
@@ -53,6 +54,7 @@ func init() {
 		"Rowid":                          reflect.ValueOf(ha.Rowid),
 		"Shutdown":                       reflect.ValueOf(ha.Shutdown),
 		"TXCookieName":                   reflect.ValueOf(constant.MakeFromLiteral("\"_txseq\"", token.STRING, 0)),
+		"TwoPhaseCommitDecisionTable":    reflect.ValueOf(constant.MakeFromLiteral("\"ha_2pc_decisions\"", token.STRING, 0)),
 		"TypeAlterTable":                 reflect.ValueOf(constant.MakeFromLiteral("\"ALTER TABLE\"", token.STRING, 0)),
 		"TypeAnalyze":                    reflect.ValueOf(constant.MakeFromLiteral("\"ANALYZE\"", token.STRING, 0)),
 		"TypeBegin":                      reflect.ValueOf(constant.MakeFromLiteral("\"BEGIN\"", token.STRING, 0)),
@@ -111,48 +113,51 @@ func init() {
 		"WithWaitFor":                    reflect.ValueOf(ha.WithWaitFor),
 
 		// type definitions
-		"AsyncNATSPublisher":      reflect.ValueOf((*ha.AsyncNATSPublisher)(nil)),
-		"BackupFn":                reflect.ValueOf((*ha.BackupFn)(nil)),
-		"CDCPublisher":            reflect.ValueOf((*ha.CDCPublisher)(nil)),
-		"Change":                  reflect.ValueOf((*ha.Change)(nil)),
-		"ChangeSet":               reflect.ValueOf((*ha.ChangeSet)(nil)),
-		"ChangeSetInterceptor":    reflect.ValueOf((*ha.ChangeSetInterceptor)(nil)),
-		"ChangeSetSerializer":     reflect.ValueOf((*ha.ChangeSetSerializer)(nil)),
-		"CompositePublisher":      reflect.ValueOf((*ha.CompositePublisher)(nil)),
-		"ConnHooksFactory":        reflect.ValueOf((*ha.ConnHooksFactory)(nil)),
-		"ConnHooksProvider":       reflect.ValueOf((*ha.ConnHooksProvider)(nil)),
-		"Connector":               reflect.ValueOf((*ha.Connector)(nil)),
-		"DBPublisher":             reflect.ValueOf((*ha.DBPublisher)(nil)),
-		"DBSnapshotter":           reflect.ValueOf((*ha.DBSnapshotter)(nil)),
-		"DBSubscriber":            reflect.ValueOf((*ha.DBSubscriber)(nil)),
-		"DBSubscriberConfig":      reflect.ValueOf((*ha.DBSubscriberConfig)(nil)),
-		"DebeziumData":            reflect.ValueOf((*ha.DebeziumData)(nil)),
-		"DebeziumPayload":         reflect.ValueOf((*ha.DebeziumPayload)(nil)),
-		"DebeziumSource":          reflect.ValueOf((*ha.DebeziumSource)(nil)),
-		"DebeziumTransaction":     reflect.ValueOf((*ha.DebeziumTransaction)(nil)),
-		"DynamicLeader":           reflect.ValueOf((*ha.DynamicLeader)(nil)),
-		"EmbeddedNatsConfig":      reflect.ValueOf((*ha.EmbeddedNatsConfig)(nil)),
-		"JSONPublisher":           reflect.ValueOf((*ha.JSONPublisher)(nil)),
-		"LeaderProvider":          reflect.ValueOf((*ha.LeaderProvider)(nil)),
-		"NATSPublisher":           reflect.ValueOf((*ha.NATSPublisher)(nil)),
-		"NATSSnapshotter":         reflect.ValueOf((*ha.NATSSnapshotter)(nil)),
-		"NATSSubscriber":          reflect.ValueOf((*ha.NATSSubscriber)(nil)),
-		"NATSSubscriberConfig":    reflect.ValueOf((*ha.NATSSubscriberConfig)(nil)),
-		"NoopPublisher":           reflect.ValueOf((*ha.NoopPublisher)(nil)),
-		"NoopSnapshotter":         reflect.ValueOf((*ha.NoopSnapshotter)(nil)),
-		"NoopSubscriber":          reflect.ValueOf((*ha.NoopSubscriber)(nil)),
-		"Option":                  reflect.ValueOf((*ha.Option)(nil)),
-		"ProxiedPositionProvider": reflect.ValueOf((*ha.ProxiedPositionProvider)(nil)),
-		"Publisher":               reflect.ValueOf((*ha.Publisher)(nil)),
-		"RowIdentify":             reflect.ValueOf((*ha.RowIdentify)(nil)),
-		"SequenceProvider":        reflect.ValueOf((*ha.SequenceProvider)(nil)),
-		"Statement":               reflect.ValueOf((*ha.Statement)(nil)),
-		"StaticLeader":            reflect.ValueOf((*ha.StaticLeader)(nil)),
-		"Subscriber":              reflect.ValueOf((*ha.Subscriber)(nil)),
-		"TwoPhaseCommitPublisher": reflect.ValueOf((*ha.TwoPhaseCommitPublisher)(nil)),
-		"TxSeqTracker":            reflect.ValueOf((*ha.TxSeqTracker)(nil)),
-		"TxSeqTrackerProvider":    reflect.ValueOf((*ha.TxSeqTrackerProvider)(nil)),
-		"WriterPublisher":         reflect.ValueOf((*ha.WriterPublisher)(nil)),
+		"AsyncNATSPublisher":           reflect.ValueOf((*ha.AsyncNATSPublisher)(nil)),
+		"BackupFn":                     reflect.ValueOf((*ha.BackupFn)(nil)),
+		"CDCPublisher":                 reflect.ValueOf((*ha.CDCPublisher)(nil)),
+		"Change":                       reflect.ValueOf((*ha.Change)(nil)),
+		"ChangeSet":                    reflect.ValueOf((*ha.ChangeSet)(nil)),
+		"ChangeSetInterceptor":         reflect.ValueOf((*ha.ChangeSetInterceptor)(nil)),
+		"ChangeSetSerializer":          reflect.ValueOf((*ha.ChangeSetSerializer)(nil)),
+		"CompositePublisher":           reflect.ValueOf((*ha.CompositePublisher)(nil)),
+		"ConnHooksFactory":             reflect.ValueOf((*ha.ConnHooksFactory)(nil)),
+		"ConnHooksProvider":            reflect.ValueOf((*ha.ConnHooksProvider)(nil)),
+		"Connector":                    reflect.ValueOf((*ha.Connector)(nil)),
+		"DBPublisher":                  reflect.ValueOf((*ha.DBPublisher)(nil)),
+		"DBSnapshotter":                reflect.ValueOf((*ha.DBSnapshotter)(nil)),
+		"DBSubscriber":                 reflect.ValueOf((*ha.DBSubscriber)(nil)),
+		"DBSubscriberConfig":           reflect.ValueOf((*ha.DBSubscriberConfig)(nil)),
+		"DebeziumData":                 reflect.ValueOf((*ha.DebeziumData)(nil)),
+		"DebeziumPayload":              reflect.ValueOf((*ha.DebeziumPayload)(nil)),
+		"DebeziumSource":               reflect.ValueOf((*ha.DebeziumSource)(nil)),
+		"DebeziumTransaction":          reflect.ValueOf((*ha.DebeziumTransaction)(nil)),
+		"DynamicLeader":                reflect.ValueOf((*ha.DynamicLeader)(nil)),
+		"EmbeddedNatsConfig":           reflect.ValueOf((*ha.EmbeddedNatsConfig)(nil)),
+		"JSONPublisher":                reflect.ValueOf((*ha.JSONPublisher)(nil)),
+		"LeaderProvider":               reflect.ValueOf((*ha.LeaderProvider)(nil)),
+		"NATSPublisher":                reflect.ValueOf((*ha.NATSPublisher)(nil)),
+		"NATSSnapshotter":              reflect.ValueOf((*ha.NATSSnapshotter)(nil)),
+		"NATSSubscriber":               reflect.ValueOf((*ha.NATSSubscriber)(nil)),
+		"NATSSubscriberConfig":         reflect.ValueOf((*ha.NATSSubscriberConfig)(nil)),
+		"NoopPublisher":                reflect.ValueOf((*ha.NoopPublisher)(nil)),
+		"NoopSnapshotter":              reflect.ValueOf((*ha.NoopSnapshotter)(nil)),
+		"NoopSubscriber":               reflect.ValueOf((*ha.NoopSubscriber)(nil)),
+		"Option":                       reflect.ValueOf((*ha.Option)(nil)),
+		"PreparedTwoPhaseCommit":       reflect.ValueOf((*ha.PreparedTwoPhaseCommit)(nil)),
+		"ProxiedPositionProvider":      reflect.ValueOf((*ha.ProxiedPositionProvider)(nil)),
+		"Publisher":                    reflect.ValueOf((*ha.Publisher)(nil)),
+		"RowIdentify":                  reflect.ValueOf((*ha.RowIdentify)(nil)),
+		"SequenceProvider":             reflect.ValueOf((*ha.SequenceProvider)(nil)),
+		"Statement":                    reflect.ValueOf((*ha.Statement)(nil)),
+		"StaticLeader":                 reflect.ValueOf((*ha.StaticLeader)(nil)),
+		"Subscriber":                   reflect.ValueOf((*ha.Subscriber)(nil)),
+		"TwoPhaseCommitDecisionWriter": reflect.ValueOf((*ha.TwoPhaseCommitDecisionWriter)(nil)),
+		"TwoPhaseCommitPreparer":       reflect.ValueOf((*ha.TwoPhaseCommitPreparer)(nil)),
+		"TwoPhaseCommitPublisher":      reflect.ValueOf((*ha.TwoPhaseCommitPublisher)(nil)),
+		"TxSeqTracker":                 reflect.ValueOf((*ha.TxSeqTracker)(nil)),
+		"TxSeqTrackerProvider":         reflect.ValueOf((*ha.TxSeqTrackerProvider)(nil)),
+		"WriterPublisher":              reflect.ValueOf((*ha.WriterPublisher)(nil)),
 
 		// interface wrapper definitions
 		"_CDCPublisher":            reflect.ValueOf((*_github_com_litesql_go_ha_CDCPublisher)(nil)),
@@ -160,10 +165,12 @@ func init() {
 		"_ConnHooksProvider":       reflect.ValueOf((*_github_com_litesql_go_ha_ConnHooksProvider)(nil)),
 		"_DBSnapshotter":           reflect.ValueOf((*_github_com_litesql_go_ha_DBSnapshotter)(nil)),
 		"_LeaderProvider":          reflect.ValueOf((*_github_com_litesql_go_ha_LeaderProvider)(nil)),
+		"_PreparedTwoPhaseCommit":  reflect.ValueOf((*_github_com_litesql_go_ha_PreparedTwoPhaseCommit)(nil)),
 		"_ProxiedPositionProvider": reflect.ValueOf((*_github_com_litesql_go_ha_ProxiedPositionProvider)(nil)),
 		"_Publisher":               reflect.ValueOf((*_github_com_litesql_go_ha_Publisher)(nil)),
 		"_SequenceProvider":        reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
 		"_Subscriber":              reflect.ValueOf((*_github_com_litesql_go_ha_Subscriber)(nil)),
+		"_TwoPhaseCommitPreparer":  reflect.ValueOf((*_github_com_litesql_go_ha_TwoPhaseCommitPreparer)(nil)),
 		"_TxSeqTracker":            reflect.ValueOf((*_github_com_litesql_go_ha_TxSeqTracker)(nil)),
 	}
 }
@@ -254,6 +261,32 @@ func (W _github_com_litesql_go_ha_LeaderProvider) RedirectTarget() string {
 	return W.WRedirectTarget()
 }
 
+// _github_com_litesql_go_ha_PreparedTwoPhaseCommit is an interface wrapper for PreparedTwoPhaseCommit type
+type _github_com_litesql_go_ha_PreparedTwoPhaseCommit struct {
+	IValue                interface{}
+	WAbort                func() error
+	WClose                func()
+	WCommit               func() error
+	WRecordCommitDecision func(a0 ha.TwoPhaseCommitDecisionWriter) error
+	WResolveCommit        func() (bool, error)
+}
+
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Abort() error {
+	return W.WAbort()
+}
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Close() {
+	W.WClose()
+}
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Commit() error {
+	return W.WCommit()
+}
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) RecordCommitDecision(a0 ha.TwoPhaseCommitDecisionWriter) error {
+	return W.WRecordCommitDecision(a0)
+}
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) ResolveCommit() (bool, error) {
+	return W.WResolveCommit()
+}
+
 // _github_com_litesql_go_ha_ProxiedPositionProvider is an interface wrapper for ProxiedPositionProvider type
 type _github_com_litesql_go_ha_ProxiedPositionProvider struct {
 	IValue           interface{}
@@ -336,6 +369,16 @@ func (W _github_com_litesql_go_ha_Subscriber) UndoBySeq(ctx context.Context, sta
 }
 func (W _github_com_litesql_go_ha_Subscriber) UndoByTime(ctx context.Context, duration time.Duration, filterType grpc.UndoFilter, filterEntities map[string][]int64) error {
 	return W.WUndoByTime(ctx, duration, filterType, filterEntities)
+}
+
+// _github_com_litesql_go_ha_TwoPhaseCommitPreparer is an interface wrapper for TwoPhaseCommitPreparer type
+type _github_com_litesql_go_ha_TwoPhaseCommitPreparer struct {
+	IValue                 interface{}
+	WPrepareTwoPhaseCommit func(a0 *ha.ChangeSet) (ha.PreparedTwoPhaseCommit, error)
+}
+
+func (W _github_com_litesql_go_ha_TwoPhaseCommitPreparer) PrepareTwoPhaseCommit(a0 *ha.ChangeSet) (ha.PreparedTwoPhaseCommit, error) {
+	return W.WPrepareTwoPhaseCommit(a0)
 }
 
 // _github_com_litesql_go_ha_TxSeqTracker is an interface wrapper for TxSeqTracker type
