@@ -26,7 +26,7 @@ HA is a highly available SQLite cluster powered by an embedded NATS JetStream se
 - 📚 **Read Replicas**: Create live local read replicas with [ha-sync SQLite extension](https://github.com/litesql/ha-sync)
 - 🔄 **Change Data Capture (CDC)**: Supports CDC for real-time data streaming
 - 🔌 **Proxy**: Proxy and replicate PostgreSQL or MySQL databases to the edge
-- ⚙️ **Cluster Modes**: Configure leader-based or leaderless clusters with custom conflict resolution strategies
+- ⚙️ **Cluster Modes**: Configure a two-phase commit (2PC), leader-based or leaderless clusters with custom conflict resolution strategies
 - 📚 **Cross-Shard Queries**: Execute queries across shards using SQL hints like `/*+ db=DSN */`
 - 🔄 **Transaction Undo**: Supports undo operations on committed transactions, allowing rollback to previous states
 - 📖 **Full Documentation**: [https://litesql.github.io/ha/](https://litesql.github.io/ha/)
