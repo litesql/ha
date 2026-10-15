@@ -46,8 +46,10 @@ func init() {
 		"NewNoopPublisher":               reflect.ValueOf(ha.NewNoopPublisher),
 		"NewNoopSnapshotter":             reflect.ValueOf(ha.NewNoopSnapshotter),
 		"NewNoopSubscriber":              reflect.ValueOf(ha.NewNoopSubscriber),
+		"NewOutboxPublisher":             reflect.ValueOf(ha.NewOutboxPublisher),
 		"NewTwoPhaseCommitPublisher":     reflect.ValueOf(ha.NewTwoPhaseCommitPublisher),
 		"NewWriterPublisher":             reflect.ValueOf(ha.NewWriterPublisher),
+		"OutboxTable":                    reflect.ValueOf(constant.MakeFromLiteral("\"ha_outbox\"", token.STRING, 0)),
 		"PK":                             reflect.ValueOf(ha.PK),
 		"Parse":                          reflect.ValueOf(ha.Parse),
 		"ParseStatement":                 reflect.ValueOf(ha.ParseStatement),
@@ -113,7 +115,6 @@ func init() {
 		"WithWaitFor":                    reflect.ValueOf(ha.WithWaitFor),
 
 		// type definitions
-		"AsyncNATSPublisher":           reflect.ValueOf((*ha.AsyncNATSPublisher)(nil)),
 		"BackupFn":                     reflect.ValueOf((*ha.BackupFn)(nil)),
 		"CDCPublisher":                 reflect.ValueOf((*ha.CDCPublisher)(nil)),
 		"Change":                       reflect.ValueOf((*ha.Change)(nil)),
@@ -144,6 +145,7 @@ func init() {
 		"NoopSnapshotter":              reflect.ValueOf((*ha.NoopSnapshotter)(nil)),
 		"NoopSubscriber":               reflect.ValueOf((*ha.NoopSubscriber)(nil)),
 		"Option":                       reflect.ValueOf((*ha.Option)(nil)),
+		"OutboxPublisher":              reflect.ValueOf((*ha.OutboxPublisher)(nil)),
 		"PreparedTwoPhaseCommit":       reflect.ValueOf((*ha.PreparedTwoPhaseCommit)(nil)),
 		"ProxiedPositionProvider":      reflect.ValueOf((*ha.ProxiedPositionProvider)(nil)),
 		"Publisher":                    reflect.ValueOf((*ha.Publisher)(nil)),

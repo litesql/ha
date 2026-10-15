@@ -96,15 +96,14 @@ var (
 	natsStoreDir *string
 	natsConfig   *string
 
-	asyncReplication          *bool
-	asyncReplicationOutboxDir *string
-	replicationStream         *string
-	replicationTimeout        *time.Duration
-	replicationMaxAge         *time.Duration
-	replicationURL            *string
-	replicationPolicy         *string
-	replicas                  *int
-	rowIdentify               *string
+	asyncReplication   *bool
+	replicationStream  *string
+	replicationTimeout *time.Duration
+	replicationMaxAge  *time.Duration
+	replicationURL     *string
+	replicationPolicy  *string
+	replicas           *int
+	rowIdentify        *string
 
 	interceptorPath *string
 
@@ -177,7 +176,6 @@ func main() {
 	concurrentQueries = flagSet.IntLong("concurrent-queries", 50, "Maximum number of concurrent queries")
 
 	asyncReplication = flagSet.BoolLong("async-replication", "Enable asynchronous replication message publishing")
-	asyncReplicationOutboxDir = flagSet.StringLong("async-replication-store-dir", "", "Directory for asynchronous replication outbox storage")
 	replicas = flagSet.IntLong("replicas", 1, "Number of JetStream replicas for stream and object store, from 1 to 5")
 	replicationTimeout = flagSet.DurationLong("replication-timeout", 15*time.Second, "Timeout for replication publisher operations")
 	replicationStream = flagSet.StringLong("replication-stream", "ha_replication", "Replication stream name")
@@ -341,7 +339,6 @@ func run() error {
 
 	if *asyncReplication {
 		opts = append(opts, ha.WithAsyncPublisher())
-		opts = append(opts, ha.WithAsyncPublisherOutboxDir(*asyncReplicationOutboxDir))
 	}
 
 	if *rowIdentify != "" {

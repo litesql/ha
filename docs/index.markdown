@@ -496,7 +496,6 @@ Use `ha --help` for the full list of options.
 | --debezium-source-dsn | HA_DEBEZIUM_SOURCE_DSN | | Source DSN for Debezium write redirection |
 | --concurrent-queries | HA_CONCURRENT_QUERIES | 50 | Maximum number of concurrent queries |
 | --async-replication | HA_ASYNC_REPLICATION | false | Enable asynchronous replication message publishing |
-| --async-replication-store-dir | HA_ASYNC_REPLICATION_STORE_DIR | | Directory for asynchronous replication outbox storage |
 | --replicas | HA_REPLICAS | 1 | Number of JetStream replicas for stream and object store |
 | --replication-timeout | HA_REPLICATION_TIMEOUT | 15s | Timeout for replication publisher operations |
 | --replication-stream | HA_REPLICATION_STREAM | ha_replication | Replication stream name |
