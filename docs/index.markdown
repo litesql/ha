@@ -35,7 +35,7 @@ HA runs SQLite databases as a highly available service. It exposes SQLite over H
 Start a node with an on-disk database and PostgreSQL wire protocol enabled:
 
 ```sh
-mkdir db1 && mkdir db2
+mkdir db1 db2
 ```
 
 ```sh
