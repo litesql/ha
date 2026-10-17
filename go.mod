@@ -11,7 +11,7 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.20.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/debezium-sink v0.0.3
-	github.com/litesql/go-ha v0.14.0
+	github.com/litesql/go-ha v0.14.1
 	github.com/litesql/go-sqlite-ha v0.14.0
 	github.com/litesql/go-sqlite3-ha v0.14.0
 	github.com/litesql/mysql v0.0.4
@@ -80,7 +80,7 @@ require (
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20260508113557-84548dbcc173 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rqlite/sql v0.0.0-20261009033234-4555bb784427 // indirect
+	github.com/rqlite/sql v0.0.0-20261016220845-5c0832fea6e1 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect

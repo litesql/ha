@@ -80,7 +80,6 @@ func init() {
 		"TypeVacuum":                     reflect.ValueOf(constant.MakeFromLiteral("\"VACUUM\"", token.STRING, 0)),
 		"UnverifiedStatement":            reflect.ValueOf(ha.UnverifiedStatement),
 		"WithAsyncPublisher":             reflect.ValueOf(ha.WithAsyncPublisher),
-		"WithAsyncPublisherOutboxDir":    reflect.ValueOf(ha.WithAsyncPublisherOutboxDir),
 		"WithAutoStart":                  reflect.ValueOf(ha.WithAutoStart),
 		"WithCDCPublisher":               reflect.ValueOf(ha.WithCDCPublisher),
 		"WithChangeSetInterceptor":       reflect.ValueOf(ha.WithChangeSetInterceptor),
