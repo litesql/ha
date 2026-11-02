@@ -239,12 +239,21 @@ func run() error {
 		return fmt.Errorf("invalid log-level! Valid values: info, debug, error, warn")
 	}
 
+	nodeName := *name
+	if nodeName == "" {
+		var err error
+		nodeName, err = os.Hostname()
+		if err != nil {
+			return fmt.Errorf("failed to get hostname: %w\n set a static name with --name", err)
+		}
+	}
+
 	if *remote != "" {
 		ctx := context.Background()
 		var flushObservability func(context.Context) error
 		if *observability {
 			var err error
-			flushObservability, err = initObservability(ctx, level, true)
+			flushObservability, err = initObservability(ctx, nodeName, level, true)
 			if err != nil {
 				return err
 			}
@@ -262,15 +271,6 @@ func run() error {
 
 	if *concurrentQueries < 1 {
 		return fmt.Errorf("--concurrent-queries must be at least 1")
-	}
-
-	nodeName := *name
-	if nodeName == "" {
-		var err error
-		nodeName, err = os.Hostname()
-		if err != nil {
-			return fmt.Errorf("failed to get hostname: %w", err)
-		}
 	}
 
 	dsnList := make([]string, 0)
@@ -411,7 +411,7 @@ func run() error {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 
-	flushObservability, err := initObservability(ctx, level, *observability)
+	flushObservability, err := initObservability(ctx, nodeName, level, *observability)
 	if err != nil {
 		return err
 	}
@@ -610,16 +610,16 @@ func run() error {
 	return server.ListenAndServe()
 }
 
-func initObservability(ctx context.Context, level slog.Level, enabled bool) (func(context.Context) error, error) {
-	logsFlusher, err := halog.Init(ctx, level, enabled)
+func initObservability(ctx context.Context, nodeName string, level slog.Level, enabled bool) (func(context.Context) error, error) {
+	logsFlusher, err := halog.Init(ctx, nodeName, level, enabled)
 	if err != nil {
 		return nil, err
 	}
-	metricsFlusher, err := metric.Init(ctx, enabled)
+	metricsFlusher, err := metric.Init(ctx, nodeName, enabled)
 	if err != nil {
 		return nil, errors.Join(err, logsFlusher(ctx))
 	}
-	tracesFlusher, err := trace.Init(ctx, enabled)
+	tracesFlusher, err := trace.Init(ctx, nodeName, enabled)
 	if err != nil {
 		return nil, errors.Join(err, metricsFlusher(ctx), logsFlusher(ctx))
 	}

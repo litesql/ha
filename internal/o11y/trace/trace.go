@@ -11,7 +11,7 @@ import (
 	"github.com/litesql/ha/internal/o11y"
 )
 
-func Init(ctx context.Context, enableOtel bool) (func(context.Context) error, error) {
+func Init(ctx context.Context, nodeName string, enableOtel bool) (func(context.Context) error, error) {
 	if !enableOtel {
 		//noop
 		return func(_ context.Context) error {
@@ -27,7 +27,7 @@ func Init(ctx context.Context, enableOtel bool) (func(context.Context) error, er
 	tp := tracesdk.NewTracerProvider(
 		tracesdk.WithBatcher(exp),
 		tracesdk.WithSampler(tracesdk.AlwaysSample()),
-		tracesdk.WithResource(o11y.Resource()),
+		tracesdk.WithResource(o11y.Resource(nodeName)),
 	)
 
 	otel.SetTracerProvider(tp)

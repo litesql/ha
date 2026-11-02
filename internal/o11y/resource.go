@@ -17,11 +17,12 @@ var (
 	once sync.Once
 )
 
-func Resource() *resource.Resource {
+func Resource(nodeName string) *resource.Resource {
 	once.Do(func() {
 		attr := append(resource.Default().Attributes(),
 			semconv.ServiceName(serviceName),
-			semconv.ServiceVersion(version))
+			semconv.ServiceVersion(version),
+			semconv.ServiceInstanceID(nodeName))
 		res = resource.NewWithAttributes(semconv.SchemaURL,
 			attr...,
 		)

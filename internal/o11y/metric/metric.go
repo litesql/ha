@@ -11,7 +11,7 @@ import (
 	"github.com/litesql/ha/internal/o11y"
 )
 
-func Init(ctx context.Context, enableOtel bool) (func(context.Context) error, error) {
+func Init(ctx context.Context, nodeName string, enableOtel bool) (func(context.Context) error, error) {
 	var reader metric.Reader
 
 	if !enableOtel {
@@ -30,7 +30,7 @@ func Init(ctx context.Context, enableOtel bool) (func(context.Context) error, er
 	)
 
 	mp := metric.NewMeterProvider(
-		metric.WithResource(o11y.Resource()),
+		metric.WithResource(o11y.Resource(nodeName)),
 		metric.WithReader(reader))
 	otel.SetMeterProvider(mp)
 

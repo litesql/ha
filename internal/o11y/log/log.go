@@ -15,7 +15,7 @@ import (
 
 type flusher func(context.Context) error
 
-func Init(ctx context.Context, level slog.Level, enableOtel bool) (flusher, error) {
+func Init(ctx context.Context, nodeName string, level slog.Level, enableOtel bool) (flusher, error) {
 	opts := slog.HandlerOptions{
 		AddSource: true,
 		Level:     level,
@@ -27,7 +27,7 @@ func Init(ctx context.Context, level slog.Level, enableOtel bool) (flusher, erro
 	var loggerProvider *log.LoggerProvider
 	if enableOtel {
 		var err error
-		loggerProvider, err = newLoggerProvider(ctx)
+		loggerProvider, err = newLoggerProvider(ctx, nodeName)
 		if err != nil {
 			return nil, err
 		}
@@ -55,14 +55,14 @@ func Init(ctx context.Context, level slog.Level, enableOtel bool) (flusher, erro
 	return flush, nil
 }
 
-func newLoggerProvider(ctx context.Context) (*log.LoggerProvider, error) {
+func newLoggerProvider(ctx context.Context, nodeName string) (*log.LoggerProvider, error) {
 	exporter, err := otlploghttp.New(ctx)
 	if err != nil {
 		return nil, err
 	}
 	processor := log.NewBatchProcessor(exporter)
 	loggerProvider := log.NewLoggerProvider(
-		log.WithResource(o11y.Resource()),
+		log.WithResource(o11y.Resource(nodeName)),
 		log.WithProcessor(processor),
 	)
 	return loggerProvider, nil

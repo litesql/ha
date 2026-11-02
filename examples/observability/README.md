@@ -41,7 +41,7 @@ curl -sS http://localhost:8080/query \
 
 curl -sS http://localhost:8080/query \
   -H 'Content-Type: application/json' \
-  -d '{"sql":"INSERT INTO events (name) VALUES (?)","params":{"$1":"example"}}'
+  -d '{"sql":"INSERT INTO events (name) VALUES (:name)","params":{"name":"example"}}'
 ```
 
 The Grafana, Prometheus, and HA ports are bound to localhost. Grafana's
