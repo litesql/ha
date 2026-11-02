@@ -2,7 +2,6 @@ package metric
 
 import (
 	"context"
-	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
@@ -26,7 +25,6 @@ func Init(ctx context.Context, nodeName string, enableOtel bool) (func(context.C
 	}
 	reader = metric.NewPeriodicReader(
 		metricExporter,
-		metric.WithInterval(5*time.Second),
 	)
 
 	mp := metric.NewMeterProvider(

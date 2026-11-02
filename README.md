@@ -204,14 +204,14 @@ HA can proxy connections to PostgreSQL, MySQL databases or any [Debezium source 
 
 ```bash
 mkdir db1
-ha -n node1 --nats-port 0 --log-level debug "file:db1/mydatabase.db?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://localhost:8081"
+ha -n node1 --nats-port 0 "file:db1/mydatabase.db?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://localhost:8081"
 ```
 
 ### 2. Start a Second HA Instance
 
 ```bash
 mkdir db2
-ha -n node2 --nats-port 0 -p 8081 --log-level debug "file:db2/mydatabase.db?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://localhost:8080"
+ha -n node2 --nats-port 0 -p 8081 "file:db2/mydatabase.db?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://localhost:8080"
 ```
 
 ## API Documentation

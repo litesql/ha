@@ -17,7 +17,7 @@ type flusher func(context.Context) error
 
 func Init(ctx context.Context, nodeName string, level slog.Level, enableOtel bool) (flusher, error) {
 	opts := slog.HandlerOptions{
-		AddSource: true,
+		AddSource: false,
 		Level:     level,
 	}
 	var handlers []slog.Handler

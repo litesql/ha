@@ -11,7 +11,7 @@ services:
       HA_LOG_LEVEL: "debug"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
-      - "127.0.0.1:8080:8080"
+      - "8080:8080"
     volumes:
       - node1_data:/data
 
@@ -28,7 +28,7 @@ services:
       HA_LOG_LEVEL: "debug"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
-      - "127.0.0.1:8081:8080"
+      - "8081:8080"
     volumes:
       - node2_data:/data
 

@@ -403,10 +403,6 @@ func run() error {
 		ReadYourWrites:    *proxyReadYourWrites,
 	}
 
-	if *observability {
-		opts = append(opts, ha.WithOpenTelemetry(nil, nil))
-	}
-
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 
@@ -416,6 +412,7 @@ func run() error {
 	}
 	var otelInterceptor *otelconnect.Interceptor
 	if *observability {
+		opts = append(opts, ha.WithOpenTelemetry(nil, nil))
 		otelInterceptor, err = otelconnect.NewInterceptor()
 		if err != nil {
 			return fmt.Errorf("failed to create OpenTelemetry Connect interceptor: %w", err)
@@ -594,12 +591,12 @@ func run() error {
 		if err := pgServer.Close(); err != nil {
 			slog.Error("PostgreSQL server shutdown failed", "error", err)
 		}
-		ha.Shutdown()
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("HTTP server shutdown failed", "error", err)
 		}
+		ha.Shutdown()
 		if err := flushObservability(ctx); err != nil {
 			slog.Error("observability shutdown failed", "error", err)
 		}

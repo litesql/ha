@@ -336,7 +336,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		dbs[""] = connDB
 	}
 
-	return nil
+	return db.QueryRowContext(ctx, "SELECT 1").Scan(new(int))
 }
 
 type Request struct {
@@ -480,7 +480,6 @@ type querier interface {
 }
 
 func doQuery(ctx context.Context, querier querier, query string, args map[string]any) (*Response, error) {
-	slog.Warn("Query", "q", querier, "query", query, "ctx", ctx)
 	rows, err := querier.QueryContext(ctx, query, getArgs(args)...)
 	if err != nil {
 		return nil, err
