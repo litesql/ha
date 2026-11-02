@@ -1,8 +1,8 @@
 services:
-  ha:
+  node1:
     image: ghcr.io/litesql/ha:latest
     environment:
-      HA_NAME: ha
+      HA_NAME: node1
       HA_ARGS: "file:/data/ha.db?_journal=WAL&_timeout=5000&_sync=NORMAL"
       HA_CREATE_DB_DIR: /data
       HA_OBSERVABILITY: "true"
@@ -10,9 +10,45 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
-      - ha_data:/data
+      - node1_data:/data
     depends_on:
       - otel-collector
+
+  node2:
+    image: ghcr.io/litesql/ha:latest
+    restart: on-failure
+    environment:
+      HA_NAME: node2
+      HA_ARGS: "file:/data/ha.db?_journal=WAL&_timeout=5000&_sync=NORMAL"
+      HA_CREATE_DB_DIR: /data
+      HA_NATS_PORT: "0"
+      HA_REPLICATION_URL: nats://node1:4222
+      HA_OBSERVABILITY: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - node2_data:/data
+    depends_on:
+      - node1
+
+  node3:
+    image: ghcr.io/litesql/ha:latest
+    restart: on-failure
+    environment:
+      HA_NAME: node3
+      HA_ARGS: "file:/data/ha.db?_journal=WAL&_timeout=5000&_sync=NORMAL"
+      HA_CREATE_DB_DIR: /data
+      HA_NATS_PORT: "0"
+      HA_REPLICATION_URL: nats://node1:4222
+      HA_OBSERVABILITY: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "127.0.0.1:8082:8080"
+    volumes:
+      - node3_data:/data
+    depends_on:
+      - node1
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.139.0
@@ -69,7 +105,9 @@ services:
       - tempo
 
 volumes:
-  ha_data:
+  node1_data:
+  node2_data:
+  node3_data:
   prometheus_data:
   loki_data:
   tempo_data:

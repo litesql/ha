@@ -18,6 +18,12 @@ outgoing HTTP and native gRPC calls when `--observability` (or
 `/metrics` endpoint; the Collector exports received OTLP metrics for
 Prometheus to scrape.
 
+The example runs three HA nodes. `node1` hosts the embedded NATS server; the
+other two nodes join its replication stream. In Grafana, use the **Service
+instance ID** selector to filter metrics by `node1`, `node2`, or `node3`.
+Each node sets `service.instance.id` to its HA name, and the Collector converts
+that resource attribute into a Prometheus label.
+
 ## Start
 
 From this directory:
@@ -31,8 +37,10 @@ The **HA / HA Observability** dashboard and Prometheus, Loki, and Tempo
 datasources are provisioned automatically. For traces, open Grafana Explore
 and select Tempo; the datasource also links traces to matching Loki logs.
 
-HA's HTTP API is available at [http://localhost:8080](http://localhost:8080).
-For example, create a table and insert a row to generate database activity:
+Each node's HTTP API is available locally at
+[node1](http://localhost:8080), [node2](http://localhost:8081), and
+[node3](http://localhost:8082). Use node1 to create a table and insert a row
+to generate replicated database activity:
 
 ```sh
 curl -sS http://localhost:8080/query \
