@@ -749,6 +749,151 @@
     },
     {
       "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 45
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_request_method) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{http_request_method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP server request duration (p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 45
+      },
+      "id": 17,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, http_request_method) (rate(http_client_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{http_request_method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP client request duration (p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 53
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, rpc_system_name, rpc_method) (rate(rpc_server_call_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{rpc_system_name}} {{rpc_method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "RPC server call duration (p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 53
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, rpc_system_name, rpc_method) (rate(rpc_client_call_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{rpc_system_name}} {{rpc_method}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, rpc_system, rpc_method) (rate(rpc_client_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{rpc_system}} {{rpc_method}}",
+          "refId": "B"
+        }
+      ],
+      "title": "RPC client call duration (p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
         "type": "loki",
         "uid": "loki"
       },
@@ -756,7 +901,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 61
       },
       "id": 13,
       "options": {

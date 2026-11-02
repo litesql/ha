@@ -21,6 +21,8 @@ import (
 	"github.com/knz/bubbline"
 	"github.com/knz/bubbline/history"
 	haconnect "github.com/litesql/go-ha/connect"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -45,7 +47,11 @@ var (
 	evenRowStyle = cellStyle.Foreground(lightGray)
 )
 
-func Start(remote string, token string) {
+func Start(remote string, token string, enableOtel bool) {
+	httpClient := http.DefaultClient
+	if enableOtel {
+		httpClient = &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+	}
 	u, err := url.Parse(remote)
 	if err != nil {
 		slog.Error("parse url", "error", err)
@@ -61,6 +67,9 @@ func Start(remote string, token string) {
 	}
 	if token != "" {
 		dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(grpcCredentials{token: token}))
+	}
+	if enableOtel {
+		dialOpts = append(dialOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	}
 
 	cc, err := grpc.NewClient(u.Host, dialOpts...)
@@ -205,7 +214,7 @@ func Start(remote string, token string) {
 			if match := reCreateDatabase.FindStringSubmatch(command); len(match) == 2 {
 				dsn := match[1]
 				command = ""
-				err := createDatabase(remote, token, dsn)
+				err := createDatabase(httpClient, remote, token, dsn)
 				if err != nil {
 					fmt.Println("create database error:", err)
 				} else {
@@ -217,7 +226,7 @@ func Start(remote string, token string) {
 			if match := reDropDatabase.FindStringSubmatch(command); len(match) == 2 {
 				id := match[1]
 				command = ""
-				err := dropDatabase(remote, token, id)
+				err := dropDatabase(httpClient, remote, token, id)
 				if err != nil {
 					fmt.Println("drop database error:", err)
 				} else {
@@ -305,7 +314,7 @@ func (c grpcCredentials) RequireTransportSecurity() bool {
 	return false
 }
 
-func createDatabase(baseURL string, token string, dsn string) error {
+func createDatabase(httpClient *http.Client, baseURL string, token string, dsn string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	var payload struct {
@@ -323,7 +332,7 @@ func createDatabase(baseURL string, token string, dsn string) error {
 	if token != "" {
 		req.Header.Set("Authorization", token)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -334,7 +343,7 @@ func createDatabase(baseURL string, token string, dsn string) error {
 	return nil
 }
 
-func dropDatabase(baseURL string, token string, id string) error {
+func dropDatabase(httpClient *http.Client, baseURL string, token string, id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, baseURL+"/databases/"+id, nil)
@@ -344,7 +353,7 @@ func dropDatabase(baseURL string, token string, id string) error {
 	if token != "" {
 		req.Header.Set("Authorization", token)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}

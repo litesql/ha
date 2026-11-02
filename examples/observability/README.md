@@ -11,8 +11,12 @@ This example runs HA with OpenTelemetry enabled and a local observability stack:
 The provisioned Grafana dashboard uses metrics emitted by `go-ha` and
 `go-sqlite-ha`: cluster readiness/leadership and NATS state, replication
 sequences/lag/changesets/errors/durations, snapshots, and SQLite operations,
-durations, and backup sizes. The app does not expose a Prometheus `/metrics`
-endpoint; the Collector exports received OTLP metrics for Prometheus to scrape.
+durations, and backup sizes. It also shows HTTP server/client and gRPC RPC
+latency. HA instruments incoming HTTP and Connect RPC requests and the CLI's
+outgoing HTTP and native gRPC calls when `--observability` (or
+`HA_OBSERVABILITY=true`) is enabled. The app does not expose a Prometheus
+`/metrics` endpoint; the Collector exports received OTLP metrics for
+Prometheus to scrape.
 
 ## Start
 

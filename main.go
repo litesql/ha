@@ -17,10 +17,12 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"connectrpc.com/otelconnect"
 	ha "github.com/litesql/go-ha"
 	haconnect "github.com/litesql/go-ha/connect"
 	"github.com/peterbourgon/ff/v4"
 	"github.com/peterbourgon/ff/v4/ffhelp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/litesql/ha/internal/cli"
 	"github.com/litesql/ha/internal/interceptor"
@@ -238,7 +240,23 @@ func run() error {
 	}
 
 	if *remote != "" {
-		cli.Start(*remote, *token)
+		ctx := context.Background()
+		var flushObservability func(context.Context) error
+		if *observability {
+			var err error
+			flushObservability, err = initObservability(ctx, level, true)
+			if err != nil {
+				return err
+			}
+		}
+		cli.Start(*remote, *token, *observability)
+		if flushObservability != nil {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if err := flushObservability(shutdownCtx); err != nil {
+				return fmt.Errorf("observability shutdown failed: %w", err)
+			}
+		}
 		return nil
 	}
 
@@ -393,19 +411,16 @@ func run() error {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 
-	logsFlusher, err := halog.Init(ctx, level, *observability)
+	flushObservability, err := initObservability(ctx, level, *observability)
 	if err != nil {
 		return err
 	}
-
-	metricsFlusher, err := metric.Init(ctx, *observability)
-	if err != nil {
-		return err
-	}
-
-	tracesFlusher, err := trace.Init(ctx, *observability)
-	if err != nil {
-		return err
+	var otelInterceptor *otelconnect.Interceptor
+	if *observability {
+		otelInterceptor, err = otelconnect.NewInterceptor()
+		if err != nil {
+			return fmt.Errorf("failed to create OpenTelemetry Connect interceptor: %w", err)
+		}
 	}
 
 	for _, dsn := range dsnList {
@@ -542,6 +557,9 @@ func run() error {
 		authInterceptor := haconnect.NewAuthInterceptor(*token)
 		connectOpts = append(connectOpts, connect.WithInterceptors(authInterceptor))
 	}
+	if otelInterceptor != nil {
+		connectOpts = append(connectOpts, connect.WithInterceptors(otelInterceptor))
+	}
 	mux.Handle(ha.ConnectHandler(connectOpts...))
 	p := new(http.Protocols)
 	p.SetHTTP1(true)
@@ -562,6 +580,9 @@ func run() error {
 			mux.ServeHTTP(w, r)
 		})
 	}
+	if *observability {
+		server.Handler = otelhttp.NewHandler(server.Handler, "ha.http")
+	}
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
@@ -580,19 +601,31 @@ func run() error {
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("HTTP server shutdown failed", "error", err)
 		}
-		if err := logsFlusher(ctx); err != nil {
-			slog.Error("logs flusher failed", "error", err)
-		}
-		if err := metricsFlusher(ctx); err != nil {
-			slog.Error("metrics flusher failed", "error", err)
-		}
-		if err := tracesFlusher(ctx); err != nil {
-			slog.Error("traces flusher failed", "error", err)
+		if err := flushObservability(ctx); err != nil {
+			slog.Error("observability shutdown failed", "error", err)
 		}
 	}()
 
 	slog.Info("starting HA HTTP server", "port", *port, "version", version, "commit", commit, "date", date)
 	return server.ListenAndServe()
+}
+
+func initObservability(ctx context.Context, level slog.Level, enabled bool) (func(context.Context) error, error) {
+	logsFlusher, err := halog.Init(ctx, level, enabled)
+	if err != nil {
+		return nil, err
+	}
+	metricsFlusher, err := metric.Init(ctx, enabled)
+	if err != nil {
+		return nil, errors.Join(err, logsFlusher(ctx))
+	}
+	tracesFlusher, err := trace.Init(ctx, enabled)
+	if err != nil {
+		return nil, errors.Join(err, metricsFlusher(ctx), logsFlusher(ctx))
+	}
+	return func(ctx context.Context) error {
+		return errors.Join(logsFlusher(ctx), metricsFlusher(ctx), tracesFlusher(ctx))
+	}, nil
 }
 
 func isSQLiteFile(path string) bool {

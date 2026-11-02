@@ -4,6 +4,7 @@ go 1.27
 
 require (
 	connectrpc.com/connect v1.21.1
+	connectrpc.com/otelconnect v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-mysql-org/go-mysql v1.16.0
 	github.com/jackc/pglogrepl v0.0.0-20261003132456-662581bb6bb6
@@ -24,6 +25,8 @@ require (
 	github.com/traefik/yaegi v0.16.1
 	github.com/twmb/franz-go v1.22.2
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.70.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.23.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.47.0
@@ -54,6 +57,7 @@ require (
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
+	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
