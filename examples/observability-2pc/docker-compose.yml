@@ -7,7 +7,7 @@ services:
       HA_CREATE_DB_DIR: /data
       HA_GRPC_INSECURE: "true"
       HA_NATS_PORT: "0"
-      HA_OBSERVABILITY: "false"
+      HA_OBSERVABILITY: "true"
       HA_LOG_LEVEL: "debug"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
@@ -24,7 +24,7 @@ services:
       HA_CREATE_DB_DIR: /data
       HA_GRPC_INSECURE: "true"
       HA_NATS_PORT: "0"
-      HA_OBSERVABILITY: "false"
+      HA_OBSERVABILITY: "true"
       HA_LOG_LEVEL: "debug"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
