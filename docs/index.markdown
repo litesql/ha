@@ -337,6 +337,7 @@ Run `ha --help` for current command-line options. Most options can also be set t
 | `--nats-pass` | `HA_NATS_PASS` | unset | Embedded NATS password |
 | `--nats-config` | `HA_NATS_CONFIG` | unset | Embedded NATS configuration file |
 | `--nats-logs` | `HA_NATS_LOGS` | `false` | Enable embedded NATS logs |
+| `--observability`| `HA_OBSERVABILITY` | `false` | Enable OpenTelemetry observability for metrics, logs and traces |
 | `--replication-url` | `HA_REPLICATION_URL` | unset | External NATS URL; otherwise use embedded NATS |
 | `--replication-stream` | `HA_REPLICATION_STREAM` | `ha_replication` | JetStream replication stream name |
 | `--replication-policy` | `HA_REPLICATION_POLICY` | default | Subscriber delivery policy |

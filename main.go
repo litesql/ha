@@ -25,6 +25,9 @@ import (
 	"github.com/litesql/ha/internal/cli"
 	"github.com/litesql/ha/internal/interceptor"
 	"github.com/litesql/ha/internal/mcp"
+	halog "github.com/litesql/ha/internal/o11y/log"
+	"github.com/litesql/ha/internal/o11y/metric"
+	"github.com/litesql/ha/internal/o11y/trace"
 	"github.com/litesql/ha/internal/sqlite"
 	hahttp "github.com/litesql/ha/internal/wire/http"
 	"github.com/litesql/ha/internal/wire/mysql"
@@ -107,6 +110,8 @@ var (
 
 	interceptorPath *string
 
+	observability *bool
+
 	remote *string
 )
 
@@ -185,6 +190,9 @@ func main() {
 	rowIdentify = flagSet.StringLong("row-identify", "pk", "Row identification strategy for replication: pk, rowid, or full")
 
 	remote = flagSet.String('r', "remote", "", "Remote HA server address for client mode instead of starting a local server")
+
+	observability = flagSet.BoolLong("observability", "Enable OpenTelemetry observability for metrics, logs and traces")
+
 	initDynamicFlags()
 
 	printVersion := flagSet.BoolLong("version", "Print version information and exit")
@@ -215,17 +223,18 @@ func main() {
 }
 
 func run() error {
+	var level slog.Level
 	switch strings.ToUpper(*logLevel) {
 	case "INFO":
-		slog.SetLogLoggerLevel(slog.LevelInfo)
+		level = slog.LevelInfo
 	case "DEBUG":
-		slog.SetLogLoggerLevel(slog.LevelDebug)
+		level = slog.LevelDebug
 	case "ERROR":
-		slog.SetLogLoggerLevel(slog.LevelError)
+		level = slog.LevelError
 	case "WARN":
-		slog.SetLogLoggerLevel(slog.LevelWarn)
+		level = slog.LevelWarn
 	default:
-		return fmt.Errorf("invalid log-level! Valid values: info, debug, error, warm")
+		return fmt.Errorf("invalid log-level! Valid values: info, debug, error, warn")
 	}
 
 	if *remote != "" {
@@ -302,6 +311,7 @@ func run() error {
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
 		ha.WithGrpcInsecure(*grpcInsecure),
+		ha.WithOpenTelemetry(nil, nil),
 	}
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())
@@ -375,8 +385,31 @@ func run() error {
 		DisableRedirect:   *proxyDisableRedirect,
 		ReadYourWrites:    *proxyReadYourWrites,
 	}
+
+	if *observability {
+		opts = append(opts, ha.WithOpenTelemetry(nil, nil))
+	}
+
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+
+	logsFlusher, err := halog.Init(ctx, level, *observability)
+	if err != nil {
+		return err
+	}
+
+	metricsFlusher, err := metric.Init(ctx, *observability)
+	if err != nil {
+		return err
+	}
+
+	tracesFlusher, err := trace.Init(ctx, *observability)
+	if err != nil {
+		return err
+	}
+
 	for _, dsn := range dsnList {
-		err := sqlite.Load(context.Background(), dsn, sqlite.LoadConfig{
+		err := sqlite.Load(ctx, dsn, sqlite.LoadConfig{
 			MemDB:              *memDB,
 			FromLatestSnapshot: *fromLatestSnapshot,
 			DeliverPolicy:      *replicationPolicy,
@@ -546,6 +579,15 @@ func run() error {
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("HTTP server shutdown failed", "error", err)
+		}
+		if err := logsFlusher(ctx); err != nil {
+			slog.Error("logs flusher failed", "error", err)
+		}
+		if err := metricsFlusher(ctx); err != nil {
+			slog.Error("metrics flusher failed", "error", err)
+		}
+		if err := tracesFlusher(ctx); err != nil {
+			slog.Error("traces flusher failed", "error", err)
 		}
 	}()
 
