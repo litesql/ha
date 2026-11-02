@@ -26,12 +26,14 @@ func init() {
 		"ErrSnapshotterNotConfigured":    reflect.ValueOf(&ha.ErrSnapshotterNotConfigured).Elem(),
 		"ErrTwoPhaseCommitPending":       reflect.ValueOf(&ha.ErrTwoPhaseCommitPending).Elem(),
 		"Full":                           reflect.ValueOf(ha.Full),
+		"HealthPath":                     reflect.ValueOf(constant.MakeFromLiteral("\"/healthz\"", token.STRING, 0)),
 		"LatestSnapshot":                 reflect.ValueOf(ha.LatestSnapshot),
 		"ListDSN":                        reflect.ValueOf(ha.ListDSN),
 		"ListReplicationIDs":             reflect.ValueOf(ha.ListReplicationIDs),
 		"LocalDB":                        reflect.ValueOf(ha.LocalDB),
 		"LookupConnector":                reflect.ValueOf(ha.LookupConnector),
 		"LookupConnectorByReplicationID": reflect.ValueOf(ha.LookupConnectorByReplicationID),
+		"MetricsPath":                    reflect.ValueOf(constant.MakeFromLiteral("\"/metrics\"", token.STRING, 0)),
 		"NameToOptions":                  reflect.ValueOf(ha.NameToOptions),
 		"NewAsyncNATSPublisher":          reflect.ValueOf(ha.NewAsyncNATSPublisher),
 		"NewChangeSet":                   reflect.ValueOf(ha.NewChangeSet),
@@ -53,8 +55,10 @@ func init() {
 		"PK":                             reflect.ValueOf(ha.PK),
 		"Parse":                          reflect.ValueOf(ha.Parse),
 		"ParseStatement":                 reflect.ValueOf(ha.ParseStatement),
+		"ReadinessPath":                  reflect.ValueOf(constant.MakeFromLiteral("\"/readyz\"", token.STRING, 0)),
 		"Rowid":                          reflect.ValueOf(ha.Rowid),
 		"Shutdown":                       reflect.ValueOf(ha.Shutdown),
+		"StartLeaderElection":            reflect.ValueOf(ha.StartLeaderElection),
 		"TXCookieName":                   reflect.ValueOf(constant.MakeFromLiteral("\"_txseq\"", token.STRING, 0)),
 		"TwoPhaseCommitDecisionTable":    reflect.ValueOf(constant.MakeFromLiteral("\"ha_2pc_decisions\"", token.STRING, 0)),
 		"TypeAlterTable":                 reflect.ValueOf(constant.MakeFromLiteral("\"ALTER TABLE\"", token.STRING, 0)),
@@ -98,6 +102,7 @@ func init() {
 		"WithLeaderProvider":             reflect.ValueOf(ha.WithLeaderProvider),
 		"WithName":                       reflect.ValueOf(ha.WithName),
 		"WithNatsOptions":                reflect.ValueOf(ha.WithNatsOptions),
+		"WithOpenTelemetry":              reflect.ValueOf(ha.WithOpenTelemetry),
 		"WithProxiedDB":                  reflect.ValueOf(ha.WithProxiedDB),
 		"WithProxiedPositionProvider":    reflect.ValueOf(ha.WithProxiedPositionProvider),
 		"WithPublisherTimeout":           reflect.ValueOf(ha.WithPublisherTimeout),
@@ -143,6 +148,7 @@ func init() {
 		"NoopPublisher":                reflect.ValueOf((*ha.NoopPublisher)(nil)),
 		"NoopSnapshotter":              reflect.ValueOf((*ha.NoopSnapshotter)(nil)),
 		"NoopSubscriber":               reflect.ValueOf((*ha.NoopSubscriber)(nil)),
+		"ObservabilityStatus":          reflect.ValueOf((*ha.ObservabilityStatus)(nil)),
 		"Option":                       reflect.ValueOf((*ha.Option)(nil)),
 		"OutboxPublisher":              reflect.ValueOf((*ha.OutboxPublisher)(nil)),
 		"PreparedTwoPhaseCommit":       reflect.ValueOf((*ha.PreparedTwoPhaseCommit)(nil)),
@@ -267,9 +273,9 @@ type _github_com_litesql_go_ha_PreparedTwoPhaseCommit struct {
 	IValue                interface{}
 	WAbort                func() error
 	WClose                func()
-	WCommit               func() error
-	WRecordCommitDecision func(a0 ha.TwoPhaseCommitDecisionWriter) error
-	WResolveCommit        func() (bool, error)
+	WCommit               func(a0 context.Context) error
+	WRecordCommitDecision func(a0 context.Context, a1 ha.TwoPhaseCommitDecisionWriter) error
+	WResolveCommit        func(a0 context.Context) (bool, error)
 }
 
 func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Abort() error {
@@ -278,14 +284,14 @@ func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Abort() error {
 func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Close() {
 	W.WClose()
 }
-func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Commit() error {
-	return W.WCommit()
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Commit(a0 context.Context) error {
+	return W.WCommit(a0)
 }
-func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) RecordCommitDecision(a0 ha.TwoPhaseCommitDecisionWriter) error {
-	return W.WRecordCommitDecision(a0)
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) RecordCommitDecision(a0 context.Context, a1 ha.TwoPhaseCommitDecisionWriter) error {
+	return W.WRecordCommitDecision(a0, a1)
 }
-func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) ResolveCommit() (bool, error) {
-	return W.WResolveCommit()
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) ResolveCommit(a0 context.Context) (bool, error) {
+	return W.WResolveCommit(a0)
 }
 
 // _github_com_litesql_go_ha_ProxiedPositionProvider is an interface wrapper for ProxiedPositionProvider type
@@ -305,12 +311,12 @@ func (W _github_com_litesql_go_ha_ProxiedPositionProvider) SourcePosition(a0 con
 // _github_com_litesql_go_ha_Publisher is an interface wrapper for Publisher type
 type _github_com_litesql_go_ha_Publisher struct {
 	IValue    interface{}
-	WPublish  func(cs *ha.ChangeSet) error
+	WPublish  func(ctx context.Context, cs *ha.ChangeSet) error
 	WSequence func() uint64
 }
 
-func (W _github_com_litesql_go_ha_Publisher) Publish(cs *ha.ChangeSet) error {
-	return W.WPublish(cs)
+func (W _github_com_litesql_go_ha_Publisher) Publish(ctx context.Context, cs *ha.ChangeSet) error {
+	return W.WPublish(ctx, cs)
 }
 func (W _github_com_litesql_go_ha_Publisher) Sequence() uint64 {
 	return W.WSequence()
@@ -375,11 +381,11 @@ func (W _github_com_litesql_go_ha_Subscriber) UndoByTime(ctx context.Context, du
 // _github_com_litesql_go_ha_TwoPhaseCommitPreparer is an interface wrapper for TwoPhaseCommitPreparer type
 type _github_com_litesql_go_ha_TwoPhaseCommitPreparer struct {
 	IValue                 interface{}
-	WPrepareTwoPhaseCommit func(a0 *ha.ChangeSet) (ha.PreparedTwoPhaseCommit, error)
+	WPrepareTwoPhaseCommit func(a0 context.Context, a1 *ha.ChangeSet) (ha.PreparedTwoPhaseCommit, error)
 }
 
-func (W _github_com_litesql_go_ha_TwoPhaseCommitPreparer) PrepareTwoPhaseCommit(a0 *ha.ChangeSet) (ha.PreparedTwoPhaseCommit, error) {
-	return W.WPrepareTwoPhaseCommit(a0)
+func (W _github_com_litesql_go_ha_TwoPhaseCommitPreparer) PrepareTwoPhaseCommit(a0 context.Context, a1 *ha.ChangeSet) (ha.PreparedTwoPhaseCommit, error) {
+	return W.WPrepareTwoPhaseCommit(a0, a1)
 }
 
 // _github_com_litesql_go_ha_TxSeqTracker is an interface wrapper for TxSeqTracker type
