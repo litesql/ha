@@ -22,7 +22,7 @@ func Init(ctx context.Context, nodeName string, level slog.Level, enableOtel boo
 	}
 	var handlers []slog.Handler
 
-	handlers = append(handlers, slog.NewJSONHandler(os.Stderr, &opts))
+	handlers = append(handlers, slog.NewTextHandler(os.Stderr, &opts))
 
 	var loggerProvider *log.LoggerProvider
 	if enableOtel {

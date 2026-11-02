@@ -329,7 +329,6 @@ func run() error {
 		ha.WithDeliverPolicy(*replicationPolicy),
 		ha.WithSnapshotInterval(*snapshotInterval),
 		ha.WithGrpcInsecure(*grpcInsecure),
-		ha.WithOpenTelemetry(nil, nil),
 	}
 	if *disableDDLSync {
 		opts = append(opts, ha.WithDisableDDLSync())

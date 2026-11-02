@@ -1,0 +1,96 @@
+services:
+  node1:
+    image: ghcr.io/litesql/ha:latest
+    environment:
+      HA_NAME: node1
+      HA_ARGS: "file:/data/ha.db?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node2:8080"
+      HA_CREATE_DB_DIR: /data
+      HA_GRPC_INSECURE: "true"
+      HA_NATS_PORT: "0"
+      HA_OBSERVABILITY: "false"
+      HA_LOG_LEVEL: "debug"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - node1_data:/data
+
+  node2:
+    image: ghcr.io/litesql/ha:latest
+    restart: on-failure
+    environment:
+      HA_NAME: node2
+      HA_ARGS: "file:/data/ha.db?_journal=WAL&_timeout=5000&_sync=NORMAL&2pcPeers=http://node1:8080"
+      HA_CREATE_DB_DIR: /data
+      HA_GRPC_INSECURE: "true"
+      HA_NATS_PORT: "0"
+      HA_OBSERVABILITY: "false"
+      HA_LOG_LEVEL: "debug"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - node2_data:/data
+
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.139.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      - loki
+      - tempo
+
+  prometheus:
+    image: prom/prometheus:v3.7.3
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - otel-collector
+
+  loki:
+    image: grafana/loki:3.5.5
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./loki.yaml:/etc/loki/config.yaml:ro
+      - loki_data:/loki
+
+  tempo:
+    image: grafana/tempo:2.8.2
+    command: ["-config.file=/etc/tempo/config.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo/config.yaml:ro
+      - tempo_data:/var/tempo
+
+  grafana:
+    image: grafana/grafana:12.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+volumes:
+  node1_data:
+  node2_data:
+  prometheus_data:
+  loki_data:
+  tempo_data:
+  grafana_data:

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: HA observability
+    orgId: 1
+    folder: HA
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
