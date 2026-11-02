@@ -33,7 +33,6 @@ func init() {
 		"LocalDB":                        reflect.ValueOf(ha.LocalDB),
 		"LookupConnector":                reflect.ValueOf(ha.LookupConnector),
 		"LookupConnectorByReplicationID": reflect.ValueOf(ha.LookupConnectorByReplicationID),
-		"MetricsPath":                    reflect.ValueOf(constant.MakeFromLiteral("\"/metrics\"", token.STRING, 0)),
 		"NameToOptions":                  reflect.ValueOf(ha.NameToOptions),
 		"NewAsyncNATSPublisher":          reflect.ValueOf(ha.NewAsyncNATSPublisher),
 		"NewChangeSet":                   reflect.ValueOf(ha.NewChangeSet),
