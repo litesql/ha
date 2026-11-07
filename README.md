@@ -1,7 +1,7 @@
 # HA - Highly Available SQLite Cluster
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.26+-blue.svg)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.27+-blue.svg)](https://golang.org/)
 
 ![HA Architecture](ha.png)
 
@@ -36,6 +36,10 @@ HA is a highly available SQLite cluster powered by an embedded NATS JetStream se
 ### Pre-built Binaries
 
 Download the latest release from [GitHub Releases](https://github.com/litesql/ha/releases/latest).
+
+> **Note (Release Binaries vs. Docker Image)**:
+> - **Pre-built release binaries** are compiled with `CGO_ENABLED=0` (using the pure-Go SQLite driver). They are self-contained and portable, use `_pragma=...` DSN options by default, and do **not** support loading dynamic SQLite C extensions (`--extensions`).
+> - **Official Docker images** (`ghcr.io/litesql/ha`) and source builds with `CGO_ENABLED=1` use the CGO SQLite driver (`go-sqlite3`), use `_journal=WAL&_timeout=5000&_sync=NORMAL` DSN options by default, and support dynamic SQLite extensions via the `--extensions` flag.
 
 ### Build from Source
 

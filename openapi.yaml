@@ -9,6 +9,20 @@ tags:
   - name: All Databases
     description: Operations on all databases.
 paths:
+  /healthz:
+    get:
+      summary: Health check endpoint.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Server is healthy.
+  /mcp:
+    post:
+      summary: Model Context Protocol (MCP) streamable HTTP endpoint.
+      operationId: mcpEndpoint
+      responses:
+        '200':
+          description: MCP JSON-RPC response or event stream.
   /query:
     post:
       summary: Query the main database.      
@@ -38,17 +52,20 @@ paths:
                 $ref: "#/components/schemas/QueryResponse"
   /undo/{param}:
     post:
-      summary: Undo the last N transactions from stream sequence on the main database.
+      summary: Undo transactions from stream sequence or duration on the main database.
       operationId: undoMainDatabase
       tags:
         - Main Database
       parameters:
         - name: param
+          description: Sequence number (e.g. 0 or 10) or time duration (e.g. 5m, 1h).
           in: path
           required: true
           schema:
-            type: integer
-            minimum: 1
+            oneOf:
+              - type: integer
+                minimum: 0
+              - type: string
       responses:
         '200':
           description: Undo successful.
@@ -64,7 +81,7 @@ paths:
           required: true
           schema:
             type: integer
-            minimum: 1
+            minimum: 0
       responses:
         '200':
           description: Undo successful.
@@ -80,23 +97,26 @@ paths:
           required: true
           schema:
             type: integer
-            minimum: 1
+            minimum: 0
       responses:
         '200':
           description: Undo successful.
   /history/{param}:
     get:
-      summary: Get the history of the last N transactions from stream sequence on the main database.
+      summary: Get the history of transactions from stream sequence or duration on the main database.
       operationId: historyMainDatabase
       tags:
         - Main Database
       parameters:
         - name: param
+          description: Sequence number (e.g. 10) or time duration (e.g. 5m, 1h).
           in: path
           required: true
           schema:
-            type: integer
-            minimum: 1
+            oneOf:
+              - type: integer
+                minimum: 0
+              - type: string
       responses:
         '200':
           description: History retrieved successfully.
@@ -238,7 +258,7 @@ paths:
           description: Snapshot file.
   /databases/{id}/undo/{param}:
     post:
-      summary: Undo transactions from stream sequence on a specific database.
+      summary: Undo transactions from stream sequence or duration on a specific database.
       operationId: undoDatabase
       tags:
         - All Databases
@@ -249,11 +269,14 @@ paths:
           schema:
             type: string
         - name: param
+          description: Sequence number (e.g. 0 or 10) or time duration (e.g. 5m, 1h).
           in: path
           required: true
           schema:
-            type: integer
-            minimum: 1
+            oneOf:
+              - type: integer
+                minimum: 0
+              - type: string
       responses:
         '200':
           description: Undo successful.
@@ -274,7 +297,7 @@ paths:
           required: true
           schema:
             type: integer
-            minimum: 1
+            minimum: 0
       responses:
         '200':
           description: Undo successful.
@@ -295,13 +318,13 @@ paths:
           required: true
           schema:
             type: integer
-            minimum: 1
+            minimum: 0
       responses:
         '200':
           description: Undo successful.
   /databases/{id}/history/{param}:
     get:
-      summary: Get the history of the last N transactions from stream sequence on a specific database.
+      summary: Get the history of transactions from stream sequence or duration on a specific database.
       operationId: historyDatabase
       tags:
         - All Databases
@@ -312,11 +335,14 @@ paths:
           schema:
             type: string
         - name: param
+          description: Sequence number (e.g. 10) or time duration (e.g. 5m, 1h).
           in: path
           required: true
           schema:
-            type: integer
-            minimum: 1
+            oneOf:
+              - type: integer
+                minimum: 0
+              - type: string
       responses:
         '200':
           description: History retrieved successfully.
@@ -450,34 +476,45 @@ components:
       properties:
         dsn:
           type: string
-    QueryRequest:
-      type: array
-      items:
-        type: object
-        properties:
-          sql:
-            type: string
-          params:
-            type: object
-            additionalProperties:
-              oneOf:
-                - type: string
-                - type: integer
-    QueryResponse:
+    QueryItem:
+      type: object
+      required:
+        - sql
+      properties:
+        sql:
+          type: string
+        params:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: integer
+              - type: number
+              - type: boolean
+    QueryResultSet:
       type: object
       properties:
-        results:
+        columns:
           type: array
           items:
-            type: object
-            properties:
-              columns:
-                type: array
-                items:
-                  type: string
-              rows:
-                type: array
-                items:
-                  type: array
-                  items:
-                    type: string
+            type: string
+        rows:
+          type: array
+          items:
+            type: array
+            items: {}
+    QueryRequest:
+      oneOf:
+        - $ref: "#/components/schemas/QueryItem"
+        - type: array
+          items:
+            $ref: "#/components/schemas/QueryItem"
+    QueryResponse:
+      oneOf:
+        - $ref: "#/components/schemas/QueryResultSet"
+        - type: object
+          properties:
+            results:
+              type: array
+              items:
+                $ref: "#/components/schemas/QueryResultSet"

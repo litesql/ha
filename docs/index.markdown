@@ -136,6 +136,8 @@ Install with Go:
 go install github.com/litesql/ha@latest
 ```
 
+> **Note (Release Binaries vs. Docker Image)**: Pre-built binaries on [GitHub Releases](https://github.com/litesql/ha/releases/latest) are built with `CGO_ENABLED=0` (pure-Go SQLite driver, default DSN options `_pragma=...`, without `--extensions` support). The official Docker image (`ghcr.io/litesql/ha`) and `CGO_ENABLED=1` source builds use the CGO SQLite driver (`_journal=WAL&_timeout=5000&_sync=NORMAL`) and support loading dynamic SQLite extensions via `--extensions`.
+
 ### Install with Docker
 
 ```sh
@@ -241,10 +243,13 @@ curl -H 'Content-Type: application/json' -d '[
 
 ### MCP endpoint
 
-HA exposes a streamable HTTP MCP endpoint at `/mcp` with two tools:
+HA exposes a streamable HTTP MCP endpoint at `/mcp` with the following tools:
 
 - `databases`: list loaded database identifiers.
+- `schema`: inspect tables, views, indexes, and triggers in a database.
 - `query`: execute a query against a selected database, optionally with parameters.
+- `history`: retrieve committed transaction history by sequence or duration.
+- `undo`: undo transactions by sequence or duration.
 
 ## Replication and CDC
 
