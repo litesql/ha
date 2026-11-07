@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/litesql/go-ha"
 	"github.com/traefik/yaegi/interp"
@@ -50,7 +51,11 @@ func Load(filename string) (ha.ChangeSetInterceptor, error) {
 		}
 	}
 
-	return newInterceptor(before, after), nil
+	ic := newInterceptor(before, after)
+	if ic == nil {
+		return nil, fmt.Errorf("interceptor script must define ha.Before or ha.After")
+	}
+	return ic, nil
 }
 
 func newInterceptor(before beforeFn, after afterFn) *baseInterceptor {
@@ -70,14 +75,19 @@ func newInterceptor(before beforeFn, after afterFn) *baseInterceptor {
 }
 
 type baseInterceptor struct {
+	mu     sync.Mutex
 	before beforeFn
 	after  afterFn
 }
 
 func (i *baseInterceptor) BeforeApply(cs *ha.ChangeSet, conn *sql.Conn) (skip bool, err error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
 	return i.before(cs, conn)
 }
 func (i *baseInterceptor) AfterApply(cs *ha.ChangeSet, conn *sql.Conn, err error) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
 	return i.after(cs, conn, err)
 }
 

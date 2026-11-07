@@ -1,3 +1,11 @@
+.PHONY: build
+build:
+	go build -o ha -ldflags="-X main.commit=$(commit) -X main.date=$(date) -X main.version=$(version)" .
+
+.PHONY: test
+test:
+	go test -race ./...
+
 .PHONY: release
 release:
 	goreleaser release --clean

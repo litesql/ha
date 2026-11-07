@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,35 @@ import (
 	"github.com/litesql/ha/internal/sqlite"
 )
 
+const maxRequestBodyBytes = 10 << 20 // 10 MiB
+
+func writeDBError(w http.ResponseWriter, msg string, err error) {
+	status := http.StatusInternalServerError
+	if errors.Is(err, sqlite.ErrDatabaseNotFound) {
+		status = http.StatusNotFound
+	}
+	if msg != "" {
+		http.Error(w, fmt.Sprintf("%s: %v", msg, err), status)
+		return
+	}
+	http.Error(w, err.Error(), status)
+}
+
+func ReadyHandler(w http.ResponseWriter, r *http.Request) {
+	db, err := sqlite.DB("")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	if err := db.QueryRowContext(ctx, "SELECT 1").Scan(new(int)); err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func DatabasesHandler(w http.ResponseWriter, r *http.Request) {
 	dbs := sqlite.Databases()
 	w.Header().Set("Content-Type", "application/json")
@@ -30,6 +60,7 @@ func CreateDatabaseHandler(createDatabaseDir string, memDB bool, defaultDSNOpts 
 		DSN string `json:"dsn"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 		var req request
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
@@ -75,7 +106,7 @@ func DropDatabaseHandler() http.HandlerFunc {
 		id := r.PathValue("id")
 		dbfile, err := sqlite.Drop(r.Context(), id)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeDBError(w, "", err)
 			return
 		}
 		if dbfile != "" {
@@ -117,6 +148,7 @@ func (r *QueriesRequest) UnmarshalJSON(b []byte) error {
 }
 
 func QueryHandler(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 	var req QueriesRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -131,7 +163,7 @@ func QueryHandler(w http.ResponseWriter, r *http.Request) {
 	dbID := r.PathValue("id")
 	db, err := sqlite.DB(dbID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeDBError(w, "", err)
 		return
 	}
 
@@ -173,7 +205,7 @@ func UndoHandler(undoType haconnect.UndoFilter) http.HandlerFunc {
 		dbID := r.PathValue("id")
 		c, err := sqlite.Connector(dbID)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeDBError(w, "", err)
 			return
 		}
 
@@ -216,7 +248,7 @@ func HistoryHandler(w http.ResponseWriter, r *http.Request) {
 	dbID := r.PathValue("id")
 	c, err := sqlite.Connector(dbID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeDBError(w, "", err)
 		return
 	}
 
@@ -260,7 +292,7 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	dbID := r.PathValue("id")
 	db, err := sqlite.DB(dbID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeDBError(w, "", err)
 		return
 	}
 	filename := fmt.Sprintf("%s_ha.db", time.Now().UTC().Format(time.DateTime))
@@ -278,7 +310,7 @@ func TakeSnapshotHandler(w http.ResponseWriter, r *http.Request) {
 	connector, err := sqlite.Connector(dbID)
 	if err != nil {
 		slog.Error("get connector", "error", err)
-		http.Error(w, fmt.Sprintf("failed to get connector: %v", err), http.StatusInternalServerError)
+		writeDBError(w, "failed to get connector", err)
 		return
 	}
 	sequence, err := connector.TakeSnapshot(r.Context())
@@ -296,7 +328,7 @@ func DownloadSnapshotHandler(w http.ResponseWriter, r *http.Request) {
 	connector, err := sqlite.Connector(dbID)
 	if err != nil {
 		slog.Error("get connector", "error", err)
-		http.Error(w, fmt.Sprintf("failed to get connector: %v", err), http.StatusInternalServerError)
+		writeDBError(w, "failed to get connector", err)
 		return
 	}
 	sequence, reader, err := connector.LatestSnapshot(r.Context())
@@ -322,7 +354,7 @@ func ReplicationsHandler(w http.ResponseWriter, r *http.Request) {
 	connector, err := sqlite.Connector(dbID)
 	if err != nil {
 		slog.Error("get connector", "error", err)
-		http.Error(w, fmt.Sprintf("failed to get connector: %v", err), http.StatusBadRequest)
+		writeDBError(w, "failed to get connector", err)
 		return
 	}
 	name := r.PathValue("name")
@@ -341,14 +373,14 @@ func ReplicationsHandler(w http.ResponseWriter, r *http.Request) {
 func DeleteReplicationHandler(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if name == "" {
-		http.Error(w, "name is required", http.StatusInternalServerError)
+		http.Error(w, "name is required", http.StatusBadRequest)
 		return
 	}
 	dbID := r.PathValue("id")
 	connector, err := sqlite.Connector(dbID)
 	if err != nil {
 		slog.Error("get connector", "error", err)
-		http.Error(w, fmt.Sprintf("failed to get connector: %v", err), http.StatusInternalServerError)
+		writeDBError(w, "failed to get connector", err)
 		return
 	}
 	err = connector.RemoveConsumer(r.Context(), name)

@@ -89,13 +89,15 @@ func Start(remote string, token string, enableOtel bool) {
 	fmt.Println("Connected to", u.String(), "(Ctrl+D to exit)")
 
 	reqChan := make(chan *sqlv1.QueryRequest)
+	rawRespChan := make(chan *sqlv1.QueryResponse)
 	respChan := make(chan *sqlv1.QueryResponse)
-	exitChan := make(chan struct{}, 1)
+	exitChan := make(chan struct{}, 2)
 
 	m := bubbline.New()
 	defer m.Close()
 
 	go func() {
+		defer close(respChan)
 		for {
 			select {
 			case req := <-reqChan:
@@ -106,6 +108,11 @@ func Start(remote string, token string, enableOtel bool) {
 					exitChan <- struct{}{}
 					return
 				}
+				res, ok := <-rawRespChan
+				if !ok {
+					return
+				}
+				respChan <- res
 			case <-time.After(25 * time.Second):
 				err := stream.Send(&sqlv1.QueryRequest{
 					Type: sqlv1.QueryType_QUERY_TYPE_PING,
@@ -116,12 +123,15 @@ func Start(remote string, token string, enableOtel bool) {
 					exitChan <- struct{}{}
 					return
 				}
-				<-respChan // pong
+				if _, ok := <-rawRespChan; !ok {
+					return
+				}
 			}
 		}
 	}()
 
 	go func() {
+		defer close(rawRespChan)
 		for {
 			res, err := stream.Recv()
 			if err != nil {
@@ -130,7 +140,7 @@ func Start(remote string, token string, enableOtel bool) {
 				exitChan <- struct{}{}
 				return
 			}
-			respChan <- res
+			rawRespChan <- res
 		}
 	}()
 
@@ -255,7 +265,10 @@ func Start(remote string, token string, enableOtel bool) {
 				Type:          queryTypeFromSQL(command),
 			}
 			command = ""
-			resp := <-respChan
+			resp, ok := <-respChan
+			if !ok {
+				return
+			}
 			if resp.Error != "" {
 				fmt.Println(resp.Error)
 				continue

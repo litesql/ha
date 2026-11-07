@@ -16,6 +16,15 @@ paths:
       responses:
         '200':
           description: Server is healthy.
+  /readyz:
+    get:
+      summary: Readiness check endpoint.
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Default database is ready to serve queries.
+        '503':
+          description: Default database is not ready.
   /mcp:
     post:
       summary: Model Context Protocol (MCP) streamable HTTP endpoint.

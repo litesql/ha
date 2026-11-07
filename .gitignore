@@ -1,2 +1,7 @@
 *.db
+*.db-shm
+*.db-wal
 dist
+/ha
+docs/_site/
+docs/.jekyll-cache/

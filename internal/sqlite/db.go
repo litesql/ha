@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +45,8 @@ type baseProxiedPositionTracker interface {
 }
 
 var (
+	ErrDatabaseNotFound = errors.New("database not found")
+
 	dbs                 = make(map[string]*connectorDB)
 	proxiedSubscription = make(map[string]stoppableSubscription)
 	muDBs               sync.RWMutex
@@ -408,7 +411,7 @@ func DB(id string) (*sql.DB, error) {
 	defer muDBs.RUnlock()
 	dbConnector, ok := dbs[id]
 	if !ok {
-		return nil, fmt.Errorf("database with id %q not found", id)
+		return nil, fmt.Errorf("%w: %q", ErrDatabaseNotFound, id)
 	}
 	return dbConnector.db, nil
 }
@@ -418,7 +421,7 @@ func Connector(id string) (*ha.Connector, error) {
 	defer muDBs.RUnlock()
 	dbConnector, ok := dbs[id]
 	if !ok {
-		return nil, fmt.Errorf("database with id %q not found", id)
+		return nil, fmt.Errorf("%w: %q", ErrDatabaseNotFound, id)
 	}
 	return dbConnector.connector, nil
 }
@@ -452,7 +455,7 @@ func Drop(ctx context.Context, id string) (string, error) {
 	defer muDBs.Unlock()
 	dbConnector, ok := dbs[id]
 	if !ok {
-		return "", fmt.Errorf("database with id %q not found", id)
+		return "", fmt.Errorf("%w: %q", ErrDatabaseNotFound, id)
 	}
 	if dbConnector == dbs[""] {
 		return "", fmt.Errorf("cannot drop default database")
@@ -470,6 +473,23 @@ func Drop(ctx context.Context, id string) (string, error) {
 	dbConnector.connector.Close()
 	delete(dbs, id)
 	return filename, nil
+}
+
+func Shutdown() {
+	muDBs.Lock()
+	defer muDBs.Unlock()
+	for id, sub := range proxiedSubscription {
+		if sub != nil {
+			sub.Stop()
+		}
+		delete(proxiedSubscription, id)
+	}
+	for id, connDB := range dbs {
+		if id != "" && connDB != nil && connDB.db != nil {
+			_ = connDB.db.Close()
+		}
+		delete(dbs, id)
+	}
 }
 
 func deserializeFromReader(ctx context.Context, db *sql.DB, r io.Reader) error {
@@ -590,13 +610,19 @@ func getArgs(params map[string]any) []any {
 		return nil
 	}
 	for k := range params {
-		if isPositional(rune(k[0])) {
+		if k == "" {
+			continue
+		}
+		if isPositional(k) {
 			return getPositionalArgs(params)
 		}
 		break
 	}
 	var args []any = make([]any, 0, len(params))
 	for k, v := range params {
+		if k == "" {
+			continue
+		}
 		if len(k) > 1 && (strings.HasPrefix(k, "$") || (strings.HasPrefix(k, "?") ||
 			strings.HasPrefix(k, ":") || strings.HasPrefix(k, "@"))) {
 			k = k[1:]
@@ -606,8 +632,12 @@ func getArgs(params map[string]any) []any {
 	return args
 }
 
-func isPositional(r rune) bool {
-	return r == '$'
+func isPositional(k string) bool {
+	if len(k) < 2 || k[0] != '$' {
+		return false
+	}
+	_, err := strconv.Atoi(k[1:])
+	return err == nil
 }
 
 func getPositionalArgs(params map[string]any) []any {

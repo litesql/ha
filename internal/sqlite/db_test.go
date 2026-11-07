@@ -224,4 +224,47 @@ func TestDeserializeInMemoryDB(t *testing.T) {
 	}
 }
 
+func TestGetArgsNamedWithDollarPrefixAndEmptyKey(t *testing.T) {
+	ctx := context.Background()
+	err := Load(ctx, "file:/args_test.db?vfs=memdb", LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	})
+	if err != nil {
+		t.Fatalf("failed to load memdb: %v", err)
+	}
+	defer Drop(ctx, "args_test.db")
+
+	db, err := DB("args_test.db")
+	if err != nil {
+		t.Fatalf("failed to get db: %v", err)
+	}
+
+	if _, err := Exec(ctx, db, "CREATE TABLE t (id INT, name TEXT)", nil); err != nil {
+		t.Fatalf("create table: %v", err)
+	}
+
+	// Named parameter prefixed with '$' and an empty key "" should not panic or lose "$name"
+	_, err = Exec(ctx, db, "INSERT INTO t (id, name) VALUES (1, $name)", map[string]any{
+		"$name": "Alice",
+		"":      "ignored",
+	})
+	if err != nil {
+		t.Fatalf("insert with $name failed: %v", err)
+	}
+
+	// Positional parameters "$1", "$2"
+	res, err := Exec(ctx, db, "SELECT name FROM t WHERE id = $1 AND name = $2", map[string]any{
+		"$1": 1,
+		"$2": "Alice",
+	})
+	if err != nil {
+		t.Fatalf("select with positional $1, $2 failed: %v", err)
+	}
+	if len(res.Rows) != 1 || res.Rows[0][0] != "Alice" {
+		t.Fatalf("unexpected rows: %+v", res.Rows)
+	}
+}
+
+
 

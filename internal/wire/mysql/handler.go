@@ -318,6 +318,9 @@ func (h *Handler) HandleStmtPrepare(query string) (int, int, any, error) {
 		stmt = h.tx.Stmt(stmt)
 	}
 	params := strings.Count(query, "?")
+	if parsed, err := ha.ParseStatement(context.Background(), query); err == nil {
+		params = len(parsed.Parameters())
+	}
 	columns := 0
 	return params, columns, stmt, nil
 }
@@ -470,6 +473,9 @@ func rowsToResultset(rows *sql.Rows, binary bool) (*mysql.Resultset, error) {
 			row[i] = *c.(*any)
 		}
 		vals = append(vals, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return mysql.BuildSimpleResultset(cols, vals, binary)
 }

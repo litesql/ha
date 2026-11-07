@@ -450,6 +450,7 @@ func run() error {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	mux.HandleFunc("GET /readyz", hahttp.ReadyHandler)
 	mux.HandleFunc("GET /databases", hahttp.DatabasesHandler)
 	mux.HandleFunc("POST /databases", hahttp.CreateDatabaseHandler(*createDatabaseDir,
 		*memDB, dsnParams, *fromLatestSnapshot, *replicationPolicy, *concurrentQueries, proxyCfg, opts...))
@@ -581,7 +582,7 @@ func run() error {
 		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 			if subtle.ConstantTimeCompare([]byte(authHeader), expectedToken) != 1 &&
-				r.URL.Path != "/healthz" && r.URL.Path != "/openapi.yaml" && r.URL.Path != "/docs" {
+				r.URL.Path != "/healthz" && r.URL.Path != "/readyz" && r.URL.Path != "/openapi.yaml" && r.URL.Path != "/docs" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
@@ -593,8 +594,10 @@ func run() error {
 	}
 
 	done := make(chan os.Signal, 1)
+	shutdownDone := make(chan struct{})
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
+		defer close(shutdownDone)
 		sig := <-done
 		shuttingDown.Store(true)
 		slog.Warn("signal detected...", "signal", sig)
@@ -609,6 +612,7 @@ func run() error {
 		if err := server.Shutdown(ctx); err != nil {
 			slog.Error("HTTP server shutdown failed", "error", err)
 		}
+		sqlite.Shutdown()
 		ha.Shutdown()
 		if err := flushObservability(ctx); err != nil {
 			slog.Error("observability shutdown failed", "error", err)
@@ -616,7 +620,11 @@ func run() error {
 	}()
 
 	slog.Info("starting HA HTTP server", "port", *port, "version", version, "commit", commit, "date", date)
-	return server.ListenAndServe()
+	err = server.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		<-shutdownDone
+	}
+	return err
 }
 
 func initObservability(ctx context.Context, nodeName string, level slog.Level, enabled bool) (func(context.Context) error, error) {
