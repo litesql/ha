@@ -266,5 +266,30 @@ func TestGetArgsNamedWithDollarPrefixAndEmptyKey(t *testing.T) {
 	}
 }
 
+func TestResolveDatabaseID(t *testing.T) {
+	ctx := context.Background()
+	if err := Load(ctx, "file:/resolve_test.db?vfs=memdb", LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	}); err != nil {
+		t.Fatalf("failed to load memdb: %v", err)
+	}
+	defer Drop(ctx, "resolve_test.db")
+
+	for _, input := range []string{"resolve_test.db", "resolve_test", "'resolve_test'", "`resolve_test.db`;", " \"resolve_test\" "} {
+		got, ok := ResolveDatabaseID(input)
+		if !ok || got != "resolve_test.db" {
+			t.Fatalf("ResolveDatabaseID(%q) = (%q, %v), want (\"resolve_test.db\", true)", input, got, ok)
+		}
+	}
+
+	if _, ok := ResolveDatabaseID("nonexistent"); ok {
+		t.Fatal("expected false for nonexistent database")
+	}
+	if _, ok := ResolveDatabaseID(""); ok {
+		t.Fatal("expected false for empty database name")
+	}
+}
+
 
 

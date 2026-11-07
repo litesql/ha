@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/litesql/go-ha"
@@ -209,13 +210,11 @@ func UndoHandler(undoType haconnect.UndoFilter) http.HandlerFunc {
 			return
 		}
 
-		param := r.PathValue("param")
+		param := strings.TrimSpace(r.PathValue("param"))
+		param = strings.TrimRight(param, "; \t\r\n")
+		param = strings.Trim(param, "`'\"")
 		seq, err := strconv.Atoi(param)
 		if err != nil {
-			if undoType != haconnect.UndoFilterNone {
-				http.Error(w, "invalid sequence number for undo", http.StatusBadRequest)
-				return
-			}
 			duration, err := time.ParseDuration(param)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("invalid param: %v", err), http.StatusBadRequest)
@@ -225,7 +224,7 @@ func UndoHandler(undoType haconnect.UndoFilter) http.HandlerFunc {
 				http.Error(w, "duration must be greater than 0", http.StatusBadRequest)
 				return
 			}
-			err = c.UndoByTime(r.Context(), duration, haconnect.UndoFilterNone, nil)
+			err = c.UndoByTime(r.Context(), duration, undoType, nil)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -252,7 +251,9 @@ func HistoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	param := r.PathValue("param")
+	param := strings.TrimSpace(r.PathValue("param"))
+	param = strings.TrimRight(param, "; \t\r\n")
+	param = strings.Trim(param, "`'\"")
 	var items []haconnect.HistoryItem
 	seq, err := strconv.Atoi(param)
 	if err != nil {

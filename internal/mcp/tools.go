@@ -63,6 +63,8 @@ func History(ctx context.Context, req *mcp.CallToolRequest, input HistoryInput) 
 		return
 	}
 	param := strings.TrimSpace(input.Param)
+	param = strings.TrimRight(param, "; \t\r\n")
+	param = strings.Trim(param, "`'\"")
 	seq, parseErr := strconv.Atoi(param)
 	if parseErr != nil {
 		duration, durErr := time.ParseDuration(param)
@@ -88,7 +90,7 @@ func History(ctx context.Context, req *mcp.CallToolRequest, input HistoryInput) 
 type UndoInput struct {
 	DatabaseID string `json:"database_id,omitempty" jsonschema:"The identifier of the database (empty uses default).,example=ha.db"`
 	Param      string `json:"param" jsonschema:"Sequence number (e.g. '0' for last transaction, '10' for until seq 10) or duration (e.g. '5m').,example=0"`
-	Filter     string `json:"filter,omitempty" jsonschema:"Optional undo filter when undoing by sequence: 'none', 'entity', or 'transaction'.,example=none"`
+	Filter     string `json:"filter,omitempty" jsonschema:"Optional undo filter: 'none', 'entity', or 'transaction'.,example=none"`
 }
 
 type UndoOutput struct {
@@ -114,12 +116,10 @@ func Undo(ctx context.Context, req *mcp.CallToolRequest, input UndoInput) (resul
 	}
 
 	param := strings.TrimSpace(input.Param)
+	param = strings.TrimRight(param, "; \t\r\n")
+	param = strings.Trim(param, "`'\"")
 	seq, parseErr := strconv.Atoi(param)
 	if parseErr != nil {
-		if undoType != haconnect.UndoFilterNone {
-			err = fmt.Errorf("cannot specify entity or transaction undo filter with a duration")
-			return
-		}
 		duration, durErr := time.ParseDuration(param)
 		if durErr != nil {
 			err = fmt.Errorf("invalid param: %w", durErr)
@@ -129,7 +129,7 @@ func Undo(ctx context.Context, req *mcp.CallToolRequest, input UndoInput) (resul
 			err = fmt.Errorf("duration must be greater than 0")
 			return
 		}
-		if err = c.UndoByTime(ctx, duration, haconnect.UndoFilterNone, nil); err != nil {
+		if err = c.UndoByTime(ctx, duration, undoType, nil); err != nil {
 			return
 		}
 		output.Status = fmt.Sprintf("undone transactions in the last %s", duration)

@@ -33,6 +33,7 @@ import (
 type connectorDB struct {
 	db        *sql.DB
 	connector *ha.Connector
+	proxiedDB *sql.DB
 }
 
 type stoppableSubscription interface {
@@ -108,11 +109,35 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	}
 	options := slices.Clone(cfg.Options)
 
-	var proxiedPositionProvider baseProxiedPositionTracker
+	var (
+		proxiedPositionProvider baseProxiedPositionTracker
+		proxiedDB               *sql.DB
+		connector               *ha.Connector
+		db                      *sql.DB
+		loaded                  bool
+	)
+	defer func() {
+		if !loaded {
+			if sub, ok := proxiedSubscription[id]; ok && sub != nil {
+				sub.Stop()
+				delete(proxiedSubscription, id)
+			}
+			if db != nil {
+				_ = db.Close()
+			}
+			if connector != nil {
+				connector.Close()
+			}
+			if proxiedDB != nil {
+				_ = proxiedDB.Close()
+			}
+		}
+	}()
 	if cfg.ProxiedDBConfig.LocalDB == id && !cfg.ProxiedDBConfig.DisableRedirect {
+		var err error
 		switch {
 		case cfg.ProxiedDBConfig.PgDSN != "":
-			proxiedDB, err := sql.Open("pgx", cfg.ProxiedDBConfig.PgDSN)
+			proxiedDB, err = sql.Open("pgx", cfg.ProxiedDBConfig.PgDSN)
 			if err != nil {
 				return fmt.Errorf("failed to open proxied db: %w", err)
 			}
@@ -122,7 +147,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 				sourceDB: proxiedDB,
 			}
 		case cfg.ProxiedDBConfig.MysqlDSN != "":
-			proxiedDB, err := sql.Open("mysql", cfg.ProxiedDBConfig.MysqlDSN)
+			proxiedDB, err = sql.Open("mysql", cfg.ProxiedDBConfig.MysqlDSN)
 			if err != nil {
 				return fmt.Errorf("failed to open proxied db: %w", err)
 			}
@@ -146,7 +171,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 				return fmt.Errorf("unsupported debezium source DSN")
 			}
 
-			proxiedDB, err := sql.Open(driver, cfg.ProxiedDBConfig.DebeziumSourceDSN)
+			proxiedDB, err = sql.Open(driver, cfg.ProxiedDBConfig.DebeziumSourceDSN)
 			if err != nil {
 				return fmt.Errorf("failed to open proxied db: %w", err)
 			}
@@ -159,7 +184,6 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 
 	options = append(options, ha.WithAutoStart(false))
 	var (
-		connector       *ha.Connector
 		snapshotReader  io.ReadCloser
 		preloadFilename string
 	)
@@ -240,7 +264,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		<-connector.LeaderProvider().Ready()
 	}
 
-	db := sql.OpenDB(connector)
+	db = sql.OpenDB(connector)
 	db.SetConnMaxIdleTime(0)
 	db.SetConnMaxLifetime(0)
 	db.SetMaxOpenConns(cfg.MaxConns)
@@ -248,15 +272,11 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 
 	if snapshotReader != nil {
 		if err := deserializeFromReader(ctx, db, snapshotReader); err != nil {
-			db.Close()
-			connector.Close()
 			return fmt.Errorf("failed to load latest snapshot: %w", err)
 		}
 	} else if preloadFilename != "" {
 		slog.Info("loading database", "file", preloadFilename)
 		if err := deserialize(ctx, db, preloadFilename); err != nil {
-			db.Close()
-			connector.Close()
 			return fmt.Errorf("failed to load database %q: %w", preloadFilename, err)
 		}
 	}
@@ -342,16 +362,21 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		return fmt.Errorf("failed to start connector: %w", err)
 	}
 
+	if err := db.QueryRowContext(ctx, "SELECT 1").Scan(new(int)); err != nil {
+		return err
+	}
+
 	connDB := &connectorDB{
 		db:        db,
 		connector: connector,
+		proxiedDB: proxiedDB,
 	}
 	dbs[id] = connDB
 	if defaultDB {
 		dbs[""] = connDB
 	}
-
-	return db.QueryRowContext(ctx, "SELECT 1").Scan(new(int))
+	loaded = true
+	return nil
 }
 
 type Request struct {
@@ -404,6 +429,27 @@ func Databases() []string {
 		list = append(list, id)
 	}
 	return list
+}
+
+func ResolveDatabaseID(name string) (string, bool) {
+	name = strings.TrimSpace(name)
+	name = strings.TrimRight(name, "; \t\r\n")
+	name = strings.Trim(name, "`'\"")
+	if name == "" {
+		return "", false
+	}
+	muDBs.RLock()
+	defer muDBs.RUnlock()
+	if _, ok := dbs[name]; ok {
+		return name, true
+	}
+	if !strings.HasSuffix(name, ".db") {
+		withExt := name + ".db"
+		if _, ok := dbs[withExt]; ok {
+			return withExt, true
+		}
+	}
+	return "", false
 }
 
 func DB(id string) (*sql.DB, error) {
@@ -471,6 +517,9 @@ func Drop(ctx context.Context, id string) (string, error) {
 	}
 	dbConnector.db.Close()
 	dbConnector.connector.Close()
+	if dbConnector.proxiedDB != nil {
+		_ = dbConnector.proxiedDB.Close()
+	}
 	delete(dbs, id)
 	return filename, nil
 }
@@ -485,8 +534,13 @@ func Shutdown() {
 		delete(proxiedSubscription, id)
 	}
 	for id, connDB := range dbs {
-		if id != "" && connDB != nil && connDB.db != nil {
-			_ = connDB.db.Close()
+		if id != "" && connDB != nil {
+			if connDB.db != nil {
+				_ = connDB.db.Close()
+			}
+			if connDB.proxiedDB != nil {
+				_ = connDB.proxiedDB.Close()
+			}
 		}
 		delete(dbs, id)
 	}

@@ -1,12 +1,14 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"testing"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/litesql/go-ha"
+	"github.com/litesql/ha/internal/sqlite"
 )
 
 func TestUseDB(t *testing.T) {
@@ -230,5 +232,87 @@ func TestUndoAndHistoryWithoutSelectedDatabase(t *testing.T) {
 	}
 	if _, err := h.HandleQuery("HISTORY 1;"); err == nil {
 		t.Fatal("expected error for HISTORY when no connector is set, got nil")
+	}
+}
+
+func TestUnsetDatabaseAndPreparedStmtInTransaction(t *testing.T) {
+	ctx := context.Background()
+	if err := sqlite.Load(ctx, "file:/mysql_default.db?vfs=memdb", sqlite.LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	}); err != nil {
+		t.Fatalf("failed to load default db: %v", err)
+	}
+	defer sqlite.Shutdown()
+
+	if err := sqlite.Load(ctx, "file:/mysql_other.db?vfs=memdb", sqlite.LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	}); err != nil {
+		t.Fatalf("failed to load other db: %v", err)
+	}
+
+	defaultDB, _ := sqlite.DB("")
+	defaultConn, _ := sqlite.Connector("")
+
+	h := &Handler{
+		db:        defaultDB,
+		connector: defaultConn,
+		dbProvider: func(name string) (*sql.DB, bool) {
+			db, err := sqlite.DB(name)
+			return db, err == nil
+		},
+		connectorProvider: func(name string) (*ha.Connector, bool) {
+			c, err := sqlite.Connector(name)
+			return c, err == nil
+		},
+	}
+
+	// Switch to mysql_other and then UNSET DATABASE
+	if _, err := h.HandleQuery("USE mysql_other"); err != nil {
+		t.Fatalf("USE mysql_other failed: %v", err)
+	}
+	if h.db == defaultDB {
+		t.Fatal("expected h.db to change after USE mysql_other")
+	}
+
+	if _, err := h.HandleQuery("UNSET DATABASE;"); err != nil {
+		t.Fatalf("UNSET DATABASE failed: %v", err)
+	}
+	if h.db != defaultDB {
+		t.Fatal("expected h.db to reset to defaultDB after UNSET DATABASE")
+	}
+
+	// Prepare statement BEFORE starting transaction
+	if _, err := h.HandleQuery("CREATE TABLE items (id INT, name TEXT)"); err != nil {
+		t.Fatalf("CREATE TABLE failed: %v", err)
+	}
+	params, _, stmtCtx, err := h.HandleStmtPrepare("INSERT INTO items (id, name) VALUES (?, ?)")
+	if err != nil {
+		t.Fatalf("HandleStmtPrepare failed: %v", err)
+	}
+	defer h.HandleStmtClose(stmtCtx)
+	if params != 2 {
+		t.Fatalf("expected 2 params, got %d", params)
+	}
+
+	// Start transaction, execute prepared statement, and rollback
+	if _, err := h.HandleQuery("BEGIN"); err != nil {
+		t.Fatalf("BEGIN failed: %v", err)
+	}
+	if _, err := h.HandleStmtExecute(stmtCtx, "INSERT INTO items (id, name) VALUES (?, ?)", []any{1, "in-tx"}); err != nil {
+		t.Fatalf("HandleStmtExecute in tx failed: %v", err)
+	}
+	if _, err := h.HandleQuery("ROLLBACK"); err != nil {
+		t.Fatalf("ROLLBACK failed: %v", err)
+	}
+
+	// Row must not exist because prepared statement was executed inside the rolled-back transaction
+	var count int
+	if err := defaultDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM items").Scan(&count); err != nil {
+		t.Fatalf("count query failed: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected 0 rows after rollback of prepared statement, got %d", count)
 	}
 }

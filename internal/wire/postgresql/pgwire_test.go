@@ -368,7 +368,7 @@ func TestTransactionPrepared(t *testing.T) {
 		t.Fatalf("failed to commit transaction: %v", err)
 	}
 
-	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM users WHERE id = $1 LIMIT 1", 1).Scan(&name)
+	err = pgPool.QueryRow(context.TODO(), "SELECT name FROM users WHERE id = $1", 1).Scan(&name)
 	if err != nil {
 		t.Fatalf("failed to select row after commit: %v", err)
 	}
@@ -389,8 +389,8 @@ func TestTransactionPrepared(t *testing.T) {
 	}
 
 	var name2 string
-	// change query to ignore cached value
-	err = tx2.QueryRow(context.TODO(), "SELECT name FROM users WHERE id = $1 LIMIT $2", 1, 2).Scan(&name2)
+	// Reuse the exact same prepared statement across transactions
+	err = tx2.QueryRow(context.TODO(), "SELECT name FROM users WHERE id = $1", 1).Scan(&name2)
 	if err != nil {
 		t.Fatalf("failed to select row: %v", err)
 	}
@@ -410,5 +410,87 @@ func TestTransactionPrepared(t *testing.T) {
 	}
 	if name2 != name {
 		t.Fatalf("unexpected name: want %q got %q", name, name2)
+	}
+}
+
+func TestHandshakeDatabaseAndSetUnsetDatabase(t *testing.T) {
+	ctx := context.Background()
+	err := sqlite.Load(ctx, "file:/second.db?vfs=memdb", sqlite.LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	})
+	if err != nil {
+		t.Fatalf("failed to load second.db: %v", err)
+	}
+	defer sqlite.Drop(ctx, "second.db")
+
+	secondDB, err := sqlite.DB("second.db")
+	if err != nil {
+		t.Fatalf("failed to get second.db: %v", err)
+	}
+	if _, err := secondDB.ExecContext(ctx, "CREATE TABLE only_in_second(val TEXT); INSERT INTO only_in_second VALUES('from-second')"); err != nil {
+		t.Fatalf("failed to setup second.db: %v", err)
+	}
+
+	defaultDB, err := sqlite.DB("")
+	if err != nil {
+		t.Fatalf("failed to get default db: %v", err)
+	}
+	if _, err := defaultDB.ExecContext(ctx, "CREATE TABLE only_in_default(val TEXT); INSERT INTO only_in_default VALUES('from-default')"); err != nil {
+		t.Fatalf("failed to setup default db: %v", err)
+	}
+
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("failed to create listener: %v", err)
+	}
+	defer listener.Close()
+
+	server, err := postgresql.NewServer(postgresql.Config{
+		User: "test", Pass: "test",
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+	defer server.Shutdown(ctx)
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	// Connect specifying "second" (without .db extension) in handshake URL
+	connString := fmt.Sprintf("postgresql://test:test@localhost:%d/second", port)
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer conn.Close(ctx)
+
+	var val string
+	if err := conn.QueryRow(ctx, "SELECT val FROM only_in_second").Scan(&val); err != nil {
+		t.Fatalf("expected handshake to select second.db, got error: %v", err)
+	}
+	if val != "from-second" {
+		t.Fatalf("want from-second, got %q", val)
+	}
+
+	// UNSET DATABASE should revert to default database
+	if _, err := conn.Exec(ctx, "UNSET DATABASE;"); err != nil {
+		t.Fatalf("UNSET DATABASE failed: %v", err)
+	}
+	if err := conn.QueryRow(ctx, "SELECT val FROM only_in_default").Scan(&val); err != nil {
+		t.Fatalf("expected default db after UNSET DATABASE, got error: %v", err)
+	}
+	if val != "from-default" {
+		t.Fatalf("want from-default, got %q", val)
+	}
+
+	// SET DATABASE TO second (without .db) should switch back to second.db
+	if _, err := conn.Exec(ctx, "SET DATABASE TO second"); err != nil {
+		t.Fatalf("SET DATABASE TO second failed: %v", err)
+	}
+	if err := conn.QueryRow(ctx, "SELECT val FROM only_in_second").Scan(&val); err != nil {
+		t.Fatalf("expected second.db after SET DATABASE TO second, got error: %v", err)
 	}
 }

@@ -10,7 +10,6 @@ import (
 	"net"
 	"os"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -118,9 +117,15 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 		var dbID string
 		if id, ok := wire.GetAttribute(ctx, databaseIDAttribute); ok {
 			dbID = id.(string)
+		} else if params := wire.ClientParameters(ctx); params != nil {
+			if resolvedID, ok := sqlite.ResolveDatabaseID(string(params["database"])); ok {
+				dbID = resolvedID
+				wire.SetAttribute(ctx, databaseIDAttribute, dbID)
+			}
 		}
 
-		if strings.TrimSpace(strings.ReplaceAll(upper, ";", "")) == "SHOW DATABASES" {
+		cleanUpper := strings.TrimSpace(strings.ReplaceAll(upper, ";", ""))
+		if cleanUpper == "SHOW DATABASES" {
 			handle := func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				var count int
 				for _, id := range sqlite.Databases() {
@@ -151,17 +156,25 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 				}))), nil
 		}
 
+		if cleanUpper == "UNSET DATABASE" {
+			rollback(ctx)
+			wire.SetAttribute(ctx, databaseIDAttribute, "")
+			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+				return writer.Complete("OK")
+			})), nil
+		}
+
 		if strings.HasPrefix(upper, "SET ") {
 			if match := reSetDatabase.FindStringSubmatch(sql.Query); len(match) == 3 {
-				dbID := match[2]
-				if slices.Contains((sqlite.Databases()), dbID) {
+				targetDB := match[2]
+				if resolvedID, ok := sqlite.ResolveDatabaseID(targetDB); ok {
 					rollback(ctx)
-					wire.SetAttribute(ctx, databaseIDAttribute, dbID)
+					wire.SetAttribute(ctx, databaseIDAttribute, resolvedID)
 					return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
-						return writer.Complete("OK, " + dbID)
+						return writer.Complete("OK, " + resolvedID)
 					})), nil
 				}
-				return nil, fmt.Errorf("database %q not found", dbID)
+				return nil, fmt.Errorf("database %q not found", targetDB)
 			}
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete("ignored")
@@ -223,11 +236,10 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 			}
 
 			undoParam := strings.TrimSpace(reUndoMatch[2])
+			undoParam = strings.TrimRight(undoParam, "; \t\r\n")
+			undoParam = strings.Trim(undoParam, "`'\"")
 			seq, err := strconv.Atoi(undoParam)
 			if err != nil {
-				if undoType != haconnect.UndoFilterNone {
-					return nil, fmt.Errorf("invalid undo syntax: cannot specify undo type without a valid sequence or duration")
-				}
 				duration, err := time.ParseDuration(undoParam)
 				if err != nil {
 					return nil, fmt.Errorf("invalid undo argument: %v", err)
@@ -235,7 +247,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 				if duration <= 0 {
 					return nil, fmt.Errorf("duration must be greater than 0")
 				}
-				err = c.UndoByTime(ctx, duration, haconnect.UndoFilterNone, nil)
+				err = c.UndoByTime(ctx, duration, undoType, nil)
 				if err != nil {
 					return nil, fmt.Errorf("undo failed: %v", err)
 				}
@@ -265,7 +277,8 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 				return nil, fmt.Errorf("database %q not found", dbID)
 			}
 			param := strings.TrimSpace(sql.Query[8:])
-			param = strings.TrimSuffix(param, ";")
+			param = strings.TrimRight(param, "; \t\r\n")
+			param = strings.Trim(param, "`'\"")
 			seq, err := strconv.Atoi(param)
 			var items []haconnect.HistoryItem
 			if err != nil {
@@ -474,27 +487,27 @@ func handlerPrepared(ctx context.Context, stmt *ha.Statement, db *sql.DB) (wire.
 		}
 		options = append(options, wire.WithColumns(columns))
 	}
-	var (
-		eq execerQuerier
-	)
-	if tx, ok := wire.GetAttribute(ctx, transactionAttribute); ok && tx != nil {
-		eq = tx.(*sql.Tx)
-	} else {
-		eq = db
-	}
 	handle := func(ctxHandle context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
+		var eq execerQuerier
+		if tx, ok := wire.GetAttribute(ctxHandle, transactionAttribute); ok && tx != nil {
+			eq = tx.(*sql.Tx)
+		} else if tx, ok := wire.GetAttribute(ctx, transactionAttribute); ok && tx != nil {
+			eq = tx.(*sql.Tx)
+		} else {
+			eq = db
+		}
 		params := make(map[string]any)
 		for i, p := range parameters {
 			value, err := p.Scan(25) // postgresql OID type text -> oid.T_text
 			if err != nil {
-				slog.ErrorContext(ctx, "pg-wire: parameter scan", "error", err)
+				slog.ErrorContext(ctxHandle, "pg-wire: parameter scan", "error", err)
 				return err
 			}
 			params[bindParameters[i]] = value
 		}
 		resp, err := sqlite.Exec(ctxHandle, eq, stmt.Source(), params)
 		if err != nil {
-			slog.ErrorContext(ctx, "pg-wire: local exec", "error", err, "query", stmt.Source())
+			slog.ErrorContext(ctxHandle, "pg-wire: local exec", "error", err, "query", stmt.Source())
 			return err
 		}
 

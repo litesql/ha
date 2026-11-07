@@ -118,6 +118,30 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return nil, h.UseDB(dbName)
 	}
 
+	if strings.TrimSpace(strings.ReplaceAll(cleanQuery, ";", "")) == "UNSET DATABASE" {
+		if h.tx != nil {
+			_ = h.tx.Rollback()
+			h.tx = nil
+		}
+		if h.dbProvider != nil {
+			db, ok := h.dbProvider("")
+			if ok {
+				h.db = db
+			} else {
+				h.db = nil
+			}
+		}
+		if h.connectorProvider != nil {
+			connector, ok := h.connectorProvider("")
+			if ok {
+				h.connector = connector
+			} else {
+				h.connector = nil
+			}
+		}
+		return mysql.NewResultReserveResultset(0), nil
+	}
+
 	if cleanQuery == "SHOW DATABASES" {
 		dbs := sqlite.Databases()
 		vals := make([][]any, 0, len(dbs))
@@ -192,12 +216,10 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		}
 
 		undoParam := strings.TrimSpace(reUndoMatch[2])
-		undoParam = strings.TrimSuffix(undoParam, ";")
+		undoParam = strings.TrimRight(undoParam, "; \t\r\n")
+		undoParam = strings.Trim(undoParam, "`'\"")
 		seq, err := strconv.Atoi(undoParam)
 		if err != nil {
-			if undoType != haconnect.UndoFilterNone {
-				return nil, fmt.Errorf("invalid undo syntax: cannot specify undo type without a valid sequence or duration")
-			}
 			duration, err := time.ParseDuration(undoParam)
 			if err != nil {
 				return nil, fmt.Errorf("invalid undo argument: %v", err)
@@ -205,7 +227,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 			if duration <= 0 {
 				return nil, fmt.Errorf("duration must be greater than 0")
 			}
-			err = h.connector.UndoByTime(context.Background(), duration, haconnect.UndoFilterNone, nil)
+			err = h.connector.UndoByTime(context.Background(), duration, undoType, nil)
 			if err != nil {
 				return nil, fmt.Errorf("undo failed: %v", err)
 			}
@@ -226,7 +248,8 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 			return nil, fmt.Errorf("no database selected")
 		}
 		historyParam := strings.TrimSpace(keepCaseQuery[8:])
-		historyParam = strings.TrimSuffix(historyParam, ";")
+		historyParam = strings.TrimRight(historyParam, "; \t\r\n")
+		historyParam = strings.Trim(historyParam, "`'\"")
 		var items []haconnect.HistoryItem
 		seq, err := strconv.Atoi(historyParam)
 		if err != nil {
@@ -314,9 +337,6 @@ func (h *Handler) HandleStmtPrepare(query string) (int, int, any, error) {
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	if h.tx != nil {
-		stmt = h.tx.Stmt(stmt)
-	}
 	params := strings.Count(query, "?")
 	if parsed, err := ha.ParseStatement(context.Background(), query); err == nil {
 		params = len(parsed.Parameters())
@@ -329,8 +349,13 @@ func (h *Handler) HandleStmtExecute(context any, query string, args []any) (*mys
 	slog.Debug("Received: StmtExecute", "query", query, "args", args, "context", context)
 	switch stmt := context.(type) {
 	case *sql.Stmt:
+		execStmt := stmt
+		if h.tx != nil {
+			execStmt = h.tx.Stmt(stmt)
+			defer execStmt.Close()
+		}
 		if isSelect(query) {
-			rows, err := stmt.Query(args...)
+			rows, err := execStmt.Query(args...)
 			if err != nil {
 				return nil, err
 			}
@@ -340,7 +365,7 @@ func (h *Handler) HandleStmtExecute(context any, query string, args []any) (*mys
 			}
 			return mysql.NewResult(resultSet), nil
 		}
-		res, err := stmt.Exec(args...)
+		res, err := execStmt.Exec(args...)
 		if err != nil {
 			return nil, err
 		}
@@ -393,7 +418,8 @@ func (r *sqlResult) RowsAffected() (int64, error) {
 }
 
 func (h *Handler) exec(query string) (sql.Result, error) {
-	if strings.HasPrefix(strings.ToUpper(query), "BEGIN") {
+	upper := strings.TrimSpace(strings.ToUpper(query))
+	if strings.HasPrefix(upper, "BEGIN") || strings.HasPrefix(upper, "START TRANSACTION") {
 		if h.tx != nil {
 			return nil, fmt.Errorf("transaction already started")
 		}
@@ -405,8 +431,9 @@ func (h *Handler) exec(query string) (sql.Result, error) {
 			return nil, err
 		}
 		h.tx = tx
+		return &sqlResult{}, nil
 	}
-	if strings.HasPrefix(strings.ToUpper(query), "COMMIT") {
+	if strings.HasPrefix(upper, "COMMIT") {
 		if h.tx == nil {
 			return nil, fmt.Errorf("no transaction started")
 		}
@@ -417,7 +444,7 @@ func (h *Handler) exec(query string) (sql.Result, error) {
 		h.tx = nil
 		return &sqlResult{}, nil
 	}
-	if strings.HasPrefix(strings.ToUpper(query), "ROLLBACK") {
+	if strings.HasPrefix(upper, "ROLLBACK") {
 		if h.tx == nil {
 			return nil, fmt.Errorf("no transaction started")
 		}
