@@ -7,7 +7,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -211,7 +210,7 @@ func main() {
 	); err != nil {
 		fmt.Printf("%s\n", ffhelp.Flags(flagSet))
 		fmt.Printf("err=%v\n", err)
-		return
+		os.Exit(1)
 	}
 
 	if *printVersion {
@@ -290,7 +289,7 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("failed to create database directory: %w", err)
 		}
-		filepath.Walk(*createDatabaseDir, func(path string, info os.FileInfo, err error) error {
+		err = filepath.Walk(*createDatabaseDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -300,11 +299,14 @@ func run() error {
 			}
 			return nil
 		})
+		if err != nil {
+			return fmt.Errorf("failed to scan database directory: %w", err)
+		}
 	}
 	for _, pattern := range patterns {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("invalid pattern %q: %w", pattern, err)
 		}
 
 		for _, file := range matches {

@@ -55,7 +55,7 @@ Using a docker image:
 
 ```bash
 docker run --name node1 \
--e HA_CREATE_DB_DIR=/data
+-e HA_CREATE_DB_DIR=/data -v ha-data:/data \
 -p 5432:5432 -p 8080:8080 -p 4222:4222 \
 ghcr.io/litesql/ha:latest
 ```
