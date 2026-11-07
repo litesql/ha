@@ -3,11 +3,16 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"net"
+	"net/url"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/litesql/go-ha"
 	natsserver "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 )
 
 func startTestNATSServer(t *testing.T) *natsserver.Server {
@@ -31,6 +36,95 @@ func startTestNATSServer(t *testing.T) *natsserver.Server {
 		s.Shutdown()
 	})
 	return s
+}
+
+func startTestNATSCluster(t *testing.T, size int) (*nats.Conn, []*natsserver.Server) {
+	t.Helper()
+	routes := make([]*url.URL, 0, size)
+	clusterPorts := make([]int, size)
+	for i := range clusterPorts {
+		clusterPorts[i] = freePort(t)
+		routes = append(routes, &url.URL{Scheme: "nats", Host: fmt.Sprintf("127.0.0.1:%d", clusterPorts[i])})
+	}
+
+	servers := make([]*natsserver.Server, size)
+	for i := range servers {
+		opts := natsserver.Options{
+			ServerName: fmt.Sprintf("node%d", i+1),
+			Host:       "127.0.0.1",
+			Port:       -1,
+			JetStream:  true,
+			StoreDir:   t.TempDir(),
+			NoLog:      true,
+			NoSigs:     true,
+			Cluster: natsserver.ClusterOpts{
+				Name: "test-cluster",
+				Host: "127.0.0.1",
+				Port: clusterPorts[i],
+			},
+			Routes: routes,
+		}
+		ns, err := natsserver.NewServer(&opts)
+		if err != nil {
+			t.Fatalf("new nats cluster node %d: %v", i+1, err)
+		}
+		go ns.Start()
+		servers[i] = ns
+	}
+
+	for _, ns := range servers {
+		if !ns.ReadyForConnections(20 * time.Second) {
+			t.Fatalf("nats cluster node %q did not become ready", ns.Name())
+		}
+	}
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		ready := true
+		for _, ns := range servers {
+			if !ns.JetStreamEnabled() || !ns.JetStreamIsCurrent() {
+				ready = false
+				break
+			}
+			if ns.JetStreamIsLeader() && len(ns.JetStreamClusterPeers()) < len(servers) {
+				ready = false
+				break
+			}
+		}
+		if ready && metaLeader(servers) != nil {
+			nc, err := nats.Connect(servers[0].ClientURL())
+			if err != nil {
+				t.Fatalf("connect to cluster: %v", err)
+			}
+			t.Cleanup(nc.Close)
+			return nc, servers
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	for _, ns := range servers {
+		ns.Shutdown()
+	}
+	t.Fatal("nats jetstream cluster is not ready")
+	return nil, nil
+}
+
+func metaLeader(servers []*natsserver.Server) *natsserver.Server {
+	for _, ns := range servers {
+		if ns.JetStreamIsLeader() {
+			return ns
+		}
+	}
+	return nil
+}
+
+func freePort(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("free port: %v", err)
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
 }
 
 func waitForRowCount(t *testing.T, db *sql.DB, query string, expected int) {
@@ -59,6 +153,21 @@ func waitForNamedValue(t *testing.T, db *sql.DB, query string, expected string) 
 		time.Sleep(200 * time.Millisecond)
 	}
 	t.Fatalf("timeout waiting for query %q to return %q", query, expected)
+}
+
+func waitForLeader(t *testing.T, providers ...ha.LeaderProvider) ha.LeaderProvider {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		for _, provider := range providers {
+			if provider != nil && provider.IsLeader() {
+				return provider
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatalf("timeout waiting for a leader among %d provider(s)", len(providers))
+	return nil
 }
 
 func TestReplicationAcrossNodes(t *testing.T) {
@@ -248,3 +357,59 @@ func TestReplicationPropagatesLaterWritesAfterFollowerStarts(t *testing.T) {
 	waitForNamedValue(t, follower, "SELECT name FROM checkpoints WHERE id = 1", "updated")
 	waitForNamedValue(t, follower, "SELECT name FROM checkpoints WHERE id = 2", "later")
 }
+
+func TestLeaderElectionSelectsExactLeader(t *testing.T) {
+	_, servers := startTestNATSCluster(t, 2)
+	conns := make([]*nats.Conn, 0, len(servers))
+	for _, s := range servers {
+		nc, err := nats.Connect(s.ClientURL())
+		if err != nil {
+			t.Fatalf("connect to nats server %q: %v", s.Name(), err)
+		}
+		conns = append(conns, nc)
+	}
+	t.Cleanup(func() {
+		for _, nc := range conns {
+			nc.Close()
+		}
+		for _, ns := range servers {
+			ns.Shutdown()
+		}
+	})
+
+	providers := make([]ha.LeaderProvider, 0, len(servers))
+	for i, nc := range conns {
+		dl, err := ha.StartLeaderElection(
+			context.Background(),
+			fmt.Sprintf("127.0.0.1:%d", 5200+i),
+			nc,
+			"leader.election.test",
+			2,
+			2,
+			filepath.Join(t.TempDir(), fmt.Sprintf("ha-election-%d.log", i+1)),
+		)
+		if err != nil {
+			t.Fatalf("start leader election for node %d: %v", i+1, err)
+		}
+		providers = append(providers, dl)
+	}
+
+	leader := waitForLeader(t, providers...)
+	if leader == nil {
+		t.Fatal("expected a leader to be elected")
+	}
+	if leader.RedirectTarget() == "" {
+		t.Fatal("elected leader must expose a redirect target")
+	}
+
+	leaderCount := 0
+	for _, provider := range providers {
+		if provider.IsLeader() {
+			leaderCount++
+		}
+	}
+	if leaderCount != 1 {
+		t.Fatalf("expected exactly one leader, got %d", leaderCount)
+	}
+}
+
