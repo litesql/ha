@@ -234,7 +234,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 			case "E", "e":
 				undoType = haconnect.UndoFilterEntity
 			case "T", "t":
-				undoType = haconnect.UndoFilterNone
+				undoType = haconnect.UndoFilterTransaction
 			default:
 				undoType = haconnect.UndoFilterNone
 			}

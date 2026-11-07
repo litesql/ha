@@ -62,9 +62,7 @@ func (s *Server) ListenAndServe() error {
 
 			go func(c net.Conn) {
 				defer c.Close()
-
 				slog.Debug("New mysql connection", "remote", c.RemoteAddr().String())
-				slog.Info("MySQL user/pass", "user", s.User, "pass", s.Pass)
 				conn, err := mysqlServer.NewConn(c, s.User, s.Pass, &Handler{
 					connectorProvider:     s.ConnectorProvider,
 					dbProvider:            s.DBProvider,

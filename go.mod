@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	connectrpc.com/connect v1.21.1
-	connectrpc.com/otelconnect v0.10.0
+	connectrpc.com/otelconnect v0.12.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-mysql-org/go-mysql v1.16.0
 	github.com/jackc/pglogrepl v0.0.0-20261003132456-662581bb6bb6
@@ -12,9 +12,9 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.20.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/debezium-sink v0.0.3
-	github.com/litesql/go-ha v0.15.7
-	github.com/litesql/go-sqlite-ha v0.15.5
-	github.com/litesql/go-sqlite3-ha v0.15.5
+	github.com/litesql/go-ha v0.15.8
+	github.com/litesql/go-sqlite-ha v0.15.6
+	github.com/litesql/go-sqlite3-ha v0.15.6
 	github.com/litesql/mysql v0.0.4
 	github.com/litesql/postgresql v0.1.5
 	github.com/microsoft/go-mssqldb v1.11.2
@@ -22,11 +22,11 @@ require (
 	github.com/nats-io/nats.go v1.55.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/sijms/go-ora/v2 v2.9.0
-	github.com/traefik/yaegi v0.16.1
+	github.com/traefik/yaegi v0.16.3
 	github.com/twmb/franz-go v1.22.2
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.70.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.72.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.23.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.47.0
@@ -38,6 +38,7 @@ require (
 )
 
 require (
+	connectrpc.com/connect/v2 v2.0.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/antithesishq/antithesis-sdk-go v0.8.0 // indirect
@@ -85,9 +86,9 @@ require (
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nats-io/graft v0.0.0-20260325174230-f9e6710ae36e // indirect
-	github.com/nats-io/jwt/v2 v2.8.2 // indirect
+	github.com/nats-io/jwt/v2 v2.8.3 // indirect
 	github.com/nats-io/nats-server/v2 v2.15.2 // indirect
-	github.com/nats-io/nkeys v0.4.16 // indirect
+	github.com/nats-io/nkeys v0.4.17 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
@@ -122,10 +123,10 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20261026165753-2ffab32bce7e // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261104224025-d1e00e9f33ab // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	modernc.org/libc v1.80.0 // indirect
+	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 	modernc.org/sqlite v1.61.1 // indirect

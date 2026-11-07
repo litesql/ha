@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -538,12 +540,14 @@ func run() error {
 		return fmt.Errorf("failed to create PostgreSQL server: %w", err)
 	}
 
+	var shuttingDown atomic.Bool
 	if *pgPort > 0 {
 		slog.Info("starting HA PostgreSQL wire Protocol server", "port", *pgPort)
 		go func() {
-			err = pgServer.ListenAndServe(*pgPort)
-			if err != nil {
-				log.Fatalf("PostgreSQL server error: %v", err)
+			if err := pgServer.ListenAndServe(*pgPort); err != nil && !errors.Is(err, net.ErrClosed) {
+				if !shuttingDown.Load() {
+					slog.Error("PostgreSQL server error", "error", err)
+				}
 			}
 		}()
 	}
@@ -568,7 +572,7 @@ func run() error {
 
 	if *token != "" {
 		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := r.Header.Get("Authorization")
+			authHeader := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 			if authHeader != *token && r.URL.Path != "/healthz" && r.URL.Path != "/openapi.yaml" && r.URL.Path != "/docs" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
@@ -584,6 +588,7 @@ func run() error {
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		sig := <-done
+		shuttingDown.Store(true)
 		slog.Warn("signal detected...", "signal", sig)
 		if err := mysqlServer.Close(); err != nil {
 			slog.Error("MySQL server shutdown failed", "error", err)

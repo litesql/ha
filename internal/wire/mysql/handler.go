@@ -35,13 +35,32 @@ type ConnectorProvider func(dbName string) (*ha.Connector, bool)
 
 func (h *Handler) UseDB(dbName string) error {
 	slog.Debug("Received: UseDB", "dbname", dbName)
-	db, ok := h.dbProvider(dbName)
-	if ok {
+	dbName = strings.TrimSpace(dbName)
+	dbName = strings.TrimRight(dbName, "; \t\r\n")
+	dbName = strings.Trim(dbName, "`'\"")
+	if dbName == "" {
+		return mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+	}
+
+	if h.dbProvider != nil {
+		db, ok := h.dbProvider(dbName)
+		if !ok && !strings.HasSuffix(dbName, ".db") {
+			db, ok = h.dbProvider(dbName + ".db")
+			if ok {
+				dbName = dbName + ".db"
+			}
+		}
+		if !ok {
+			return mysql.NewDefaultError(mysql.ER_BAD_DB_ERROR, dbName)
+		}
 		h.db = db
 	}
-	connector, ok := h.connectorProvider(dbName)
-	if ok {
-		h.connector = connector
+
+	if h.connectorProvider != nil {
+		connector, ok := h.connectorProvider(dbName)
+		if ok {
+			h.connector = connector
+		}
 	}
 
 	return nil
@@ -50,6 +69,7 @@ func (h *Handler) UseDB(dbName string) error {
 var (
 	reComments = regexp.MustCompile(`(?s)//.*?\\n|/\\*.*?\\*/`)
 	reUndo     = regexp.MustCompile(`(?i)^UNDO(\s|E|T)\s*([^;\s]+)`)
+	reUse      = regexp.MustCompile(`(?i)^USE(?:\s+([^;\s]+.*?))?(?:\s*;)*$`)
 )
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
@@ -71,8 +91,16 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return mysql.NewResult(r), nil
 	}
 
-	if strings.HasPrefix(cleanQuery, "USE ") {
-		dbName := strings.ReplaceAll(strings.TrimSpace(query[strings.Index(query, "use ")+4:]), "`", "")
+	if match := reUse.FindStringSubmatch(keepCaseQuery); len(match) > 0 {
+		var dbName string
+		if len(match) > 1 {
+			dbName = strings.TrimSpace(match[1])
+			dbName = strings.TrimRight(dbName, "; \t\r\n")
+			dbName = strings.Trim(dbName, "`'\"")
+		}
+		if dbName == "" {
+			return nil, mysql.NewDefaultError(mysql.ER_NO_DB_ERROR)
+		}
 		return nil, h.UseDB(dbName)
 	}
 
@@ -161,7 +189,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		case "E", "e":
 			undoType = haconnect.UndoFilterEntity
 		case "T", "t":
-			undoType = haconnect.UndoFilterNone
+			undoType = haconnect.UndoFilterTransaction
 		default:
 			undoType = haconnect.UndoFilterNone
 		}

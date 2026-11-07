@@ -424,6 +424,9 @@ func Drop(ctx context.Context, id string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("database with id %q not found", id)
 	}
+	if dbConnector == dbs[""] {
+		return "", fmt.Errorf("cannot drop default database")
+	}
 	var filename string
 	err := dbConnector.db.QueryRowContext(ctx, "SELECT file FROM pragma_database_list WHERE name = ?", "main").Scan(&filename)
 	if err != nil {
@@ -433,6 +436,7 @@ func Drop(ctx context.Context, id string) (string, error) {
 		proxiedSubscription[id].Stop()
 		delete(proxiedSubscription, id)
 	}
+	dbConnector.db.Close()
 	dbConnector.connector.Close()
 	delete(dbs, id)
 	return filename, nil
