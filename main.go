@@ -590,7 +590,9 @@ func run() error {
 		})
 	}
 	if *observability {
-		server.Handler = otelhttp.NewHandler(server.Handler, "ha.http")
+		server.Handler = otelhttp.NewHandler(server.Handler, "ha.http", otelhttp.WithFilter(func(r *http.Request) bool {
+			return r.URL.Path != "/healthz" && r.URL.Path != "/readyz" && r.URL.Path != "/openapi.yaml" && r.URL.Path != "/docs"
+		}))
 	}
 
 	done := make(chan os.Signal, 1)
