@@ -134,7 +134,7 @@ func Start(remote string, token string, enableOtel bool) {
 		}
 	}()
 
-	historyPath := filepath.Join(os.TempDir(), "ha_cli.history")
+	historyPath := cliHistoryPath()
 	h, _ := history.LoadHistory(historyPath)
 	m.SetHistory(h)
 
@@ -373,4 +373,17 @@ func queryTypeFromSQL(sql string) sqlv1.QueryType {
 	}
 
 	return sqlv1.QueryType_QUERY_TYPE_EXEC_UPDATE
+}
+
+func cliHistoryPath() string {
+	if configDir, err := os.UserConfigDir(); err == nil && configDir != "" {
+		haDir := filepath.Join(configDir, "ha")
+		if err := os.MkdirAll(haDir, 0o700); err == nil {
+			return filepath.Join(haDir, "cli.history")
+		}
+	}
+	if homeDir, err := os.UserHomeDir(); err == nil && homeDir != "" {
+		return filepath.Join(homeDir, ".ha_cli_history")
+	}
+	return filepath.Join(os.TempDir(), "ha_cli.history")
 }
