@@ -233,18 +233,12 @@ type _github_com_litesql_go_ha_DBSnapshotter struct {
 	WTakeSnapshot   func(ctx context.Context) (sequence uint64, err error)
 }
 
-func (W _github_com_litesql_go_ha_DBSnapshotter) DB() *sql.DB {
-	return W.WDB()
-}
+func (W _github_com_litesql_go_ha_DBSnapshotter) DB() *sql.DB { return W.WDB() }
 func (W _github_com_litesql_go_ha_DBSnapshotter) LatestSnapshot(ctx context.Context) (sequence uint64, reader io.ReadCloser, err error) {
 	return W.WLatestSnapshot(ctx)
 }
-func (W _github_com_litesql_go_ha_DBSnapshotter) SetDB(a0 *sql.DB) {
-	W.WSetDB(a0)
-}
-func (W _github_com_litesql_go_ha_DBSnapshotter) Start() {
-	W.WStart()
-}
+func (W _github_com_litesql_go_ha_DBSnapshotter) SetDB(a0 *sql.DB) { W.WSetDB(a0) }
+func (W _github_com_litesql_go_ha_DBSnapshotter) Start()           { W.WStart() }
 func (W _github_com_litesql_go_ha_DBSnapshotter) TakeSnapshot(ctx context.Context) (sequence uint64, err error) {
 	return W.WTakeSnapshot(ctx)
 }
@@ -257,15 +251,9 @@ type _github_com_litesql_go_ha_LeaderProvider struct {
 	WRedirectTarget func() string
 }
 
-func (W _github_com_litesql_go_ha_LeaderProvider) IsLeader() bool {
-	return W.WIsLeader()
-}
-func (W _github_com_litesql_go_ha_LeaderProvider) Ready() chan struct{} {
-	return W.WReady()
-}
-func (W _github_com_litesql_go_ha_LeaderProvider) RedirectTarget() string {
-	return W.WRedirectTarget()
-}
+func (W _github_com_litesql_go_ha_LeaderProvider) IsLeader() bool         { return W.WIsLeader() }
+func (W _github_com_litesql_go_ha_LeaderProvider) Ready() chan struct{}   { return W.WReady() }
+func (W _github_com_litesql_go_ha_LeaderProvider) RedirectTarget() string { return W.WRedirectTarget() }
 
 // _github_com_litesql_go_ha_PreparedTwoPhaseCommit is an interface wrapper for PreparedTwoPhaseCommit type
 type _github_com_litesql_go_ha_PreparedTwoPhaseCommit struct {
@@ -277,12 +265,8 @@ type _github_com_litesql_go_ha_PreparedTwoPhaseCommit struct {
 	WResolveCommit        func(a0 context.Context) (bool, error)
 }
 
-func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Abort() error {
-	return W.WAbort()
-}
-func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Close() {
-	W.WClose()
-}
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Abort() error { return W.WAbort() }
+func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Close()       { W.WClose() }
 func (W _github_com_litesql_go_ha_PreparedTwoPhaseCommit) Commit(a0 context.Context) error {
 	return W.WCommit(a0)
 }
@@ -317,9 +301,7 @@ type _github_com_litesql_go_ha_Publisher struct {
 func (W _github_com_litesql_go_ha_Publisher) Publish(ctx context.Context, cs *ha.ChangeSet) error {
 	return W.WPublish(ctx, cs)
 }
-func (W _github_com_litesql_go_ha_Publisher) Sequence() uint64 {
-	return W.WSequence()
-}
+func (W _github_com_litesql_go_ha_Publisher) Sequence() uint64 { return W.WSequence() }
 
 // _github_com_litesql_go_ha_SequenceProvider is an interface wrapper for SequenceProvider type
 type _github_com_litesql_go_ha_SequenceProvider struct {
@@ -327,9 +309,7 @@ type _github_com_litesql_go_ha_SequenceProvider struct {
 	WLatestSeq func() uint64
 }
 
-func (W _github_com_litesql_go_ha_SequenceProvider) LatestSeq() uint64 {
-	return W.WLatestSeq()
-}
+func (W _github_com_litesql_go_ha_SequenceProvider) LatestSeq() uint64 { return W.WLatestSeq() }
 
 // _github_com_litesql_go_ha_Subscriber is an interface wrapper for Subscriber type
 type _github_com_litesql_go_ha_Subscriber struct {
@@ -346,9 +326,7 @@ type _github_com_litesql_go_ha_Subscriber struct {
 	WUndoByTime     func(ctx context.Context, duration time.Duration, filterType grpc.UndoFilter, filterEntities map[string][]int64) error
 }
 
-func (W _github_com_litesql_go_ha_Subscriber) DB() *sql.DB {
-	return W.WDB()
-}
+func (W _github_com_litesql_go_ha_Subscriber) DB() *sql.DB { return W.WDB() }
 func (W _github_com_litesql_go_ha_Subscriber) DeliveredInfo(ctx context.Context, name string) (any, error) {
 	return W.WDeliveredInfo(ctx, name)
 }
@@ -358,18 +336,12 @@ func (W _github_com_litesql_go_ha_Subscriber) HistoryBySeq(ctx context.Context, 
 func (W _github_com_litesql_go_ha_Subscriber) HistoryByTime(ctx context.Context, duration time.Duration) ([]grpc.HistoryItem, error) {
 	return W.WHistoryByTime(ctx, duration)
 }
-func (W _github_com_litesql_go_ha_Subscriber) LatestSeq() uint64 {
-	return W.WLatestSeq()
-}
+func (W _github_com_litesql_go_ha_Subscriber) LatestSeq() uint64 { return W.WLatestSeq() }
 func (W _github_com_litesql_go_ha_Subscriber) RemoveConsumer(ctx context.Context, name string) error {
 	return W.WRemoveConsumer(ctx, name)
 }
-func (W _github_com_litesql_go_ha_Subscriber) SetDB(a0 *sql.DB) {
-	W.WSetDB(a0)
-}
-func (W _github_com_litesql_go_ha_Subscriber) Start() error {
-	return W.WStart()
-}
+func (W _github_com_litesql_go_ha_Subscriber) SetDB(a0 *sql.DB) { W.WSetDB(a0) }
+func (W _github_com_litesql_go_ha_Subscriber) Start() error     { return W.WStart() }
 func (W _github_com_litesql_go_ha_Subscriber) UndoBySeq(ctx context.Context, startSeq uint64, filterType grpc.UndoFilter, filterEntities map[string][]int64) error {
 	return W.WUndoBySeq(ctx, startSeq, filterType, filterEntities)
 }
@@ -393,6 +365,4 @@ type _github_com_litesql_go_ha_TxSeqTracker struct {
 	WLatestSeq func() uint64
 }
 
-func (W _github_com_litesql_go_ha_TxSeqTracker) LatestSeq() uint64 {
-	return W.WLatestSeq()
-}
+func (W _github_com_litesql_go_ha_TxSeqTracker) LatestSeq() uint64 { return W.WLatestSeq() }
