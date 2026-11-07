@@ -199,3 +199,29 @@ func TestIsQueryAndExecReturningCTEPragma(t *testing.T) {
 	}
 }
 
+func TestDeserializeInMemoryDB(t *testing.T) {
+	ctx := context.Background()
+	err := Load(ctx, "file:../../testdata/example.db?vfs=memdb", LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	})
+	if err != nil {
+		t.Fatalf("failed to load example.db into memdb: %v", err)
+	}
+	defer Drop(ctx, "example.db")
+
+	db, err := DB("example.db")
+	if err != nil {
+		t.Fatalf("failed to get example.db: %v", err)
+	}
+
+	res, err := Exec(ctx, db, "SELECT name FROM sqlite_schema WHERE type = 'table'", nil)
+	if err != nil {
+		t.Fatalf("failed to query deserialized db: %v", err)
+	}
+	if len(res.Rows) == 0 {
+		t.Fatal("expected tables in deserialized example.db")
+	}
+}
+
+

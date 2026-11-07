@@ -155,7 +155,11 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	}
 
 	options = append(options, ha.WithAutoStart(false))
-	var connector *ha.Connector
+	var (
+		connector       *ha.Connector
+		snapshotReader  io.ReadCloser
+		preloadFilename string
+	)
 	if cfg.FromLatestSnapshot {
 		slog.Info("loading latest snapshot from NATS JetStream Object Store", "dsn", dsn)
 		sequence, reader, err := ha.LatestSnapshot(ctx, dsn, cfg.Options...)
@@ -168,15 +172,9 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			options = append(options, ha.WithDeliverPolicy(policy))
 		}
 		if reader != nil {
+			defer reader.Close()
 			if cfg.MemDB {
-				connector, err = newConnector(dsn, options...)
-				if err != nil {
-					return err
-				}
-				err = deserializeFromReader(ctx, connector, reader)
-				if err != nil {
-					return fmt.Errorf("failed to load latest snapshot: %w", err)
-				}
+				snapshotReader = reader
 			} else {
 				filename := filenameFromDSN(dsn)
 				f, err := os.Create(filename)
@@ -190,11 +188,11 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 				}
 				f.Close()
 				slog.Info("loading snapshot", "filename", filename)
-				connector, err = newConnector(dsn, options...)
-				if err != nil {
-					return err
-				}
 			}
+		}
+		connector, err = newConnector(dsn, options...)
+		if err != nil {
+			return err
 		}
 	} else {
 		if cfg.MemDB {
@@ -221,11 +219,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			if filename != "" {
 				fi, err := os.Stat(filename)
 				if err == nil && !fi.IsDir() {
-					slog.Info("loading database", "file", filename)
-					err := deserialize(ctx, connector, filename)
-					if err != nil {
-						return fmt.Errorf("failed to load database %q: %w", filename, err)
-					}
+					preloadFilename = filename
 				}
 			}
 		} else {
@@ -248,6 +242,21 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 	db.SetConnMaxLifetime(0)
 	db.SetMaxOpenConns(cfg.MaxConns)
 	db.SetMaxIdleConns(cfg.MaxConns)
+
+	if snapshotReader != nil {
+		if err := deserializeFromReader(ctx, db, snapshotReader); err != nil {
+			db.Close()
+			connector.Close()
+			return fmt.Errorf("failed to load latest snapshot: %w", err)
+		}
+	} else if preloadFilename != "" {
+		slog.Info("loading database", "file", preloadFilename)
+		if err := deserialize(ctx, db, preloadFilename); err != nil {
+			db.Close()
+			connector.Close()
+			return fmt.Errorf("failed to load database %q: %w", preloadFilename, err)
+		}
+	}
 
 	if proxiedPositionProvider != nil {
 		proxiedPositionProvider.SetReplicaDB(db)
@@ -463,41 +472,53 @@ func Drop(ctx context.Context, id string) (string, error) {
 	return filename, nil
 }
 
-func deserializeFromReader(ctx context.Context, connector driver.Connector, r io.Reader) error {
-	dest, err := os.CreateTemp("", "ha-*.db")
+func deserializeFromReader(ctx context.Context, db *sql.DB, r io.Reader) error {
+	raw, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(dest.Name())
-
-	_, err = io.Copy(dest, r)
-	if err != nil {
-		return err
-	}
-	dest.Close()
-
-	return deserialize(ctx, connector, dest.Name())
+	data := make([]byte, len(raw)*2)
+	copy(data, raw)
+	return deserializeBytes(ctx, db, data)
 }
 
-func deserialize(ctx context.Context, connector driver.Connector, file string) error {
-	data, err := os.ReadFile(file)
+func deserialize(ctx context.Context, db *sql.DB, file string) error {
+	f, err := os.Open(file)
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 
-	conn, err := connector.Connect(ctx)
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	size := fi.Size()
+	data := make([]byte, size*2)
+	if _, err := io.ReadFull(f, data[:size]); err != nil {
+		return err
+	}
+	return deserializeBytes(ctx, db, data)
+}
+
+func deserializeBytes(ctx context.Context, db *sql.DB, data []byte) error {
+	conn, err := db.Conn(ctx)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	deserializerConn, err := deserializerConn(conn)
-	if err != nil {
-		return err
-	}
-	buf := make([]byte, len(data))
-	data = append(data, buf...)
-	return deserializerConn.Deserialize(data, "")
+	return conn.Raw(func(driverConn any) error {
+		dc, ok := driverConn.(driver.Conn)
+		if !ok {
+			return fmt.Errorf("not a driver.Conn")
+		}
+		deserializerConn, err := deserializerConn(dc)
+		if err != nil {
+			return err
+		}
+		return deserializerConn.Deserialize(data, "")
+	})
 }
 
 type querier interface {
