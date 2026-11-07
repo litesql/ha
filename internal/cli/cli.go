@@ -78,71 +78,18 @@ func Start(remote string, token string, enableOtel bool) {
 		slog.Error("grpc connect", "error", err)
 		return
 	}
+	defer cc.Close()
+
 	client := sqlv1.NewDatabaseServiceClient(cc)
-	stream, err := client.Query(context.Background())
-	if err != nil {
-		slog.Error("stream", "error", err)
-		return
-	}
-	defer stream.CloseSend()
+	fmt.Println("Connecting to", u.String(), "(Ctrl+D to exit)")
 
-	fmt.Println("Connected to", u.String(), "(Ctrl+D to exit)")
-
-	reqChan := make(chan *sqlv1.QueryRequest)
-	rawRespChan := make(chan *sqlv1.QueryResponse)
-	respChan := make(chan *sqlv1.QueryResponse)
-	exitChan := make(chan struct{}, 2)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reqChan := make(chan *cliRequest, 1)
+	go maintainQueryStream(ctx, client, reqChan)
 
 	m := bubbline.New()
 	defer m.Close()
-
-	go func() {
-		defer close(respChan)
-		for {
-			select {
-			case req := <-reqChan:
-				err := stream.Send(req)
-				if err != nil {
-					m.Close()
-					slog.Error(err.Error())
-					exitChan <- struct{}{}
-					return
-				}
-				res, ok := <-rawRespChan
-				if !ok {
-					return
-				}
-				respChan <- res
-			case <-time.After(25 * time.Second):
-				err := stream.Send(&sqlv1.QueryRequest{
-					Type: sqlv1.QueryType_QUERY_TYPE_PING,
-				})
-				if err != nil {
-					m.Close()
-					slog.Error(err.Error())
-					exitChan <- struct{}{}
-					return
-				}
-				if _, ok := <-rawRespChan; !ok {
-					return
-				}
-			}
-		}
-	}()
-
-	go func() {
-		defer close(rawRespChan)
-		for {
-			res, err := stream.Recv()
-			if err != nil {
-				m.Close()
-				slog.Error(err.Error())
-				exitChan <- struct{}{}
-				return
-			}
-			rawRespChan <- res
-		}
-	}()
 
 	historyPath := cliHistoryPath()
 	h, _ := history.LoadHistory(historyPath)
@@ -153,163 +100,284 @@ func Start(remote string, token string, enableOtel bool) {
 		replicationID string
 	)
 	for {
-		select {
-		case <-exitChan:
-			return
-		default:
-			if command == "" {
-				m.Prompt = fmt.Sprintf("%s> ", replicationID)
-			} else {
-				m.Prompt = ""
-			}
+		if command == "" {
+			m.Prompt = fmt.Sprintf("%s> ", replicationID)
+		} else {
+			m.Prompt = ""
+		}
 
-			line, err := m.GetLine()
-			if err != nil {
-				if err == io.EOF {
-					return
-				}
-				if errors.Is(err, bubbline.ErrInterrupted) {
-					// Entered Ctrl+C to cancel input.
-					fmt.Println("^C")
-					command = ""
-					continue
-				} else if errors.Is(err, bubbline.ErrTerminated) {
-					fmt.Println("terminated")
-					return
-				} else {
-					fmt.Println("error:", err)
-				}
-				continue
-			}
-			command += line
-			command = strings.TrimSpace(command)
-			if !strings.HasSuffix(command, ";") {
-				command += "\n"
-				continue
-			}
-
-			m.AddHistoryEntry(command)
-			history.SaveHistory(m.GetHistory(), historyPath)
-
-			if strings.HasPrefix(strings.ToUpper(command), "EXIT") {
+		line, err := m.GetLine()
+		if err != nil {
+			if err == io.EOF {
 				return
 			}
-
-			if strings.HasPrefix(strings.ToUpper(command), "SHOW DATABASES") {
-				command = ""
-				resp, err := client.ReplicationIDs(context.Background(), &sqlv1.ReplicationIDsRequest{})
-				if err != nil {
-					slog.Error("databases", "error", err)
-					continue
-				}
-				t := table.New().
-					Border(lipgloss.NormalBorder()).
-					BorderStyle(lipgloss.NewStyle().Foreground(white)).
-					StyleFunc(func(row, col int) lipgloss.Style {
-						switch {
-						case row == table.HeaderRow:
-							return headerStyle
-						case row%2 == 0:
-							return evenRowStyle
-						default:
-							return oddRowStyle
-						}
-					}).Headers("Databases")
-				for _, row := range resp.ReplicationId {
-					t.Row(row)
-				}
-				fmt.Println(t.Render())
-				continue
-			}
-
-			if match := reCreateDatabase.FindStringSubmatch(command); len(match) == 2 {
-				dsn := match[1]
-				command = ""
-				err := createDatabase(httpClient, remote, token, dsn)
-				if err != nil {
-					fmt.Println("create database error:", err)
-				} else {
-					fmt.Println("database created")
-				}
-				continue
-			}
-
-			if match := reDropDatabase.FindStringSubmatch(command); len(match) == 2 {
-				id := match[1]
-				command = ""
-				err := dropDatabase(httpClient, remote, token, id)
-				if err != nil {
-					fmt.Println("drop database error:", err)
-				} else {
-					fmt.Println("database dropped")
-				}
-				continue
-			}
-
-			if match := reSetDatabase.FindStringSubmatch(command); len(match) == 3 {
-				replicationID = match[2]
+			if errors.Is(err, bubbline.ErrInterrupted) {
+				// Entered Ctrl+C to cancel input.
+				fmt.Println("^C")
 				command = ""
 				continue
+			} else if errors.Is(err, bubbline.ErrTerminated) {
+				fmt.Println("terminated")
+				return
+			} else {
+				fmt.Println("error:", err)
 			}
+			continue
+		}
+		command += line
+		command = strings.TrimSpace(command)
+		if !strings.HasSuffix(command, ";") {
+			command += "\n"
+			continue
+		}
 
-			if strings.HasPrefix(strings.ToUpper(command), "UNSET DATABASE") {
-				replicationID = ""
-				command = ""
+		m.AddHistoryEntry(command)
+		history.SaveHistory(m.GetHistory(), historyPath)
+
+		if strings.HasPrefix(strings.ToUpper(command), "EXIT") {
+			return
+		}
+
+		if strings.HasPrefix(strings.ToUpper(command), "SHOW DATABASES") {
+			command = ""
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			resp, err := client.ReplicationIDs(ctx, &sqlv1.ReplicationIDsRequest{})
+			cancel()
+			if err != nil {
+				slog.Error("databases", "error", err)
 				continue
 			}
+			t := table.New().
+				Border(lipgloss.NormalBorder()).
+				BorderStyle(lipgloss.NewStyle().Foreground(white)).
+				StyleFunc(func(row, col int) lipgloss.Style {
+					switch {
+					case row == table.HeaderRow:
+						return headerStyle
+					case row%2 == 0:
+						return evenRowStyle
+					default:
+						return oddRowStyle
+					}
+				}).Headers("Databases")
+			for _, row := range resp.ReplicationId {
+				t.Row(row)
+			}
+			fmt.Println(t.Render())
+			continue
+		}
 
-			start := time.Now()
-			reqChan <- &sqlv1.QueryRequest{
+		if match := reCreateDatabase.FindStringSubmatch(command); len(match) == 2 {
+			dsn := match[1]
+			command = ""
+			err := createDatabase(httpClient, remote, token, dsn)
+			if err != nil {
+				fmt.Println("create database error:", err)
+			} else {
+				fmt.Println("database created")
+			}
+			continue
+		}
+
+		if match := reDropDatabase.FindStringSubmatch(command); len(match) == 2 {
+			id := match[1]
+			command = ""
+			err := dropDatabase(httpClient, remote, token, id)
+			if err != nil {
+				fmt.Println("drop database error:", err)
+			} else {
+				fmt.Println("database dropped")
+			}
+			continue
+		}
+
+		if match := reSetDatabase.FindStringSubmatch(command); len(match) == 3 {
+			replicationID = match[2]
+			command = ""
+			continue
+		}
+
+		if strings.HasPrefix(strings.ToUpper(command), "UNSET DATABASE") {
+			replicationID = ""
+			command = ""
+			continue
+		}
+
+		start := time.Now()
+		response := make(chan queryResult, 1)
+		reqChan <- &cliRequest{
+			request: &sqlv1.QueryRequest{
 				Sql:           strings.TrimSuffix(command, ";"),
 				ReplicationId: replicationID,
 				Type:          queryTypeFromSQL(command),
+			},
+			response: response,
+		}
+		command = ""
+		result := <-response
+		if result.err != nil {
+			fmt.Println("query failed; reconnecting:", result.err)
+			continue
+		}
+		resp := result.response
+		if resp.Error != "" {
+			fmt.Println(resp.Error)
+			continue
+		}
+		if resp.ResultSet != nil {
+			if len(resp.ResultSet.Columns) == 2 && resp.ResultSet.Columns[0] == "rows_affected" && len(resp.ResultSet.Rows) == 1 {
+				fmt.Printf("Query OK, %d rows affected (%s)\n", resp.RowsAffected, time.Since(start))
+				continue
 			}
-			command = ""
-			resp, ok := <-respChan
-			if !ok {
+			t := table.New().
+				Border(lipgloss.NormalBorder()).
+				BorderStyle(lipgloss.NewStyle().Foreground(white)).
+				StyleFunc(func(row, col int) lipgloss.Style {
+					switch {
+					case row == table.HeaderRow:
+						return headerStyle
+					case row%2 == 0:
+						return evenRowStyle
+					default:
+						return oddRowStyle
+					}
+				}).Headers(resp.ResultSet.Columns...)
+			for _, row := range resp.ResultSet.Rows {
+				var cells []string
+				for _, val := range row.Values {
+					v := haconnect.FromAnypb(val)
+					if v == nil {
+						cells = append(cells, "")
+						continue
+					}
+					cells = append(cells, fmt.Sprint(v))
+				}
+				t.Row(cells...)
+			}
+			fmt.Println(t.Render())
+		}
+		if resp.RowsAffected == 0 {
+			fmt.Printf("Query OK (%s)\n", time.Since(start))
+			continue
+		}
+		fmt.Printf("Query OK, %d rows affected (%s)\n", resp.RowsAffected, time.Since(start))
+	}
+}
+
+type cliRequest struct {
+	request  *sqlv1.QueryRequest
+	response chan queryResult
+}
+
+type queryResult struct {
+	response *sqlv1.QueryResponse
+	err      error
+}
+
+type queryStream interface {
+	Send(*sqlv1.QueryRequest) error
+	Recv() (*sqlv1.QueryResponse, error)
+}
+
+type receivedQueryResponse struct {
+	response *sqlv1.QueryResponse
+	err      error
+}
+
+func maintainQueryStream(ctx context.Context, client sqlv1.DatabaseServiceClient, requests <-chan *cliRequest) {
+	retryDelay := time.Second
+	for {
+		streamCtx, cancel := context.WithCancel(ctx)
+		stream, err := client.Query(streamCtx)
+		if err == nil {
+			slog.Info("connected to remote server")
+			err = serveQueryStream(streamCtx, stream, requests)
+		}
+		cancel()
+
+		if ctx.Err() != nil {
+			return
+		}
+		slog.Warn("query stream disconnected; reconnecting", "error", err, "retry_in", retryDelay)
+		timer := time.NewTimer(retryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+		if retryDelay < 30*time.Second {
+			retryDelay *= 2
+			if retryDelay > 30*time.Second {
+				retryDelay = 30 * time.Second
+			}
+		}
+	}
+}
+
+func serveQueryStream(ctx context.Context, stream queryStream, requests <-chan *cliRequest) error {
+	received := make(chan receivedQueryResponse, 1)
+	go func() {
+		for {
+			response, err := stream.Recv()
+			select {
+			case received <- receivedQueryResponse{response: response, err: err}:
+			case <-ctx.Done():
 				return
 			}
-			if resp.Error != "" {
-				fmt.Println(resp.Error)
+			if err != nil {
+				return
+			}
+		}
+	}()
+
+	heartbeat := time.NewTimer(25 * time.Second)
+	defer heartbeat.Stop()
+
+	var pending *cliRequest
+	pingPending := false
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case request := <-requests:
+			if pending != nil {
+				request.response <- queryResult{err: errors.New("another query is still in progress")}
 				continue
 			}
-			if resp.ResultSet != nil {
-				if len(resp.ResultSet.Columns) == 2 && resp.ResultSet.Columns[0] == "rows_affected" && len(resp.ResultSet.Rows) == 1 {
-					fmt.Printf("Query OK, %d rows affected (%s)\n", resp.RowsAffected, time.Since(start))
-					continue
-				}
-				t := table.New().
-					Border(lipgloss.NormalBorder()).
-					BorderStyle(lipgloss.NewStyle().Foreground(white)).
-					StyleFunc(func(row, col int) lipgloss.Style {
-						switch {
-						case row == table.HeaderRow:
-							return headerStyle
-						case row%2 == 0:
-							return evenRowStyle
-						default:
-							return oddRowStyle
-						}
-					}).Headers(resp.ResultSet.Columns...)
-				for _, row := range resp.ResultSet.Rows {
-					var cells []string
-					for _, val := range row.Values {
-						v := haconnect.FromAnypb(val)
-						if v == nil {
-							cells = append(cells, "")
-							continue
-						}
-						cells = append(cells, fmt.Sprint(v))
-					}
-					t.Row(cells...)
-				}
-				fmt.Println(t.Render())
+			pending = request
+			if err := stream.Send(request.request); err != nil {
+				pending.response <- queryResult{err: err}
+				return err
 			}
-			if resp.RowsAffected == 0 {
-				fmt.Printf("Query OK (%s)\n", time.Since(start))
-				continue
+		case response := <-received:
+			if response.err != nil {
+				if pending != nil {
+					pending.response <- queryResult{err: response.err}
+				}
+				return response.err
 			}
-			fmt.Printf("Query OK, %d rows affected (%s)\n", resp.RowsAffected, time.Since(start))
+			if pending != nil {
+				pending.response <- queryResult{response: response.response}
+				pending = nil
+				heartbeat.Reset(25 * time.Second)
+			} else if pingPending {
+				pingPending = false
+				heartbeat.Reset(25 * time.Second)
+			} else {
+				slog.Warn("received an unexpected response from remote server")
+			}
+		case <-heartbeat.C:
+			if pingPending {
+				return errors.New("query stream heartbeat timed out")
+			}
+			if pending == nil {
+				if err := stream.Send(&sqlv1.QueryRequest{Type: sqlv1.QueryType_QUERY_TYPE_PING}); err != nil {
+					return err
+				}
+				pingPending = true
+			}
+			heartbeat.Reset(25 * time.Second)
 		}
 	}
 }
