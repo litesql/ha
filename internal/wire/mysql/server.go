@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"sync/atomic"
 
 	"github.com/go-mysql-org/go-mysql/server"
 	"github.com/litesql/ha/internal/sqlite"
@@ -27,11 +28,12 @@ type Server struct {
 
 	createDatabaseOptions sqlite.LoadConfig
 	listener              net.Listener
-	closed                bool
+	closed                atomic.Bool
 }
 
 func NewServer(cfg Config) (*Server, error) {
 	return &Server{
+		ConnectorProvider:     cfg.ConnectorProvider,
 		DBProvider:            cfg.DBProvider,
 		Port:                  cfg.Port,
 		User:                  cfg.User,
@@ -53,7 +55,7 @@ func (s *Server) ListenAndServe() error {
 		for {
 			c, err := l.Accept()
 			if err != nil {
-				if s.closed {
+				if s.closed.Load() {
 					return
 				}
 				slog.Error("Accept conn", "error", err)
@@ -63,11 +65,19 @@ func (s *Server) ListenAndServe() error {
 			go func(c net.Conn) {
 				defer c.Close()
 				slog.Debug("New mysql connection", "remote", c.RemoteAddr().String())
-				conn, err := mysqlServer.NewConn(c, s.User, s.Pass, &Handler{
+				handler := &Handler{
 					connectorProvider:     s.ConnectorProvider,
 					dbProvider:            s.DBProvider,
 					createDatabaseOptions: s.createDatabaseOptions,
-				})
+				}
+				if s.DBProvider != nil {
+					handler.db, _ = s.DBProvider("")
+				}
+				if s.ConnectorProvider != nil {
+					handler.connector, _ = s.ConnectorProvider("")
+				}
+				defer handler.Close()
+				conn, err := mysqlServer.NewConn(c, s.User, s.Pass, handler)
 				if err != nil {
 					slog.Error("New conn", "error", err)
 					return
@@ -85,7 +95,7 @@ func (s *Server) ListenAndServe() error {
 }
 
 func (s *Server) Close() error {
-	s.closed = true
+	s.closed.Store(true)
 	if s.listener != nil {
 		return s.listener.Close()
 	}

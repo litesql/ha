@@ -53,6 +53,10 @@ func (h *Handler) UseDB(dbName string) error {
 		if !ok {
 			return mysql.NewDefaultError(mysql.ER_BAD_DB_ERROR, dbName)
 		}
+		if h.tx != nil {
+			_ = h.tx.Rollback()
+			h.tx = nil
+		}
 		h.db = db
 	}
 
@@ -60,9 +64,20 @@ func (h *Handler) UseDB(dbName string) error {
 		connector, ok := h.connectorProvider(dbName)
 		if ok {
 			h.connector = connector
+		} else {
+			h.connector = nil
 		}
 	}
 
+	return nil
+}
+
+func (h *Handler) Close() error {
+	if h.tx != nil {
+		err := h.tx.Rollback()
+		h.tx = nil
+		return err
+	}
 	return nil
 }
 
@@ -180,6 +195,9 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	}
 
 	if strings.HasPrefix(cleanQuery, "UNDO") {
+		if h.connector == nil {
+			return nil, fmt.Errorf("no database selected")
+		}
 		reUndoMatch := reUndo.FindStringSubmatch(keepCaseQuery)
 		if len(reUndoMatch) != 3 {
 			return nil, fmt.Errorf("invalid undo syntax")
@@ -225,6 +243,9 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	}
 
 	if strings.HasPrefix(cleanQuery, "HISTORY ") {
+		if h.connector == nil {
+			return nil, fmt.Errorf("no database selected")
+		}
 		historyParam := strings.TrimSpace(keepCaseQuery[8:])
 		historyParam = strings.TrimSuffix(historyParam, ";")
 		var items []haconnect.HistoryItem

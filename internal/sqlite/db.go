@@ -46,7 +46,7 @@ type baseProxiedPositionTracker interface {
 var (
 	dbs                 = make(map[string]*connectorDB)
 	proxiedSubscription = make(map[string]stoppableSubscription)
-	muDBs               sync.Mutex
+	muDBs               sync.RWMutex
 )
 
 var reDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
@@ -317,6 +317,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			if err != nil {
 				return fmt.Errorf("subscribe to proxied debezium: %w", err)
 			}
+			proxiedSubscription[id] = consumer
 			_, err = db.ExecContext(ha.ContextLocalDB(ctx, true),
 				positionTrackerCreateStatement)
 			if err != nil {
@@ -367,6 +368,8 @@ func Exec(ctx context.Context, eq execerQuerier, sql string, params map[string]a
 }
 
 func Databases() []string {
+	muDBs.RLock()
+	defer muDBs.RUnlock()
 	var list []string
 	for id := range dbs {
 		if id == "" {
@@ -378,6 +381,8 @@ func Databases() []string {
 }
 
 func DB(id string) (*sql.DB, error) {
+	muDBs.RLock()
+	defer muDBs.RUnlock()
 	dbConnector, ok := dbs[id]
 	if !ok {
 		return nil, fmt.Errorf("database with id %q not found", id)
@@ -386,6 +391,8 @@ func DB(id string) (*sql.DB, error) {
 }
 
 func Connector(id string) (*ha.Connector, error) {
+	muDBs.RLock()
+	defer muDBs.RUnlock()
 	dbConnector, ok := dbs[id]
 	if !ok {
 		return nil, fmt.Errorf("database with id %q not found", id)

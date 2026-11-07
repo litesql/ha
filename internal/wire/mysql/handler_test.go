@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/litesql/go-ha"
 )
 
 func TestUseDB(t *testing.T) {
@@ -196,4 +197,38 @@ func TestHandleQueryUse(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestNewServerSetsConnectorProvider(t *testing.T) {
+	dummyConnector := &ha.Connector{}
+	srv, err := NewServer(Config{
+		Port: 3306,
+		ConnectorProvider: func(dbName string) (*ha.Connector, bool) {
+			if dbName == "mydb.db" {
+				return dummyConnector, true
+			}
+			return nil, false
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if srv.ConnectorProvider == nil {
+		t.Fatal("expected ConnectorProvider to be set on Server")
+	}
+	got, ok := srv.ConnectorProvider("mydb.db")
+	if !ok || got != dummyConnector {
+		t.Fatalf("unexpected ConnectorProvider result: got %v, ok=%v", got, ok)
+	}
+}
+
+func TestUndoAndHistoryWithoutSelectedDatabase(t *testing.T) {
+	h := &Handler{}
+
+	if _, err := h.HandleQuery("UNDO 1;"); err == nil {
+		t.Fatal("expected error for UNDO when no connector is set, got nil")
+	}
+	if _, err := h.HandleQuery("HISTORY 1;"); err == nil {
+		t.Fatal("expected error for HISTORY when no connector is set, got nil")
+	}
 }
