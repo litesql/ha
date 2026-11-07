@@ -291,6 +291,7 @@ func maintainQueryStream(ctx context.Context, client sqlv1.DatabaseServiceClient
 		stream, err := client.Query(streamCtx)
 		if err == nil {
 			slog.Info("connected to remote server")
+			retryDelay = time.Second
 			err = serveQueryStream(streamCtx, stream, requests)
 		}
 		cancel()
