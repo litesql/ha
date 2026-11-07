@@ -54,6 +54,7 @@ var reDateTime = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}`)
 type LoadConfig struct {
 	Dir                string
 	MemDB              bool
+	DefaultDSNParams   string
 	FromLatestSnapshot bool
 	DeliverPolicy      string
 	MaxConns           int
@@ -614,7 +615,130 @@ func IdFromDSN(dsn string) string {
 		}
 	}
 	if filename != "" {
-		return filepath.Base(filename)
+		base := filepath.Base(filename)
+		if base == "." || base == ".." || base == "/" || base == string(filepath.Separator) {
+			return ""
+		}
+		return base
 	}
 	return ""
+}
+
+func BuildCreateDSN(rawDSN string, cfg LoadConfig) (string, error) {
+	if !cfg.MemDB && cfg.Dir == "" {
+		return "", fmt.Errorf("create database is disabled, inform flag --create-db-dir at startup")
+	}
+	rawDSN = strings.TrimSpace(rawDSN)
+	rawDSN = strings.TrimSuffix(rawDSN, ";")
+	rawDSN = strings.Trim(rawDSN, "`'\"")
+	if strings.Contains(rawDSN, "..") {
+		return "", fmt.Errorf("invalid dsn")
+	}
+	destPath := IdFromDSN(rawDSN)
+	if destPath == "" {
+		return "", fmt.Errorf("invalid dsn")
+	}
+	var params string
+	if idx := strings.Index(rawDSN, "?"); idx != -1 {
+		params = rawDSN[idx:]
+	} else if cfg.DefaultDSNParams != "" {
+		params = "?" + cfg.DefaultDSNParams
+	}
+	if !strings.HasSuffix(destPath, ".db") {
+		destPath += ".db"
+	}
+	destPath = filepath.Join(cfg.Dir, filepath.Base(destPath))
+	return fmt.Sprintf("file:%s%s", destPath, params), nil
+}
+
+func Create(ctx context.Context, rawDSN string, cfg LoadConfig) error {
+	dsn, err := BuildCreateDSN(rawDSN, cfg)
+	if err != nil {
+		return err
+	}
+	return Load(ctx, dsn, cfg)
+}
+
+type proxiedChange struct {
+	Kind         string
+	Table        string
+	ColumnNames  []string
+	ColumnValues []any
+	OldKeyNames  []string
+	OldKeyValues []any
+	SQL          string
+}
+
+func quoteIdent(ident string) string {
+	return "`" + strings.ReplaceAll(ident, "`", "``") + "`"
+}
+
+func quoteIdents(idents []string) string {
+	quoted := make([]string, len(idents))
+	for i, ident := range idents {
+		quoted[i] = quoteIdent(ident)
+	}
+	return strings.Join(quoted, ", ")
+}
+
+func applyProxiedChange(ctx context.Context, tx *sql.Tx, change proxiedChange) error {
+	var (
+		query string
+		err   error
+	)
+	table := quoteIdent(change.Table)
+	switch change.Kind {
+	case "INSERT":
+		query = fmt.Sprintf("REPLACE INTO %s (%s) VALUES (%s)", table, quoteIdents(change.ColumnNames), placeholders(len(change.ColumnValues)))
+		_, err = tx.ExecContext(ctx, query, change.ColumnValues...)
+	case "UPDATE":
+		setClauses := make([]string, len(change.ColumnNames))
+		for i, name := range change.ColumnNames {
+			setClauses[i] = fmt.Sprintf("%s = ?", quoteIdent(name))
+		}
+		var args []any
+		args = append(args, change.ColumnValues...)
+		whereClause := make([]string, len(change.OldKeyNames))
+		for i, col := range change.OldKeyNames {
+			if change.OldKeyValues[i] == nil {
+				whereClause[i] = fmt.Sprintf("%s IS NULL", quoteIdent(col))
+			} else {
+				whereClause[i] = fmt.Sprintf("%s = ?", quoteIdent(col))
+				args = append(args, change.OldKeyValues[i])
+			}
+		}
+		query = fmt.Sprintf("UPDATE %s SET %s WHERE %s", table, strings.Join(setClauses, ", "), strings.Join(whereClause, " AND "))
+		var res sql.Result
+		res, err = tx.ExecContext(ctx, query, args...)
+		if err == nil {
+			affected, _ := res.RowsAffected()
+			if affected == 0 {
+				query = fmt.Sprintf("REPLACE INTO %s (%s) VALUES (%s)", table, quoteIdents(change.ColumnNames), placeholders(len(change.ColumnValues)))
+				_, err = tx.ExecContext(ctx, query, change.ColumnValues...)
+			}
+		}
+	case "DELETE":
+		whereClause := make([]string, len(change.ColumnNames))
+		var args []any
+		for i, col := range change.ColumnNames {
+			if change.ColumnValues[i] == nil {
+				whereClause[i] = fmt.Sprintf("%s IS NULL", quoteIdent(col))
+			} else {
+				whereClause[i] = fmt.Sprintf("%s = ?", quoteIdent(col))
+				args = append(args, change.ColumnValues[i])
+			}
+		}
+		query = fmt.Sprintf("DELETE FROM %s WHERE %s", table, strings.Join(whereClause, " AND "))
+		_, err = tx.ExecContext(ctx, query, args...)
+	case "TRUNCATE":
+		query = fmt.Sprintf("DELETE FROM %s", table)
+		_, err = tx.ExecContext(ctx, query)
+	case "SQL":
+		query = change.SQL
+		_, err = tx.ExecContext(ctx, query)
+	}
+	if err != nil {
+		return fmt.Errorf("apply change: %s: %w", query, err)
+	}
+	return nil
 }

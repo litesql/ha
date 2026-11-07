@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/litesql/debezium-sink/consumer"
@@ -25,59 +24,17 @@ func handleDebeziumProxiedChanges(db *sql.DB) consumer.HandlerFn {
 		for _, change := range changeset {
 			slog.Debug("received proxied db data", "change", change, "position", source)
 			serverTime = change.ServerTime
-			var query string
-			switch change.Kind {
-			case "INSERT":
-				query = fmt.Sprintf("REPLACE INTO `%s` (%s) VALUES (%s)", change.Table, strings.Join(change.ColumnNames, ", "), placeholders(len(change.ColumnValues)))
-				_, err = tx.ExecContext(ctx, query, change.ColumnValues...)
-			case "UPDATE":
-				setClauses := make([]string, len(change.ColumnNames))
-				for i, name := range change.ColumnNames {
-					setClauses[i] = fmt.Sprintf("%s = ?", name)
-				}
-				var args []any
-				args = append(args, change.ColumnValues...)
-				whereClause := make([]string, len(change.OldKeys.KeyNames))
-				for i, col := range change.OldKeys.KeyNames {
-					if change.OldKeys.KeyValues[i] == nil {
-						whereClause[i] = fmt.Sprintf("%s IS NULL", col)
-					} else {
-						whereClause[i] = fmt.Sprintf("%s = ?", col)
-						args = append(args, change.OldKeys.KeyValues[i])
-					}
-				}
-				query = fmt.Sprintf("UPDATE `%s` SET %s WHERE %s", change.Table, strings.Join(setClauses, ", "), strings.Join(whereClause, " AND "))
-				var res sql.Result
-				res, err = tx.ExecContext(ctx, query, args...)
-				if err == nil {
-					affected, _ := res.RowsAffected()
-					if affected == 0 {
-						query = fmt.Sprintf("REPLACE INTO `%s` (%s) VALUES (%s)", change.Table, strings.Join(change.ColumnNames, ", "), placeholders(len(change.ColumnValues)))
-						_, err = tx.ExecContext(ctx, query, change.ColumnValues...)
-					}
-				}
-			case "DELETE":
-				whereClause := make([]string, len(change.ColumnNames))
-				var args []any
-				for i, col := range change.ColumnNames {
-					if change.ColumnValues[i] == nil {
-						whereClause[i] = fmt.Sprintf("%s IS NULL", col)
-					} else {
-						whereClause[i] = fmt.Sprintf("%s = ?", col)
-						args = append(args, change.ColumnValues[i])
-					}
-				}
-				query = fmt.Sprintf("DELETE FROM `%s` WHERE %s", change.Table, strings.Join(whereClause, " AND "))
-				_, err = tx.ExecContext(ctx, query, args...)
-			case "TRUNCATE":
-				query = fmt.Sprintf("DELETE FROM %s", change.Table)
-				_, err = tx.ExecContext(ctx, query)
-			case "SQL":
-				query = change.SQL
-				_, err = tx.ExecContext(ctx, query)
-			}
+			err = applyProxiedChange(ctx, tx, proxiedChange{
+				Kind:         change.Kind,
+				Table:        change.Table,
+				ColumnNames:  change.ColumnNames,
+				ColumnValues: change.ColumnValues,
+				OldKeyNames:  change.OldKeys.KeyNames,
+				OldKeyValues: change.OldKeys.KeyValues,
+				SQL:          change.SQL,
+			})
 			if err != nil {
-				return fmt.Errorf("apply change: %s: %w", query, err)
+				return err
 			}
 		}
 		position, _ := json.Marshal(source)

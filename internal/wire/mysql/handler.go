@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -148,28 +147,8 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	}
 
 	if strings.HasPrefix(cleanQuery, "CREATE DATABASE ") {
-		if !h.createDatabaseOptions.MemDB && h.createDatabaseOptions.Dir == "" {
-			return nil, fmt.Errorf("create database is disabled, inform flag --create-db-dir at startup")
-		}
-		dsn := strings.TrimSpace(keepCaseQuery[16:])
-		dsn = strings.TrimSuffix(dsn, ";")
-
-		destPath := sqlite.IdFromDSN(dsn)
-		if destPath == "" {
-			return nil, fmt.Errorf("invalid dsn")
-		}
-		var params string
-		if idx := strings.Index(dsn, "?"); idx != -1 {
-			params = dsn[idx:]
-		}
-
-		if !strings.HasSuffix(destPath, ".db") {
-			destPath += ".db"
-		}
-		destPath = filepath.Join(h.createDatabaseOptions.Dir, filepath.Base(destPath))
-		dsn = fmt.Sprintf("file:%s%s", destPath, params)
-
-		err := sqlite.Load(context.Background(), dsn, h.createDatabaseOptions)
+		rawDSN := strings.TrimSpace(keepCaseQuery[16:])
+		err := sqlite.Create(context.Background(), rawDSN, h.createDatabaseOptions)
 		if err != nil {
 			return nil, err
 		}

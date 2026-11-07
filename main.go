@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	_ "embed"
 	"errors"
@@ -504,6 +505,7 @@ func run() error {
 		CreateDatabaseOptions: sqlite.LoadConfig{
 			Dir:                *createDatabaseDir,
 			MemDB:              *memDB,
+			DefaultDSNParams:   dsnParams,
 			FromLatestSnapshot: *fromLatestSnapshot,
 			DeliverPolicy:      *replicationPolicy,
 			MaxConns:           *concurrentQueries,
@@ -529,6 +531,7 @@ func run() error {
 		CreateOpts: sqlite.LoadConfig{
 			Dir:                *createDatabaseDir,
 			MemDB:              *memDB,
+			DefaultDSNParams:   dsnParams,
 			FromLatestSnapshot: *fromLatestSnapshot,
 			DeliverPolicy:      *replicationPolicy,
 			MaxConns:           *concurrentQueries,
@@ -565,15 +568,19 @@ func run() error {
 	p.SetHTTP1(true)
 	p.SetUnencryptedHTTP2(true)
 	server := http.Server{
-		Addr:      fmt.Sprintf(":%d", *port),
-		Handler:   mux,
-		Protocols: p,
+		Addr:              fmt.Sprintf(":%d", *port),
+		Handler:           mux,
+		Protocols:         p,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	if *token != "" {
+		expectedToken := []byte(*token)
 		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if authHeader != *token && r.URL.Path != "/healthz" && r.URL.Path != "/openapi.yaml" && r.URL.Path != "/docs" {
+			if subtle.ConstantTimeCompare([]byte(authHeader), expectedToken) != 1 &&
+				r.URL.Path != "/healthz" && r.URL.Path != "/openapi.yaml" && r.URL.Path != "/docs" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}

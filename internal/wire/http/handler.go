@@ -8,9 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/litesql/go-ha"
@@ -47,20 +45,23 @@ func CreateDatabaseHandler(createDatabaseDir string, memDB bool, defaultDSNOpts 
 			return
 		}
 
-		dsn := fmt.Sprintf("file:%s", filepath.Join(createDatabaseDir, req.DSN))
-		if !strings.Contains(dsn, "?") {
-			dsn += "?" + defaultDSNOpts
-		}
-
-		err = sqlite.Load(r.Context(), dsn, sqlite.LoadConfig{
+		cfg := sqlite.LoadConfig{
 			Dir:                createDatabaseDir,
 			MemDB:              memDB,
+			DefaultDSNParams:   defaultDSNOpts,
 			FromLatestSnapshot: fromLatestSnapshot,
 			DeliverPolicy:      deliverPolicy,
 			MaxConns:           maxConns,
 			ProxiedDBConfig:    proxiedConfig,
 			Options:            opts,
-		})
+		}
+		dsn, err := sqlite.BuildCreateDSN(req.DSN, cfg)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		err = sqlite.Load(r.Context(), dsn, cfg)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

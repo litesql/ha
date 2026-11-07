@@ -330,12 +330,13 @@ func createDatabase(httpClient *http.Client, baseURL string, token string, dsn s
 		return err
 	}
 	if token != "" {
-		req.Header.Set("Authorization", token)
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
 		data, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to create database: %s, %s", resp.Status, string(data))
@@ -351,12 +352,13 @@ func dropDatabase(httpClient *http.Client, baseURL string, token string, id stri
 		return err
 	}
 	if token != "" {
-		req.Header.Set("Authorization", token)
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		data, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to drop database: %s, %s", resp.Status, string(data))

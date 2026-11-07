@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net"
 	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -170,28 +169,12 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 		}
 
 		if strings.HasPrefix(upper, "CREATE DATABASE ") {
-			if !createDatabaseOptions.MemDB && createDatabaseOptions.Dir == "" {
-				return nil, fmt.Errorf("create database is disabled, inform flag --create-db-dir at startup")
+			rawDSN := strings.TrimSpace(sql.Query[16:])
+			dsn, err := sqlite.BuildCreateDSN(rawDSN, createDatabaseOptions)
+			if err != nil {
+				return nil, err
 			}
-			dsn := strings.TrimSpace(sql.Query[16:])
-			dsn = strings.TrimSuffix(dsn, ";")
-
-			destPath := sqlite.IdFromDSN(dsn)
-			if destPath == "" {
-				return nil, fmt.Errorf("invalid dsn")
-			}
-			var params string
-			if idx := strings.Index(dsn, "?"); idx != -1 {
-				params = dsn[idx:]
-			}
-
-			if !strings.HasSuffix(destPath, ".db") {
-				destPath += ".db"
-			}
-			destPath = filepath.Join(createDatabaseOptions.Dir, filepath.Base(destPath))
-			dsn = fmt.Sprintf("file:%s%s", destPath, params)
-
-			err := sqlite.Load(ctx, dsn, createDatabaseOptions)
+			err = sqlite.Load(ctx, dsn, createDatabaseOptions)
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				if err != nil {
 					return writer.Complete(fmt.Sprintf("failed to create database: %v", err))
