@@ -18,15 +18,19 @@ import (
 func init() {
 	Symbols["github.com/litesql/go-ha/ha"] = map[string]reflect.Value{
 		// function, constant and variable definitions
+		"ClearTableSchemaCache":          reflect.ValueOf(ha.ClearTableSchemaCache),
 		"ConnectHandler":                 reflect.ValueOf(ha.ConnectHandler),
 		"ContextLocalDB":                 reflect.ValueOf(ha.ContextLocalDB),
 		"CrossShardQuery":                reflect.ValueOf(ha.CrossShardQuery),
 		"DefaultStream":                  reflect.ValueOf(constant.MakeFromLiteral("\"ha_replication\"", token.STRING, 0)),
 		"ErrInvalidSQL":                  reflect.ValueOf(&ha.ErrInvalidSQL).Elem(),
 		"ErrSnapshotterNotConfigured":    reflect.ValueOf(&ha.ErrSnapshotterNotConfigured).Elem(),
+		"ErrTimedOut":                    reflect.ValueOf(&ha.ErrTimedOut).Elem(),
 		"ErrTwoPhaseCommitPending":       reflect.ValueOf(&ha.ErrTwoPhaseCommitPending).Elem(),
 		"Full":                           reflect.ValueOf(ha.Full),
+		"HAConn":                         reflect.ValueOf(ha.HAConn),
 		"HealthPath":                     reflect.ValueOf(constant.MakeFromLiteral("\"/healthz\"", token.STRING, 0)),
+		"HistoryTableDeclaration":        reflect.ValueOf(ha.HistoryTableDeclaration),
 		"LatestSnapshot":                 reflect.ValueOf(ha.LatestSnapshot),
 		"ListDSN":                        reflect.ValueOf(ha.ListDSN),
 		"ListReplicationIDs":             reflect.ValueOf(ha.ListReplicationIDs),
@@ -48,12 +52,14 @@ func init() {
 		"NewNoopSnapshotter":             reflect.ValueOf(ha.NewNoopSnapshotter),
 		"NewNoopSubscriber":              reflect.ValueOf(ha.NewNoopSubscriber),
 		"NewOutboxPublisher":             reflect.ValueOf(ha.NewOutboxPublisher),
+		"NewSQLiteHooksProvider":         reflect.ValueOf(ha.NewSQLiteHooksProvider),
 		"NewTwoPhaseCommitPublisher":     reflect.ValueOf(ha.NewTwoPhaseCommitPublisher),
 		"NewWriterPublisher":             reflect.ValueOf(ha.NewWriterPublisher),
 		"OutboxTable":                    reflect.ValueOf(constant.MakeFromLiteral("\"ha_outbox\"", token.STRING, 0)),
 		"PK":                             reflect.ValueOf(ha.PK),
 		"Parse":                          reflect.ValueOf(ha.Parse),
 		"ParseStatement":                 reflect.ValueOf(ha.ParseStatement),
+		"RawSQLiteConn":                  reflect.ValueOf(ha.RawSQLiteConn),
 		"ReadinessPath":                  reflect.ValueOf(constant.MakeFromLiteral("\"/readyz\"", token.STRING, 0)),
 		"Rowid":                          reflect.ValueOf(ha.Rowid),
 		"Shutdown":                       reflect.ValueOf(ha.Shutdown),
@@ -81,6 +87,7 @@ func init() {
 		"TypeSelect":                     reflect.ValueOf(constant.MakeFromLiteral("\"SELECT\"", token.STRING, 0)),
 		"TypeUpdate":                     reflect.ValueOf(constant.MakeFromLiteral("\"UPDATE\"", token.STRING, 0)),
 		"TypeVacuum":                     reflect.ValueOf(constant.MakeFromLiteral("\"VACUUM\"", token.STRING, 0)),
+		"UndoFunc":                       reflect.ValueOf(ha.UndoFunc),
 		"UnverifiedStatement":            reflect.ValueOf(ha.UnverifiedStatement),
 		"WithAsyncPublisher":             reflect.ValueOf(ha.WithAsyncPublisher),
 		"WithAutoStart":                  reflect.ValueOf(ha.WithAutoStart),
@@ -125,6 +132,7 @@ func init() {
 		"ChangeSetInterceptor":         reflect.ValueOf((*ha.ChangeSetInterceptor)(nil)),
 		"ChangeSetSerializer":          reflect.ValueOf((*ha.ChangeSetSerializer)(nil)),
 		"CompositePublisher":           reflect.ValueOf((*ha.CompositePublisher)(nil)),
+		"Conn":                         reflect.ValueOf((*ha.Conn)(nil)),
 		"ConnHooksFactory":             reflect.ValueOf((*ha.ConnHooksFactory)(nil)),
 		"ConnHooksProvider":            reflect.ValueOf((*ha.ConnHooksProvider)(nil)),
 		"Connector":                    reflect.ValueOf((*ha.Connector)(nil)),
@@ -138,6 +146,8 @@ func init() {
 		"DebeziumTransaction":          reflect.ValueOf((*ha.DebeziumTransaction)(nil)),
 		"DynamicLeader":                reflect.ValueOf((*ha.DynamicLeader)(nil)),
 		"EmbeddedNatsConfig":           reflect.ValueOf((*ha.EmbeddedNatsConfig)(nil)),
+		"HistoryCursor":                reflect.ValueOf((*ha.HistoryCursor)(nil)),
+		"HookCallbacks":                reflect.ValueOf((*ha.HookCallbacks)(nil)),
 		"JSONPublisher":                reflect.ValueOf((*ha.JSONPublisher)(nil)),
 		"LeaderProvider":               reflect.ValueOf((*ha.LeaderProvider)(nil)),
 		"NATSPublisher":                reflect.ValueOf((*ha.NATSPublisher)(nil)),
@@ -152,8 +162,11 @@ func init() {
 		"OutboxPublisher":              reflect.ValueOf((*ha.OutboxPublisher)(nil)),
 		"PreparedTwoPhaseCommit":       reflect.ValueOf((*ha.PreparedTwoPhaseCommit)(nil)),
 		"ProxiedPositionProvider":      reflect.ValueOf((*ha.ProxiedPositionProvider)(nil)),
+		"ProxiedQuerierExecer":         reflect.ValueOf((*ha.ProxiedQuerierExecer)(nil)),
 		"Publisher":                    reflect.ValueOf((*ha.Publisher)(nil)),
 		"RowIdentify":                  reflect.ValueOf((*ha.RowIdentify)(nil)),
+		"SQLiteConn":                   reflect.ValueOf((*ha.SQLiteConn)(nil)),
+		"SQLiteHooksAdapter":           reflect.ValueOf((*ha.SQLiteHooksAdapter)(nil)),
 		"SequenceProvider":             reflect.ValueOf((*ha.SequenceProvider)(nil)),
 		"Statement":                    reflect.ValueOf((*ha.Statement)(nil)),
 		"StaticLeader":                 reflect.ValueOf((*ha.StaticLeader)(nil)),
@@ -173,7 +186,10 @@ func init() {
 		"_LeaderProvider":          reflect.ValueOf((*_github_com_litesql_go_ha_LeaderProvider)(nil)),
 		"_PreparedTwoPhaseCommit":  reflect.ValueOf((*_github_com_litesql_go_ha_PreparedTwoPhaseCommit)(nil)),
 		"_ProxiedPositionProvider": reflect.ValueOf((*_github_com_litesql_go_ha_ProxiedPositionProvider)(nil)),
+		"_ProxiedQuerierExecer":    reflect.ValueOf((*_github_com_litesql_go_ha_ProxiedQuerierExecer)(nil)),
 		"_Publisher":               reflect.ValueOf((*_github_com_litesql_go_ha_Publisher)(nil)),
+		"_SQLiteConn":              reflect.ValueOf((*_github_com_litesql_go_ha_SQLiteConn)(nil)),
+		"_SQLiteHooksAdapter":      reflect.ValueOf((*_github_com_litesql_go_ha_SQLiteHooksAdapter)(nil)),
 		"_SequenceProvider":        reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
 		"_Subscriber":              reflect.ValueOf((*_github_com_litesql_go_ha_Subscriber)(nil)),
 		"_TwoPhaseCommitPreparer":  reflect.ValueOf((*_github_com_litesql_go_ha_TwoPhaseCommitPreparer)(nil)),
@@ -291,6 +307,20 @@ func (W _github_com_litesql_go_ha_ProxiedPositionProvider) SourcePosition(a0 con
 	return W.WSourcePosition(a0)
 }
 
+// _github_com_litesql_go_ha_ProxiedQuerierExecer is an interface wrapper for ProxiedQuerierExecer type
+type _github_com_litesql_go_ha_ProxiedQuerierExecer struct {
+	IValue        interface{}
+	WExecContext  func(ctx context.Context, query string, args ...any) (sql.Result, error)
+	WQueryContext func(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+func (W _github_com_litesql_go_ha_ProxiedQuerierExecer) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return W.WExecContext(ctx, query, args...)
+}
+func (W _github_com_litesql_go_ha_ProxiedQuerierExecer) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return W.WQueryContext(ctx, query, args...)
+}
+
 // _github_com_litesql_go_ha_Publisher is an interface wrapper for Publisher type
 type _github_com_litesql_go_ha_Publisher struct {
 	IValue    interface{}
@@ -302,6 +332,50 @@ func (W _github_com_litesql_go_ha_Publisher) Publish(ctx context.Context, cs *ha
 	return W.WPublish(ctx, cs)
 }
 func (W _github_com_litesql_go_ha_Publisher) Sequence() uint64 { return W.WSequence() }
+
+// _github_com_litesql_go_ha_SQLiteConn is an interface wrapper for SQLiteConn type
+type _github_com_litesql_go_ha_SQLiteConn struct {
+	IValue          interface{}
+	WBegin          func() (driver.Tx, error)
+	WBeginTx        func(ctx context.Context, opts driver.TxOptions) (driver.Tx, error)
+	WClose          func() error
+	WDeserialize    func(b []byte, schema string) error
+	WPrepare        func(query string) (driver.Stmt, error)
+	WPrepareContext func(ctx context.Context, query string) (driver.Stmt, error)
+}
+
+func (W _github_com_litesql_go_ha_SQLiteConn) Begin() (driver.Tx, error) { return W.WBegin() }
+func (W _github_com_litesql_go_ha_SQLiteConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	return W.WBeginTx(ctx, opts)
+}
+func (W _github_com_litesql_go_ha_SQLiteConn) Close() error { return W.WClose() }
+func (W _github_com_litesql_go_ha_SQLiteConn) Deserialize(b []byte, schema string) error {
+	return W.WDeserialize(b, schema)
+}
+func (W _github_com_litesql_go_ha_SQLiteConn) Prepare(query string) (driver.Stmt, error) {
+	return W.WPrepare(query)
+}
+func (W _github_com_litesql_go_ha_SQLiteConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
+	return W.WPrepareContext(ctx, query)
+}
+
+// _github_com_litesql_go_ha_SQLiteHooksAdapter is an interface wrapper for SQLiteHooksAdapter type
+type _github_com_litesql_go_ha_SQLiteHooksAdapter struct {
+	IValue        interface{}
+	WDisableHooks func(conn ha.SQLiteConn)
+	WEnableHooks  func(conn ha.SQLiteConn, cb ha.HookCallbacks)
+	WWrapConn     func(c driver.Conn, connector *ha.Connector) (ha.SQLiteConn, error)
+}
+
+func (W _github_com_litesql_go_ha_SQLiteHooksAdapter) DisableHooks(conn ha.SQLiteConn) {
+	W.WDisableHooks(conn)
+}
+func (W _github_com_litesql_go_ha_SQLiteHooksAdapter) EnableHooks(conn ha.SQLiteConn, cb ha.HookCallbacks) {
+	W.WEnableHooks(conn, cb)
+}
+func (W _github_com_litesql_go_ha_SQLiteHooksAdapter) WrapConn(c driver.Conn, connector *ha.Connector) (ha.SQLiteConn, error) {
+	return W.WWrapConn(c, connector)
+}
 
 // _github_com_litesql_go_ha_SequenceProvider is an interface wrapper for SequenceProvider type
 type _github_com_litesql_go_ha_SequenceProvider struct {
