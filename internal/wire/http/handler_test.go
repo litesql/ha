@@ -60,4 +60,15 @@ func TestHandlersNotFoundAndReady(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("invalid JSON query payload returns 400 Bad Request", func(t *testing.T) {
+		for _, body := range []string{`"just-a-string"`, `123`, `true`} {
+			req := httptest.NewRequest(http.MethodPost, "/databases/http_test.db", strings.NewReader(body))
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("body %s: expected 400 Bad Request, got %d (%s)", body, rec.Code, rec.Body.String())
+			}
+		}
+	})
 }

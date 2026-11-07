@@ -57,6 +57,26 @@ func TestBuildCreateDSN(t *testing.T) {
 			t.Fatal("expected error when Dir is empty and MemDB is false")
 		}
 	})
+
+	t.Run("memdb enforces leading slash and vfs=memdb", func(t *testing.T) {
+		got, err := BuildCreateDSN("app", LoadConfig{MemDB: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := "file:/app.db?vfs=memdb"
+		if got != want {
+			t.Fatalf("want %q, got %q", want, got)
+		}
+
+		gotWithParams, err := BuildCreateDSN("app.db?_timeout=5000", LoadConfig{MemDB: true})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		wantWithParams := "file:/app.db?_timeout=5000&vfs=memdb"
+		if gotWithParams != wantWithParams {
+			t.Fatalf("want %q, got %q", wantWithParams, gotWithParams)
+		}
+	})
 }
 
 func TestApplyProxiedChangeEscapesIdentifiers(t *testing.T) {
@@ -288,6 +308,71 @@ func TestResolveDatabaseID(t *testing.T) {
 	}
 	if _, ok := ResolveDatabaseID(""); ok {
 		t.Fatal("expected false for empty database name")
+	}
+}
+
+func TestDropResolvesIDAndMemDBReturnsEmptyFilename(t *testing.T) {
+	ctx := context.Background()
+	if err := Load(ctx, "file:/default_drop_test.db?vfs=memdb", LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	}); err != nil {
+		t.Fatalf("failed to load default db: %v", err)
+	}
+	defer Shutdown()
+
+	if err := Create(ctx, "secondary", LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	}); err != nil {
+		t.Fatalf("failed to create secondary db: %v", err)
+	}
+
+	// Dropping by name without ".db" and with quotes should resolve "secondary.db" and return empty filename for MemDB
+	filename, err := Drop(ctx, "`secondary`;")
+	if err != nil {
+		t.Fatalf("expected Drop to resolve secondary.db, got error: %v", err)
+	}
+	if filename != "" {
+		t.Fatalf("expected empty filename when dropping in-memory db, got %q", filename)
+	}
+}
+
+func TestMysqlPositionTrackerReplicaPositionErrorHandling(t *testing.T) {
+	ctx := context.Background()
+	if err := Load(ctx, "file:/mysql_tracker_test.db?vfs=memdb", LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	}); err != nil {
+		t.Fatalf("failed to load memdb: %v", err)
+	}
+	defer Drop(ctx, "mysql_tracker_test.db")
+
+	db, err := DB("mysql_tracker_test.db")
+	if err != nil {
+		t.Fatalf("failed to get db: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, positionTrackerCreateStatement); err != nil {
+		t.Fatalf("failed to create tracker table: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "REPLACE INTO ha_proxied_tracker(`rowid`, position, server_time) VALUES (1, 'invalid-json', '')"); err != nil {
+		t.Fatalf("failed to insert invalid json: %v", err)
+	}
+
+	tracker := &mysqlPositionTracker{replicaDB: db}
+	if _, err := tracker.ReplicaPosition(ctx); err == nil {
+		t.Fatal("expected error for invalid JSON in ha_proxied_tracker, got nil")
+	}
+
+	if _, err := db.ExecContext(ctx, `REPLACE INTO ha_proxied_tracker(rowid, position, server_time) VALUES (1, '{"Name":"mysql-bin.000001","Pos":42}', '')`); err != nil {
+		t.Fatalf("failed to insert valid json: %v", err)
+	}
+	pos, err := tracker.ReplicaPosition(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pos != 42 {
+		t.Fatalf("want pos 42, got %d", pos)
 	}
 }
 

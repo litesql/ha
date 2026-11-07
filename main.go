@@ -277,6 +277,17 @@ func run() error {
 	}
 
 	dsnList := make([]string, 0)
+	seenDBIDs := make(map[string]struct{})
+	addDSN := func(dsn string) {
+		id := sqlite.IdFromDSN(dsn)
+		if id != "" {
+			if _, exists := seenDBIDs[id]; exists {
+				return
+			}
+			seenDBIDs[id] = struct{}{}
+		}
+		dsnList = append(dsnList, dsn)
+	}
 	dsnParams := *dbParams
 	dsnPrefix := "file:"
 	if *memDB {
@@ -295,7 +306,7 @@ func run() error {
 			}
 			if !info.IsDir() && isSQLiteFile(path) {
 				dsn := fmt.Sprintf("%s%s?%s", dsnPrefix, path, dsnParams)
-				dsnList = append(dsnList, dsn)
+				addDSN(dsn)
 			}
 			return nil
 		})
@@ -311,18 +322,18 @@ func run() error {
 
 		for _, file := range matches {
 			dsn := fmt.Sprintf("%s%s?%s", dsnPrefix, file, dsnParams)
-			dsnList = append(dsnList, dsn)
+			addDSN(dsn)
 		}
 		if len(matches) == 0 && !strings.Contains(pattern, "*") {
 			dsn := fmt.Sprintf("%s%s", dsnPrefix, strings.TrimPrefix(pattern, "file:"))
 			if !strings.Contains(dsn, "?") {
 				dsn = fmt.Sprintf("%s?%s", dsn, dsnParams)
 			}
-			dsnList = append(dsnList, dsn)
+			addDSN(dsn)
 		}
 	}
 	if len(dsnList) == 0 {
-		dsnList = append(dsnList, fmt.Sprintf("%s%s?%s", dsnPrefix, filepath.Join(*createDatabaseDir, "ha.db"), dsnParams))
+		addDSN(fmt.Sprintf("%s%s?%s", dsnPrefix, filepath.Join(*createDatabaseDir, "ha.db"), dsnParams))
 	}
 
 	opts := []ha.Option{
@@ -387,7 +398,10 @@ func run() error {
 		}
 	}
 
-	dumpTables := strings.Split(*mysqlProxiedDumpTables, ",")
+	var dumpTables []string
+	if *mysqlProxiedDumpTables != "" {
+		dumpTables = strings.Split(*mysqlProxiedDumpTables, ",")
+	}
 	proxyCfg := sqlite.ProxiedDBConfig{
 		PgDSN:             *pgProxied,
 		PgPublicationName: *pgPublicationName,
@@ -582,7 +596,10 @@ func run() error {
 	if *token != "" {
 		expectedToken := []byte(*token)
 		server.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authHeader := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			authHeader := r.Header.Get("Authorization")
+			if len(authHeader) >= 7 && strings.EqualFold(authHeader[:7], "Bearer ") {
+				authHeader = authHeader[7:]
+			}
 			if subtle.ConstantTimeCompare([]byte(authHeader), expectedToken) != 1 &&
 				r.URL.Path != "/healthz" && r.URL.Path != "/readyz" && r.URL.Path != "/openapi.yaml" && r.URL.Path != "/docs" {
 				w.WriteHeader(http.StatusUnauthorized)

@@ -128,6 +128,7 @@ type QueriesRequest struct {
 }
 
 func (r *QueriesRequest) UnmarshalJSON(b []byte) error {
+	b = []byte(strings.TrimSpace(string(b)))
 	if len(b) == 0 {
 		return fmt.Errorf("empty")
 	}
@@ -141,11 +142,13 @@ func (r *QueriesRequest) UnmarshalJSON(b []byte) error {
 		r.Queries = []sqlite.Request{
 			query,
 		}
+		return nil
 	case '[':
 		r.slice = true
 		return json.Unmarshal(b, &r.Queries)
+	default:
+		return fmt.Errorf("invalid query request payload")
 	}
-	return nil
 }
 
 func QueryHandler(w http.ResponseWriter, r *http.Request) {
@@ -334,7 +337,7 @@ func DownloadSnapshotHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	sequence, reader, err := connector.LatestSnapshot(r.Context())
 	if err != nil {
-		slog.ErrorContext(r.Context(), "failed o get latest snapshot", "error", err)
+		slog.ErrorContext(r.Context(), "failed to get latest snapshot", "error", err)
 		http.Error(w, fmt.Sprintf("failed to get latest snapshot: %v", err), http.StatusInternalServerError)
 		return
 	}

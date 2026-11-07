@@ -81,7 +81,7 @@ func (h *Handler) Close() error {
 }
 
 var (
-	reComments = regexp.MustCompile(`(?s)//.*?\\n|/\\*.*?\\*/`)
+	reComments = regexp.MustCompile(`(?s)/\*.*?\*/|--[^\r\n]*`)
 	reUndo     = regexp.MustCompile(`(?i)^UNDO(\s|E|T)\s*([^;\s]+)`)
 	reUse      = regexp.MustCompile(`(?i)^USE(?:\s+([^;\s]+.*?))?(?:\s*;)*$`)
 )
@@ -91,11 +91,12 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	cleanQuery := reComments.ReplaceAllString(query, "")
 	keepCaseQuery := strings.TrimSpace(cleanQuery)
 	cleanQuery = strings.ToUpper(keepCaseQuery)
+	cleanNoSemi := strings.TrimSpace(strings.TrimRight(cleanQuery, "; \t\r\n"))
 	// These queries are implemented for minimal support for MySQL Shell
-	if len(cleanQuery) > 4 && strings.HasPrefix(strings.ToUpper(cleanQuery[0:4]), "SET ") {
+	if len(cleanQuery) > 4 && strings.HasPrefix(cleanQuery, "SET ") {
 		return mysql.NewResultReserveResultset(0), nil
 	}
-	if cleanQuery == `select concat(@@version, ' ', @@version_comment)` {
+	if cleanNoSemi == `SELECT CONCAT(@@VERSION, ' ', @@VERSION_COMMENT)` {
 		r, err := mysql.BuildSimpleResultset([]string{"concat(@@version, ' ', @@version_comment)"}, [][]any{
 			{"8.4.7"},
 		}, false)
@@ -118,7 +119,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return nil, h.UseDB(dbName)
 	}
 
-	if strings.TrimSpace(strings.ReplaceAll(cleanQuery, ";", "")) == "UNSET DATABASE" {
+	if cleanNoSemi == "UNSET DATABASE" {
 		if h.tx != nil {
 			_ = h.tx.Rollback()
 			h.tx = nil
@@ -142,7 +143,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return mysql.NewResultReserveResultset(0), nil
 	}
 
-	if cleanQuery == "SHOW DATABASES" {
+	if cleanNoSemi == "SHOW DATABASES" {
 		dbs := sqlite.Databases()
 		vals := make([][]any, 0, len(dbs))
 		for _, db := range dbs {
@@ -156,7 +157,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return mysql.NewResult(resultSet), nil
 	}
 
-	if cleanQuery == "SHOW TABLES" {
+	if cleanNoSemi == "SHOW TABLES" {
 		rows, err := h.query("SELECT name as tables FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
 		if err != nil {
 			slog.Debug("Query error", "error", err)
@@ -180,7 +181,8 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	}
 	if strings.HasPrefix(cleanQuery, "DROP DATABASE ") {
 		id := strings.TrimSpace(keepCaseQuery[14:])
-		id = strings.TrimSuffix(id, ";")
+		id = strings.TrimRight(id, "; \t\r\n")
+		id = strings.Trim(id, "`'\"")
 
 		dbfile, err := sqlite.Drop(context.Background(), id)
 		if err != nil {

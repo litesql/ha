@@ -27,7 +27,7 @@ func (t *pgPositionTracker) ReplicaPosition(ctx context.Context) (uint64, error)
 		return 0, nil
 	}
 	var position pglogrepl.LSN
-	err := t.replicaDB.QueryRowContext(ctx, "SELECT position FROM ha_proxied_tracker LIMIT 1").Scan(&position)
+	err := t.replicaDB.QueryRowContext(ha.ContextLocalDB(ctx, true), "SELECT position FROM ha_proxied_tracker LIMIT 1").Scan(&position)
 	if err != nil {
 		return 0, err
 	}

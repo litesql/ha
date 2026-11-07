@@ -493,4 +493,56 @@ func TestHandshakeDatabaseAndSetUnsetDatabase(t *testing.T) {
 	if err := conn.QueryRow(ctx, "SELECT val FROM only_in_second").Scan(&val); err != nil {
 		t.Fatalf("expected second.db after SET DATABASE TO second, got error: %v", err)
 	}
+
+	// CREATE DATABASE when CreateOpts has neither MemDB nor Dir should return an error to the client
+	if _, err := conn.Exec(ctx, "CREATE DATABASE should_fail"); err == nil {
+		t.Fatal("expected CREATE DATABASE to return an error when create-db-dir is not configured")
+	}
+}
+
+func TestCreateAndDropDatabaseWithLeadingWhitespace(t *testing.T) {
+	ctx := context.Background()
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("failed to create listener: %v", err)
+	}
+	defer listener.Close()
+
+	server, err := postgresql.NewServer(postgresql.Config{
+		User: "test",
+		Pass: "test",
+		CreateOpts: sqlite.LoadConfig{
+			MemDB:    true,
+			MaxConns: 5,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+	defer server.Shutdown(ctx)
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	connString := fmt.Sprintf("postgresql://test:test@localhost:%d/ha", port)
+	conn, err := pgx.Connect(ctx, connString)
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer conn.Close(ctx)
+
+	if _, err := conn.Exec(ctx, "\n  CREATE DATABASE pg_dynamic;"); err != nil {
+		t.Fatalf("CREATE DATABASE with leading whitespace failed: %v", err)
+	}
+	if _, err := conn.Exec(ctx, "\n  SET DATABASE TO pg_dynamic;"); err != nil {
+		t.Fatalf("SET DATABASE with leading whitespace failed: %v", err)
+	}
+	if _, err := conn.Exec(ctx, "UNSET DATABASE;"); err != nil {
+		t.Fatalf("UNSET DATABASE failed: %v", err)
+	}
+	if _, err := conn.Exec(ctx, "\n  DROP DATABASE pg_dynamic;"); err != nil {
+		t.Fatalf("DROP DATABASE without .db and with leading whitespace failed: %v", err)
+	}
 }

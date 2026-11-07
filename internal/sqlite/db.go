@@ -34,6 +34,7 @@ type connectorDB struct {
 	db        *sql.DB
 	connector *ha.Connector
 	proxiedDB *sql.DB
+	memDB     bool
 }
 
 type stoppableSubscription interface {
@@ -370,6 +371,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		db:        db,
 		connector: connector,
 		proxiedDB: proxiedDB,
+		memDB:     cfg.MemDB,
 	}
 	dbs[id] = connDB
 	if defaultDB {
@@ -431,15 +433,13 @@ func Databases() []string {
 	return list
 }
 
-func ResolveDatabaseID(name string) (string, bool) {
+func resolveDatabaseIDLocked(name string) (string, bool) {
 	name = strings.TrimSpace(name)
 	name = strings.TrimRight(name, "; \t\r\n")
 	name = strings.Trim(name, "`'\"")
 	if name == "" {
 		return "", false
 	}
-	muDBs.RLock()
-	defer muDBs.RUnlock()
 	if _, ok := dbs[name]; ok {
 		return name, true
 	}
@@ -452,9 +452,20 @@ func ResolveDatabaseID(name string) (string, bool) {
 	return "", false
 }
 
+func ResolveDatabaseID(name string) (string, bool) {
+	muDBs.RLock()
+	defer muDBs.RUnlock()
+	return resolveDatabaseIDLocked(name)
+}
+
 func DB(id string) (*sql.DB, error) {
 	muDBs.RLock()
 	defer muDBs.RUnlock()
+	if id != "" {
+		if resolved, ok := resolveDatabaseIDLocked(id); ok {
+			id = resolved
+		}
+	}
 	dbConnector, ok := dbs[id]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrDatabaseNotFound, id)
@@ -465,6 +476,11 @@ func DB(id string) (*sql.DB, error) {
 func Connector(id string) (*ha.Connector, error) {
 	muDBs.RLock()
 	defer muDBs.RUnlock()
+	if id != "" {
+		if resolved, ok := resolveDatabaseIDLocked(id); ok {
+			id = resolved
+		}
+	}
 	dbConnector, ok := dbs[id]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrDatabaseNotFound, id)
@@ -499,17 +515,22 @@ func Transaction(ctx context.Context, db *sql.DB, queries []Request) ([]*Respons
 func Drop(ctx context.Context, id string) (string, error) {
 	muDBs.Lock()
 	defer muDBs.Unlock()
+	if resolved, ok := resolveDatabaseIDLocked(id); ok {
+		id = resolved
+	}
 	dbConnector, ok := dbs[id]
-	if !ok {
+	if !ok || id == "" {
 		return "", fmt.Errorf("%w: %q", ErrDatabaseNotFound, id)
 	}
 	if dbConnector == dbs[""] {
 		return "", fmt.Errorf("cannot drop default database")
 	}
 	var filename string
-	err := dbConnector.db.QueryRowContext(ctx, "SELECT file FROM pragma_database_list WHERE name = ?", "main").Scan(&filename)
-	if err != nil {
-		return "", fmt.Errorf("failed to get db filename: %w", err)
+	if !dbConnector.memDB {
+		err := dbConnector.db.QueryRowContext(ctx, "SELECT file FROM pragma_database_list WHERE name = ?", "main").Scan(&filename)
+		if err != nil {
+			return "", fmt.Errorf("failed to get db filename: %w", err)
+		}
 	}
 	if proxiedSubscription[id] != nil {
 		proxiedSubscription[id].Stop()
@@ -537,6 +558,9 @@ func Shutdown() {
 		if id != "" && connDB != nil {
 			if connDB.db != nil {
 				_ = connDB.db.Close()
+			}
+			if connDB.connector != nil {
+				connDB.connector.Close()
 			}
 			if connDB.proxiedDB != nil {
 				_ = connDB.proxiedDB.Close()
@@ -663,16 +687,29 @@ func getArgs(params map[string]any) []any {
 	if len(params) == 0 {
 		return nil
 	}
+	allPositional := false
+	nonEmptyCount := 0
 	for k := range params {
 		if k == "" {
 			continue
 		}
+		nonEmptyCount++
 		if isPositional(k) {
-			return getPositionalArgs(params)
+			allPositional = true
+		} else {
+			allPositional = false
+			break
 		}
-		break
 	}
-	var args []any = make([]any, 0, len(params))
+	if nonEmptyCount == 0 {
+		return nil
+	}
+	if allPositional {
+		if args, ok := getPositionalArgs(params, nonEmptyCount); ok {
+			return args
+		}
+	}
+	var args []any = make([]any, 0, nonEmptyCount)
 	for k, v := range params {
 		if k == "" {
 			continue
@@ -694,13 +731,16 @@ func isPositional(k string) bool {
 	return err == nil
 }
 
-func getPositionalArgs(params map[string]any) []any {
-	total := len(params)
+func getPositionalArgs(params map[string]any, total int) ([]any, bool) {
 	args := make([]any, total)
 	for i := range total {
-		args[i] = params[fmt.Sprintf("$%d", i+1)]
+		val, ok := params[fmt.Sprintf("$%d", i+1)]
+		if !ok {
+			return nil, false
+		}
+		args[i] = val
 	}
-	return args
+	return args, true
 }
 
 type deserializer interface {
@@ -768,6 +808,17 @@ func BuildCreateDSN(rawDSN string, cfg LoadConfig) (string, error) {
 		destPath += ".db"
 	}
 	destPath = filepath.Join(cfg.Dir, filepath.Base(destPath))
+	if cfg.MemDB {
+		if !strings.HasPrefix(destPath, "/") {
+			destPath = "/" + destPath
+		}
+		if params == "" {
+			params = "?vfs=memdb"
+		} else if !strings.Contains(params, "vfs=memdb") {
+			params += "&vfs=memdb"
+		}
+		return fmt.Sprintf("file:%s%s", destPath, params), nil
+	}
 	return fmt.Sprintf("file:%s%s", destPath, params), nil
 }
 
@@ -809,9 +860,20 @@ func applyProxiedChange(ctx context.Context, tx *sql.Tx, change proxiedChange) e
 	table := quoteIdent(change.Table)
 	switch change.Kind {
 	case "INSERT":
+		if len(change.ColumnNames) == 0 {
+			return fmt.Errorf("apply change: INSERT on %s without columns", table)
+		}
 		query = fmt.Sprintf("REPLACE INTO %s (%s) VALUES (%s)", table, quoteIdents(change.ColumnNames), placeholders(len(change.ColumnValues)))
 		_, err = tx.ExecContext(ctx, query, change.ColumnValues...)
 	case "UPDATE":
+		if len(change.ColumnNames) == 0 {
+			return fmt.Errorf("apply change: UPDATE on %s without columns", table)
+		}
+		if len(change.OldKeyNames) == 0 {
+			query = fmt.Sprintf("REPLACE INTO %s (%s) VALUES (%s)", table, quoteIdents(change.ColumnNames), placeholders(len(change.ColumnValues)))
+			_, err = tx.ExecContext(ctx, query, change.ColumnValues...)
+			break
+		}
 		setClauses := make([]string, len(change.ColumnNames))
 		for i, name := range change.ColumnNames {
 			setClauses[i] = fmt.Sprintf("%s = ?", quoteIdent(name))
@@ -838,6 +900,9 @@ func applyProxiedChange(ctx context.Context, tx *sql.Tx, change proxiedChange) e
 			}
 		}
 	case "DELETE":
+		if len(change.ColumnNames) == 0 {
+			return fmt.Errorf("apply change: DELETE on %s without key columns", table)
+		}
 		whereClause := make([]string, len(change.ColumnNames))
 		var args []any
 		for i, col := range change.ColumnNames {

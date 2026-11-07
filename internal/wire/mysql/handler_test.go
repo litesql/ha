@@ -315,4 +315,27 @@ func TestUnsetDatabaseAndPreparedStmtInTransaction(t *testing.T) {
 	if count != 0 {
 		t.Fatalf("expected 0 rows after rollback of prepared statement, got %d", count)
 	}
+
+	// Verify SHOW DATABASES;, SHOW TABLES;, version query, SQL comments, and CREATE/DROP DATABASE without .db
+	if _, err := h.HandleQuery("/* comment */ SHOW DATABASES;"); err != nil {
+		t.Fatalf("SHOW DATABASES; failed: %v", err)
+	}
+	if _, err := h.HandleQuery("-- comment\nSHOW TABLES;"); err != nil {
+		t.Fatalf("SHOW TABLES; failed: %v", err)
+	}
+	verRes, err := h.HandleQuery("select concat(@@version, ' ', @@version_comment);")
+	if err != nil || verRes == nil || verRes.Resultset == nil {
+		t.Fatalf("version query failed: res=%v, err=%v", verRes, err)
+	}
+
+	h.createDatabaseOptions = sqlite.LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	}
+	if _, err := h.HandleQuery("CREATE DATABASE temp_app;"); err != nil {
+		t.Fatalf("CREATE DATABASE temp_app; failed: %v", err)
+	}
+	if _, err := h.HandleQuery("DROP DATABASE `temp_app`;"); err != nil {
+		t.Fatalf("DROP DATABASE `temp_app`; failed: %v", err)
+	}
 }

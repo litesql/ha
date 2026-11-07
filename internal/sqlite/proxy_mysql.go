@@ -27,12 +27,14 @@ func (t *mysqlPositionTracker) ReplicaPosition(ctx context.Context) (uint64, err
 		return 0, nil
 	}
 	var positionJson string
-	err := t.replicaDB.QueryRowContext(ctx, "SELECT position FROM ha_proxied_tracker WHERE rowid = 1").Scan(&positionJson)
+	err := t.replicaDB.QueryRowContext(ha.ContextLocalDB(ctx, true), "SELECT position FROM ha_proxied_tracker WHERE rowid = 1").Scan(&positionJson)
 	if err != nil {
 		return 0, err
 	}
 	var position mysql.Position
-	err = json.Unmarshal([]byte(positionJson), &position)
+	if err := json.Unmarshal([]byte(positionJson), &position); err != nil {
+		return 0, err
+	}
 	slog.Debug("replica position", "pos", position.Pos)
 	return uint64(position.Pos), nil
 }

@@ -53,6 +53,11 @@ func Start(remote string, token string, enableOtel bool) {
 	if enableOtel {
 		httpClient = &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
 	}
+	remote = strings.TrimSpace(remote)
+	if !strings.Contains(remote, "://") {
+		remote = "http://" + remote
+	}
+	remote = strings.TrimRight(remote, "/")
 	u, err := url.Parse(remote)
 	if err != nil {
 		slog.Error("parse url", "error", err)
@@ -168,7 +173,7 @@ func Start(remote string, token string, enableOtel bool) {
 		}
 
 		if match := reCreateDatabase.FindStringSubmatch(command); len(match) == 2 {
-			dsn := match[1]
+			dsn := strings.Trim(strings.TrimRight(match[1], "; \t\r\n"), "`'\"")
 			command = ""
 			err := createDatabase(httpClient, remote, token, dsn)
 			if err != nil {
@@ -180,7 +185,7 @@ func Start(remote string, token string, enableOtel bool) {
 		}
 
 		if match := reDropDatabase.FindStringSubmatch(command); len(match) == 2 {
-			id := match[1]
+			id := strings.Trim(strings.TrimRight(match[1], "; \t\r\n"), "`'\"")
 			command = ""
 			err := dropDatabase(httpClient, remote, token, id)
 			if err != nil {
@@ -192,7 +197,7 @@ func Start(remote string, token string, enableOtel bool) {
 		}
 
 		if match := reSetDatabase.FindStringSubmatch(command); len(match) == 3 {
-			replicationID = match[2]
+			replicationID = strings.Trim(strings.TrimRight(match[2], "; \t\r\n"), "`'\"")
 			command = ""
 			continue
 		}
@@ -430,7 +435,7 @@ func createDatabase(httpClient *http.Client, baseURL string, token string, dsn s
 func dropDatabase(httpClient *http.Client, baseURL string, token string, id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, baseURL+"/databases/"+id, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, strings.TrimRight(baseURL, "/")+"/databases/"+url.PathEscape(id), nil)
 	if err != nil {
 		return err
 	}
@@ -442,7 +447,7 @@ func dropDatabase(httpClient *http.Client, baseURL string, token string, id stri
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		data, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to drop database: %s, %s", resp.Status, string(data))
 	}

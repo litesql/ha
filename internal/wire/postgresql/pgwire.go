@@ -107,7 +107,8 @@ var reUndo = regexp.MustCompile(`(?i)^UNDO(\s|E|T)\s*([^;\s]+)`)
 func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 	return func(ctx context.Context, sql wire.Query) (wire.PreparedStatements, error) {
 		slog.InfoContext(ctx, "pg-wire: query received", "remote", wire.RemoteAddress(ctx), "sql", sql)
-		upper := strings.ToUpper(strings.TrimSpace(sql.Query))
+		trimmedQuery := strings.TrimSpace(sql.Query)
+		upper := strings.ToUpper(trimmedQuery)
 		if strings.HasPrefix(upper, "-- PING") {
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
 				return writer.Complete("pong")
@@ -165,7 +166,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 		}
 
 		if strings.HasPrefix(upper, "SET ") {
-			if match := reSetDatabase.FindStringSubmatch(sql.Query); len(match) == 3 {
+			if match := reSetDatabase.FindStringSubmatch(trimmedQuery); len(match) == 3 {
 				targetDB := match[2]
 				if resolvedID, ok := sqlite.ResolveDatabaseID(targetDB); ok {
 					rollback(ctx)
@@ -182,21 +183,17 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 		}
 
 		if strings.HasPrefix(upper, "CREATE DATABASE ") {
-			rawDSN := strings.TrimSpace(sql.Query[16:])
-			dsn, err := sqlite.BuildCreateDSN(rawDSN, createDatabaseOptions)
-			if err != nil {
+			rawDSN := strings.TrimSpace(trimmedQuery[16:])
+			if err := sqlite.Create(ctx, rawDSN, createDatabaseOptions); err != nil {
 				return nil, err
 			}
-			err = sqlite.Load(ctx, dsn, createDatabaseOptions)
 			return wire.Prepared(wire.NewStatement(func(ctx context.Context, writer wire.DataWriter, parameters []wire.Parameter) error {
-				if err != nil {
-					return writer.Complete(fmt.Sprintf("failed to create database: %v", err))
-				}
 				return writer.Complete("DATABASE CREATED")
 			})), nil
 		} else if strings.HasPrefix(upper, "DROP DATABASE ") {
-			id := strings.TrimSpace(sql.Query[14:])
-			id = strings.TrimSuffix(id, ";")
+			id := strings.TrimSpace(trimmedQuery[14:])
+			id = strings.TrimRight(id, "; \t\r\n")
+			id = strings.Trim(id, "`'\"")
 
 			dbfile, err := sqlite.Drop(ctx, id)
 			if err != nil {
@@ -221,7 +218,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 				return nil, fmt.Errorf("database %q not found", dbID)
 			}
 
-			reUndoMatch := reUndo.FindStringSubmatch(sql.Query)
+			reUndoMatch := reUndo.FindStringSubmatch(trimmedQuery)
 			if len(reUndoMatch) != 3 {
 				return nil, fmt.Errorf("invalid undo syntax")
 			}
@@ -276,7 +273,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 			if err != nil {
 				return nil, fmt.Errorf("database %q not found", dbID)
 			}
-			param := strings.TrimSpace(sql.Query[8:])
+			param := strings.TrimSpace(trimmedQuery[8:])
 			param = strings.TrimRight(param, "; \t\r\n")
 			param = strings.Trim(param, "`'\"")
 			seq, err := strconv.Atoi(param)
@@ -284,7 +281,7 @@ func parseFn(createDatabaseOptions sqlite.LoadConfig) wire.ParseFn {
 			if err != nil {
 				duration, err := time.ParseDuration(param)
 				if err != nil {
-					return nil, fmt.Errorf("invalid undo argument: %v", err)
+					return nil, fmt.Errorf("invalid history argument: %v", err)
 				}
 				if duration <= 0 {
 					return nil, fmt.Errorf("duration must be greater than 0")

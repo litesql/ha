@@ -138,17 +138,21 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    sequence:
-                      type: integer
-                    timestamp:
-                      type: string
-                      format: date-time
-                    sql:
-                      type: string
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        seq:
+                          type: integer
+                        timestamp:
+                          type: integer
+                        sql:
+                          type: array
+                          items:
+                            type: string
   /databases:
     get:
       summary: List all databases.
@@ -370,17 +374,21 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    sequence:
-                      type: integer
-                    timestamp:
-                      type: string
-                      format: date-time
-                    sql:
-                      type: string
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        seq:
+                          type: integer
+                        timestamp:
+                          type: integer
+                        sql:
+                          type: array
+                          items:
+                            type: string
   /snapshot:
     post:
       summary: Take a snapshot of the main database.
