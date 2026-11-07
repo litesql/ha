@@ -150,3 +150,52 @@ func TestApplyProxiedChangeEscapesIdentifiers(t *testing.T) {
 		t.Fatalf("expected 0 rows after truncate, got %d", count)
 	}
 }
+
+func TestIsQueryAndExecReturningCTEPragma(t *testing.T) {
+	ctx := context.Background()
+	err := Load(ctx, "file:/query_types_test.db?vfs=memdb", LoadConfig{
+		MemDB:    true,
+		MaxConns: 5,
+	})
+	if err != nil {
+		t.Fatalf("failed to load memdb: %v", err)
+	}
+	defer Drop(ctx, "query_types_test.db")
+
+	db, err := DB("query_types_test.db")
+	if err != nil {
+		t.Fatalf("failed to get db: %v", err)
+	}
+
+	if _, err := Exec(ctx, db, "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)", nil); err != nil {
+		t.Fatalf("create table: %v", err)
+	}
+
+	// INSERT ... RETURNING
+	res, err := Exec(ctx, db, "INSERT INTO items (name) VALUES ('book') RETURNING id, name", nil)
+	if err != nil {
+		t.Fatalf("INSERT RETURNING failed: %v", err)
+	}
+	if res.NoReturning || len(res.Columns) != 2 || len(res.Rows) != 1 {
+		t.Fatalf("unexpected RETURNING response: %+v", res)
+	}
+
+	// WITH (CTE) SELECT
+	res, err = Exec(ctx, db, "WITH cte AS (SELECT id, name FROM items) SELECT name FROM cte", nil)
+	if err != nil {
+		t.Fatalf("CTE SELECT failed: %v", err)
+	}
+	if len(res.Rows) != 1 || res.Rows[0][0] != "book" {
+		t.Fatalf("unexpected CTE response: %+v", res)
+	}
+
+	// PRAGMA returning rows
+	res, err = Exec(ctx, db, "PRAGMA table_info(items)", nil)
+	if err != nil {
+		t.Fatalf("PRAGMA table_info failed: %v", err)
+	}
+	if len(res.Rows) != 2 {
+		t.Fatalf("expected 2 columns in table_info, got %d", len(res.Rows))
+	}
+}
+

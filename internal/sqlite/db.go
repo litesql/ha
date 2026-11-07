@@ -154,8 +154,7 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 		}
 	}
 
-	waitFor := make(chan struct{})
-	options = append(options, ha.WithWaitFor(waitFor))
+	options = append(options, ha.WithAutoStart(false))
 	var connector *ha.Connector
 	if cfg.FromLatestSnapshot {
 		slog.Info("loading latest snapshot from NATS JetStream Object Store", "dsn", dsn)
@@ -327,7 +326,9 @@ func Load(ctx context.Context, dsn string, cfg LoadConfig) error {
 			go consumer.Start(slog.Default(), handleDebeziumProxiedChanges(db))
 		}
 	}
-	close(waitFor)
+	if err := connector.Start(db); err != nil {
+		return fmt.Errorf("failed to start connector: %w", err)
+	}
 
 	connDB := &connectorDB{
 		db:        db,
@@ -358,10 +359,22 @@ type execerQuerier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
+func IsQuery(ctx context.Context, sql string) bool {
+	if stmt, err := ha.ParseStatement(ctx, sql); err == nil {
+		return stmt.IsSelect() || stmt.IsExplain() || stmt.HasReturning() || stmt.Type() == ha.TypePragma
+	}
+	upper := strings.ToUpper(strings.TrimSpace(sql))
+	return strings.HasPrefix(upper, "SELECT") ||
+		strings.HasPrefix(upper, "EXPLAIN") ||
+		strings.HasPrefix(upper, "PRAGMA") ||
+		strings.HasPrefix(upper, "WITH") ||
+		strings.HasPrefix(upper, "VALUES") ||
+		strings.Contains(upper, " RETURNING ")
+}
+
 func Exec(ctx context.Context, eq execerQuerier, sql string, params map[string]any) (*Response, error) {
 	slog.Debug("Executing statement", "sql", sql, "params", params)
-	upper := strings.ToUpper(strings.TrimSpace(sql))
-	if strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "EXPLAIN") {
+	if IsQuery(ctx, sql) {
 		return doQuery(ctx, eq, sql, params)
 	}
 
@@ -505,7 +518,9 @@ func doQuery(ctx context.Context, querier querier, query string, args map[string
 
 	columnsCount := len(columns)
 	if columnsCount == 0 {
-		return nil, fmt.Errorf("zero columns")
+		return &Response{
+			NoReturning: true,
+		}, nil
 	}
 
 	dataRows := make([][]any, 0)

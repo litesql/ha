@@ -87,6 +87,15 @@ func TestServe(t *testing.T) {
 					sql:      "SELECT name FROM user",
 					complete: "SELECT 0",
 				},
+				{
+					sql:      "INSERT INTO user VALUES(3, NULL)",
+					complete: "INSERT 0 1",
+				},
+				{
+					sql:      "SELECT id, name FROM user WHERE id = 3",
+					wantRows: [][]any{{"3", nil}},
+					complete: "SELECT 1",
+				},
 			},
 			expect: nil,
 		},
@@ -168,8 +177,13 @@ func TestServe(t *testing.T) {
 					}
 					for rowIndex, row := range gotRows {
 						for cellIndex, cell := range row {
-							if fmt.Sprint(cell) != fmt.Sprint(cmd.wantRows[rowIndex][cellIndex]) {
-								t.Errorf("unexpected cell at row %d column %d: want %v got %v", rowIndex, cellIndex, cmd.wantRows[rowIndex][cellIndex], fmt.Sprint(cell))
+							wantCell := cmd.wantRows[rowIndex][cellIndex]
+							if (cell == nil) != (wantCell == nil) {
+								t.Errorf("unexpected nil mismatch at row %d column %d: want %#v got %#v", rowIndex, cellIndex, wantCell, cell)
+								return
+							}
+							if fmt.Sprint(cell) != fmt.Sprint(wantCell) {
+								t.Errorf("unexpected cell at row %d column %d: want %v got %v", rowIndex, cellIndex, wantCell, fmt.Sprint(cell))
 								return
 							}
 						}

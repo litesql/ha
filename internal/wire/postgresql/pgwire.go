@@ -576,15 +576,23 @@ func rollback(ctx context.Context) error {
 func writeRow(writer wire.DataWriter, row []any) error {
 	strs := make([]any, len(row))
 	for i, v := range row {
-		if row == nil {
+		if v == nil {
+			strs[i] = nil
 			continue
 		}
-		switch v := v.(type) {
-		case *any:
-			strs[i] = fmt.Sprintf("%v", *v)
-			continue
+		if ptr, ok := v.(*any); ok {
+			if ptr == nil || *ptr == nil {
+				strs[i] = nil
+				continue
+			}
+			v = *ptr
 		}
-		strs[i] = fmt.Sprintf("%v", v)
+		switch val := v.(type) {
+		case []byte:
+			strs[i] = string(val)
+		default:
+			strs[i] = fmt.Sprintf("%v", val)
+		}
 	}
 	return writer.Row(strs)
 }

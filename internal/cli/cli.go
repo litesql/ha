@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	sqlv1 "github.com/litesql/go-ha/api/sql/v1"
+	"github.com/litesql/ha/internal/sqlite"
 )
 
 var (
@@ -367,8 +368,7 @@ func dropDatabase(httpClient *http.Client, baseURL string, token string, id stri
 }
 
 func queryTypeFromSQL(sql string) sqlv1.QueryType {
-	upper := strings.ToUpper(strings.TrimSpace(sql))
-	if strings.HasPrefix(upper, "SELECT") || strings.HasPrefix(upper, "EXPLAIN") {
+	if sqlite.IsQuery(context.Background(), sql) {
 		return sqlv1.QueryType_QUERY_TYPE_EXEC_QUERY
 	}
 

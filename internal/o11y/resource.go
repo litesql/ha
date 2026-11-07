@@ -9,13 +9,19 @@ import (
 
 const (
 	serviceName = "ha"
-	version     = "0.15.0"
 )
 
 var (
-	res  *resource.Resource
-	once sync.Once
+	version = "dev"
+	res     *resource.Resource
+	once    sync.Once
 )
+
+func SetVersion(v string) {
+	if v != "" {
+		version = v
+	}
+}
 
 func Resource(nodeName string) *resource.Resource {
 	once.Do(func() {

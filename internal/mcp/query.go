@@ -16,8 +16,10 @@ type QueryInput struct {
 }
 
 type QueryOutput struct {
+	// The column names of the query result.
+	Columns []string `json:"columns" jsonschema:"The column names of the query result.,example=[\"id\", \"name\"]"`
 	// The results of the query.
-	Results [][]any `json:"results" jsonschema:"The results of the query.,example=[{\"id\": 1, \"name\": \"Alice\"}, {\"id\": 2, \"name\": \"Bob\"}]"`
+	Results [][]any `json:"results" jsonschema:"The results of the query.,example=[[1, \"Alice\"], [2, \"Bob\"]]"`
 }
 
 func Query(ctx context.Context, req *mcp.CallToolRequest, input QueryInput) (result *mcp.CallToolResult, output QueryOutput, err error) {
@@ -29,6 +31,7 @@ func Query(ctx context.Context, req *mcp.CallToolRequest, input QueryInput) (res
 	if err != nil {
 		return
 	}
+	output.Columns = res.Columns
 	output.Results = res.Rows
 	return
 }

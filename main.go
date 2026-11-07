@@ -30,6 +30,7 @@ import (
 	"github.com/litesql/ha/internal/cli"
 	"github.com/litesql/ha/internal/interceptor"
 	"github.com/litesql/ha/internal/mcp"
+	"github.com/litesql/ha/internal/o11y"
 	halog "github.com/litesql/ha/internal/o11y/log"
 	"github.com/litesql/ha/internal/o11y/metric"
 	"github.com/litesql/ha/internal/o11y/trace"
@@ -482,7 +483,7 @@ func run() error {
 	mux.HandleFunc("DELETE /databases/{id}/replications/{name}", hahttp.DeleteReplicationHandler)
 	mux.HandleFunc("DELETE /replications/{name}", hahttp.DeleteReplicationHandler)
 
-	mux.Handle("/mcp", mcp.NewHTTPHandler())
+	mux.Handle("/mcp", mcp.NewHTTPHandler(version))
 
 	mysqlServer, err := mysql.NewServer(mysql.Config{
 		Port: *mysqlPort,
@@ -619,6 +620,7 @@ func run() error {
 }
 
 func initObservability(ctx context.Context, nodeName string, level slog.Level, enabled bool) (func(context.Context) error, error) {
+	o11y.SetVersion(version)
 	logsFlusher, err := halog.Init(ctx, nodeName, level, enabled)
 	if err != nil {
 		return nil, err

@@ -475,8 +475,5 @@ func rowsToResultset(rows *sql.Rows, binary bool) (*mysql.Resultset, error) {
 }
 
 func isSelect(query string) bool {
-	if len(query) > 6 {
-		return strings.HasPrefix(strings.ToLower(query), "select")
-	}
-	return false
+	return sqlite.IsQuery(context.Background(), query)
 }
