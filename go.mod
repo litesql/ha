@@ -12,13 +12,14 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.20.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/debezium-sink v0.0.3
-	github.com/litesql/go-ha v0.16.0
+	github.com/litesql/go-ha v0.16.1
 	github.com/litesql/go-sqlite-ha v0.16.0
 	github.com/litesql/go-sqlite3-ha v0.16.0
 	github.com/litesql/mysql v0.0.4
 	github.com/litesql/postgresql v0.1.5
 	github.com/microsoft/go-mssqldb v1.11.2
 	github.com/modelcontextprotocol/go-sdk v1.8.0
+	github.com/nats-io/nats-server/v2 v2.15.2
 	github.com/nats-io/nats.go v1.55.0
 	github.com/peterbourgon/ff/v4 v4.0.0-beta.1
 	github.com/sijms/go-ora/v2 v2.9.0
@@ -87,7 +88,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nats-io/graft v0.0.0-20260325174230-f9e6710ae36e // indirect
 	github.com/nats-io/jwt/v2 v2.8.3 // indirect
-	github.com/nats-io/nats-server/v2 v2.15.2 // indirect
 	github.com/nats-io/nkeys v0.4.17 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
