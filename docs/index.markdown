@@ -331,6 +331,7 @@ Run `ha --help` for current command-line options. Most options can also be set t
 | `--db-params` | `HA_DB_PARAMS` | build-dependent | SQLite parameters appended to database DSNs |
 | `--create-db-dir` | `HA_CREATE_DB_DIR` | unset | Directory for newly created database files |
 | `--config` | `HA_CONFIG` | unset | Optional config file |
+| `--conflict-resolution`| `HA_CONFLICT_RESOLUTION` | unset | Conflict resolution strategy for concurrent writes (only used if --interceptor is empty) : lww, column:<column> |
 | `--version` | `HA_VERSION` | | Print version and exit |
 | `--from-latest-snapshot` | `HA_FROM_LATEST_SNAPSHOT` | `false` | Load the latest available JetStream snapshot at startup |
 | `--snapshot-interval` | `HA_SNAPSHOT_INTERVAL` | `0` | Automatic snapshot interval; zero disables snapshots |
