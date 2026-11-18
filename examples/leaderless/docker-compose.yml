@@ -18,6 +18,7 @@ services:
       - HA_REPLICAS=1
       - HA_PG_PORT=5432
       - HA_MYSQL_PORT=3306
+      - HA_CONFLICT_RESOLUTION=lww
 
   node2:
     image: ghcr.io/litesql/ha:latest
@@ -37,6 +38,7 @@ services:
       - HA_REPLICAS=1
       - HA_PG_PORT=5432
       - HA_MYSQL_PORT=3306
+      - HA_CONFLICT_RESOLUTION=lww
 
   node3:
     image: ghcr.io/litesql/ha:latest
@@ -56,6 +58,7 @@ services:
       - HA_REPLICAS=1
       - HA_PG_PORT=5432
       - HA_MYSQL_PORT=3306
+      - HA_CONFLICT_RESOLUTION=lww
 
 volumes:
   node1_data:

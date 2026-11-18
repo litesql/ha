@@ -62,6 +62,7 @@ var (
 
 	staticRemoteLeaderAddr *string
 	dynamicLocalLeaderAddr *string
+	conflictResolution     *string
 	grpcInsecure           *bool
 
 	pgPort            *int
@@ -151,6 +152,7 @@ func main() {
 
 	dynamicLocalLeaderAddr = flagSet.StringLong("leader-addr", "", "Address used when this node becomes leader; enables leader election")
 	staticRemoteLeaderAddr = flagSet.StringLong("leader-static", "", "Static leader address; disables leader election")
+	conflictResolution = flagSet.StringLong("conflict-resolution", "", "Conflict resolution strategy for concurrent writes (only used if --interceptor is empty) : lww, column:<column>")
 	grpcInsecure = flagSet.BoolLong("grpc-insecure", "Use plaintext gRPC for leader messages; only on trusted networks")
 
 	mysqlPort = flagSet.IntLong("mysql-port", 0, "Port for MySQL wire protocol server")
@@ -379,6 +381,19 @@ func run() error {
 			return fmt.Errorf("failed to load custom interceptor: %w", err)
 		}
 		opts = append(opts, ha.WithChangeSetInterceptor(changeSetInterceptor))
+	} else if *conflictResolution != "" {
+		switch {
+		case *conflictResolution == "lww":
+			opts = append(opts, ha.WithChangeSetInterceptor(ha.NewLastWriterWinsInterceptor()))
+		case strings.HasPrefix(*conflictResolution, "column:"):
+			column := strings.TrimPrefix(*conflictResolution, "column:")
+			if column == "" {
+				return fmt.Errorf("invalid --conflict-resolution. Use lww or column:<column>")
+			}
+			opts = append(opts, ha.WithChangeSetInterceptor(ha.NewColumnLWWInterceptor(column)))
+		default:
+			return fmt.Errorf("invalid --conflict-resolution. Use lww or column:<column>")
+		}
 	}
 
 	if *asyncReplication {
