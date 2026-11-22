@@ -250,7 +250,7 @@ func Start(remote string, token string, enableOtel bool) {
 			for _, row := range resp.ResultSet.Rows {
 				var cells []string
 				for _, val := range row.Values {
-					v := haconnect.FromAnypb(val)
+					v := haconnect.FromTypedValue(val)
 					if v == nil {
 						cells = append(cells, "")
 						continue

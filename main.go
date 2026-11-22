@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"connectrpc.com/otelconnect"
 	ha "github.com/litesql/go-ha"
 	haconnect "github.com/litesql/go-ha/connect"
@@ -445,10 +445,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	var otelInterceptor *otelconnect.Interceptor
+	var otelInterceptor connect.ServerInterceptor
 	if *observability {
 		opts = append(opts, ha.WithOpenTelemetry(nil, nil))
-		otelInterceptor, err = otelconnect.NewInterceptor()
+		otelInterceptor, err = otelconnect.NewServerInterceptor()
 		if err != nil {
 			return fmt.Errorf("failed to create OpenTelemetry Connect interceptor: %w", err)
 		}
@@ -588,15 +588,15 @@ func run() error {
 		}()
 	}
 
-	connectOpts := make([]connect.HandlerOption, 0)
+	connectInterceptors := make([]connect.ServerInterceptor, 0)
 	if *token != "" {
 		authInterceptor := haconnect.NewAuthInterceptor(*token)
-		connectOpts = append(connectOpts, connect.WithInterceptors(authInterceptor))
+		connectInterceptors = append(connectInterceptors, authInterceptor)
 	}
 	if otelInterceptor != nil {
-		connectOpts = append(connectOpts, connect.WithInterceptors(otelInterceptor))
+		connectInterceptors = append(connectInterceptors, otelInterceptor)
 	}
-	mux.Handle(ha.ConnectHandler(connectOpts...))
+	mux.Handle(ha.ConnectHandler(connectInterceptors...))
 	p := new(http.Protocols)
 	p.SetHTTP1(true)
 	p.SetUnencryptedHTTP2(true)
