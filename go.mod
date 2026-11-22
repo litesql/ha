@@ -12,8 +12,8 @@ require (
 	github.com/jeroenrinzema/psql-wire v0.20.0
 	github.com/knz/bubbline v0.0.0-20251201090646-433e881e9884
 	github.com/litesql/debezium-sink v0.0.3
-	github.com/litesql/go-ha v0.18.1
-	github.com/litesql/go-sqlite-ha v0.18.0
+	github.com/litesql/go-ha v0.18.2
+	github.com/litesql/go-sqlite-ha v0.18.1
 	github.com/litesql/go-sqlite3-ha v0.18.0
 	github.com/litesql/mysql v0.0.4
 	github.com/litesql/postgresql v0.1.5
@@ -126,8 +126,8 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261118221215-c8830f628b3f // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	modernc.org/libc v1.82.10 // indirect
+	modernc.org/libc v1.82.12 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.13.0 // indirect
-	modernc.org/sqlite v1.62.0 // indirect
+	modernc.org/sqlite v1.63.0 // indirect
 )
