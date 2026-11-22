@@ -39,6 +39,7 @@ func init() {
 		"LocalDB":                          reflect.ValueOf(ha.LocalDB),
 		"LookupConnector":                  reflect.ValueOf(ha.LookupConnector),
 		"LookupConnectorByReplicationID":   reflect.ValueOf(ha.LookupConnectorByReplicationID),
+		"MountConnect":                     reflect.ValueOf(ha.MountConnect),
 		"NameToOptions":                    reflect.ValueOf(ha.NameToOptions),
 		"NewAllowOperationsInterceptor":    reflect.ValueOf(ha.NewAllowOperationsInterceptor),
 		"NewAllowTablesInterceptor":        reflect.ValueOf(ha.NewAllowTablesInterceptor),
@@ -47,6 +48,7 @@ func init() {
 		"NewColumnLWWInterceptor":          reflect.ValueOf(ha.NewColumnLWWInterceptor),
 		"NewCompositeInterceptor":          reflect.ValueOf(ha.NewCompositeInterceptor),
 		"NewCompositePublisher":            reflect.ValueOf(ha.NewCompositePublisher),
+		"NewConnectServer":                 reflect.ValueOf(ha.NewConnectServer),
 		"NewConnector":                     reflect.ValueOf(ha.NewConnector),
 		"NewDBPublisher":                   reflect.ValueOf(ha.NewDBPublisher),
 		"NewDBSubscriber":                  reflect.ValueOf(ha.NewDBSubscriber),
@@ -124,11 +126,13 @@ func init() {
 		"WithLWWAtomicTransaction":         reflect.ValueOf(ha.WithLWWAtomicTransaction),
 		"WithLWWIgnoreTables":              reflect.ValueOf(ha.WithLWWIgnoreTables),
 		"WithLWWOnConflict":                reflect.ValueOf(ha.WithLWWOnConflict),
+		"WithLWWRetentionTTL":              reflect.ValueOf(ha.WithLWWRetentionTTL),
 		"WithLWWTableName":                 reflect.ValueOf(ha.WithLWWTableName),
 		"WithLWWTables":                    reflect.ValueOf(ha.WithLWWTables),
 		"WithLWWTieBreaker":                reflect.ValueOf(ha.WithLWWTieBreaker),
 		"WithLeaderElectionLocalTarget":    reflect.ValueOf(ha.WithLeaderElectionLocalTarget),
 		"WithLeaderProvider":               reflect.ValueOf(ha.WithLeaderProvider),
+		"WithMetadataRetention":            reflect.ValueOf(ha.WithMetadataRetention),
 		"WithName":                         reflect.ValueOf(ha.WithName),
 		"WithNatsOptions":                  reflect.ValueOf(ha.WithNatsOptions),
 		"WithNodeTieBreakerColumn":         reflect.ValueOf(ha.WithNodeTieBreakerColumn),
@@ -205,6 +209,7 @@ func init() {
 		"RowIdentify":                  reflect.ValueOf((*ha.RowIdentify)(nil)),
 		"SQLiteConn":                   reflect.ValueOf((*ha.SQLiteConn)(nil)),
 		"SQLiteHooksAdapter":           reflect.ValueOf((*ha.SQLiteHooksAdapter)(nil)),
+		"SequenceNotifier":             reflect.ValueOf((*ha.SequenceNotifier)(nil)),
 		"SequenceProvider":             reflect.ValueOf((*ha.SequenceProvider)(nil)),
 		"Statement":                    reflect.ValueOf((*ha.Statement)(nil)),
 		"StaticLeader":                 reflect.ValueOf((*ha.StaticLeader)(nil)),
@@ -229,6 +234,7 @@ func init() {
 		"_Publisher":               reflect.ValueOf((*_github_com_litesql_go_ha_Publisher)(nil)),
 		"_SQLiteConn":              reflect.ValueOf((*_github_com_litesql_go_ha_SQLiteConn)(nil)),
 		"_SQLiteHooksAdapter":      reflect.ValueOf((*_github_com_litesql_go_ha_SQLiteHooksAdapter)(nil)),
+		"_SequenceNotifier":        reflect.ValueOf((*_github_com_litesql_go_ha_SequenceNotifier)(nil)),
 		"_SequenceProvider":        reflect.ValueOf((*_github_com_litesql_go_ha_SequenceProvider)(nil)),
 		"_Subscriber":              reflect.ValueOf((*_github_com_litesql_go_ha_Subscriber)(nil)),
 		"_TwoPhaseCommitPreparer":  reflect.ValueOf((*_github_com_litesql_go_ha_TwoPhaseCommitPreparer)(nil)),
@@ -424,6 +430,16 @@ func (W _github_com_litesql_go_ha_SQLiteHooksAdapter) EnableHooks(conn ha.SQLite
 }
 func (W _github_com_litesql_go_ha_SQLiteHooksAdapter) WrapConn(c driver.Conn, connector *ha.Connector) (ha.SQLiteConn, error) {
 	return W.WWrapConn(c, connector)
+}
+
+// _github_com_litesql_go_ha_SequenceNotifier is an interface wrapper for SequenceNotifier type
+type _github_com_litesql_go_ha_SequenceNotifier struct {
+	IValue       interface{}
+	WSeqNotifyCh func() <-chan struct{}
+}
+
+func (W _github_com_litesql_go_ha_SequenceNotifier) SeqNotifyCh() <-chan struct{} {
+	return W.WSeqNotifyCh()
 }
 
 // _github_com_litesql_go_ha_SequenceProvider is an interface wrapper for SequenceProvider type
